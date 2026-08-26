@@ -1,0 +1,64 @@
+name: Build debug APK
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      # Naming the APK after the project stops downloads from piling up
+      # as "app-debug(1).apk" in the phone's Downloads folder.
+      - name: Name the APK
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk \
+             "pixel-surface-lab-debug.apk"
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixel-surface-lab-debug
+          path: pixel-surface-lab-debug.apk
+
+      # A release asset is a direct .apk link, so it installs straight
+      # from the phone browser. Workflow artifacts are always served as
+      # a .zip, which Android will not install.
+      #
+      # One rolling tag is reused so the phone can bookmark
+      # /releases/latest and never need a new URL. Deleting first keeps
+      # the step idempotent: re-running a workflow reuses the same run
+      # number, which would otherwise collide with an existing tag.
+      - name: Publish APK as the rolling debug release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete debug-latest --yes --cleanup-tag || true
+          gh release create debug-latest \
+            "pixel-surface-lab-debug.apk" \
+            --title "Pixel Surface Lab debug (build ${{ github.run_number }})" \
+            --notes "Open this page on your phone and tap the .apk to install."

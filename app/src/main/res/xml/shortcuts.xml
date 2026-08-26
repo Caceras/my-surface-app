@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_surface"
+        android:shortcutId="alpha"
+        android:shortcutShortLabel="@string/shortcut_alpha">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.example.surfacelab.MainActivity"
+            android:targetPackage="com.example.surfacelab" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_surface"
+        android:shortcutId="beta"
+        android:shortcutShortLabel="@string/shortcut_beta">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.example.surfacelab.MainActivity"
+            android:targetPackage="com.example.surfacelab" />
+    </shortcut>
+
+</shortcuts>

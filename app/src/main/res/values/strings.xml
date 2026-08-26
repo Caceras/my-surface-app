@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pixel Surface Lab</string>
+    <string name="shortcut_alpha">First shortcut</string>
+    <string name="shortcut_beta">Second shortcut</string>
+</resources>
