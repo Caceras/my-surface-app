@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/OWNER/REPO/actions/workflows/build.yml">
-    <img src="https://github.com/OWNER/REPO/actions/workflows/build.yml/badge.svg" alt="Build debug APK">
+  <a href="https://github.com/Caceras/my-surface-app/actions/workflows/build.yml">
+    <img src="https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg" alt="Build debug APK">
   </a>
-  <a href="https://github.com/OWNER/REPO/releases/latest">
+  <a href="https://github.com/Caceras/my-surface-app/releases/latest">
     <img src="https://img.shields.io/badge/download-debug--latest.apk-38BDF8" alt="Download APK">
   </a>
   <img src="https://img.shields.io/badge/minSdk-26-152B3C" alt="minSdk 26">
@@ -62,7 +62,7 @@ Glance, Quick Share), which saves you going looking.
 ### Use this repo as-is
 
 ```bash
-git clone https://github.com/OWNER/REPO.git my-surface-app
+git clone https://github.com/Caceras/my-surface-app.git my-surface-app
 cd my-surface-app
 ./ship.sh          # creates your own repo and pushes
 ```
