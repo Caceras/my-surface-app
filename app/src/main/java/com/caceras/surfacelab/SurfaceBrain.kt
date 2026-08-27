@@ -22,8 +22,21 @@ interface SurfaceBrain {
     /** Ask the system to make the brain usable (for Nano: download the feature). */
     fun prepare(context: Context, onStatus: (BrainStatus) -> Unit)
 
-    /** Do the work. Answers on the main thread, always exactly once. */
-    fun run(context: Context, task: Task, input: String, onResult: (BrainResult) -> Unit)
+    /**
+     * Do the work. onPartial fires repeatedly with text as it is generated;
+     * onResult fires exactly once at the end. Both on the main thread.
+     *
+     * [instruction] is the user's own prompt for Task.ASK, and ignored for
+     * the presets, which carry their own.
+     */
+    fun run(
+        context: Context,
+        task: Task,
+        input: String,
+        instruction: String = "",
+        onPartial: (String) -> Unit = {},
+        onResult: (BrainResult) -> Unit
+    )
 }
 
 /**
@@ -33,6 +46,13 @@ interface SurfaceBrain {
  */
 enum class Task(val alias: String) {
     UPPERCASE("Uppercase"),
+
+    /** Free-form. The user types the prompt; the selection is the material. */
+    ASK("Ask"),
+
+    // Presets. These are ordinary prompts with a fixed system instruction --
+    // there is nothing special about them, and adding your own is one entry
+    // here plus one manifest alias.
     SUMMARIZE("Summarize"),
     PROOFREAD("Proofread"),
     REWRITE("Rewrite");

@@ -7,6 +7,7 @@
     <!-- Labels shown in the text-selection popup. Keep them short: the
          popup truncates hard and the overflow is already crowded. -->
     <string name="task_uppercase">Uppercase</string>
+    <string name="task_ask">Ask Nano</string>
     <string name="task_summarize">Summarise</string>
     <string name="task_proofread">Proofread</string>
     <string name="task_rewrite">Make professional</string>
@@ -16,4 +17,8 @@
     <string name="close">Close</string>
     <string name="replace">Replace selection</string>
     <string name="nothing_selected">Nothing selected.</string>
+    <string name="ask_hint">Ask anything about the selected text</string>
+    <string name="send">Send</string>
+    <string name="cancel">Cancel</string>
+    <string name="ask_title">Ask Nano</string>
 </resources>

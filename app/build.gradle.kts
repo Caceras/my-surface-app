@@ -47,9 +47,12 @@ dependencies {
     // "core" declares nothing, on purpose -- that invariant is enforced by
     // tools/verify.py and is the reason this template builds first time.
     //
-    // The GenAI APIs talk to Android AICore, the system service that hosts
-    // Gemini Nano. No model ships inside the APK; nothing leaves the device.
-    "nanoImplementation"("com.google.mlkit:genai-summarization:1.0.0-beta1")
-    "nanoImplementation"("com.google.mlkit:genai-proofreading:1.0.0-beta1")
-    "nanoImplementation"("com.google.mlkit:genai-rewriting:1.0.0-beta1")
+    // One artifact, because the Prompt API is a general generative client:
+    // free-form prompts, system instructions, temperature, streaming. The
+    // task-shaped siblings (genai-summarization and friends) are a narrower
+    // API for the same model and are not needed once you can prompt it.
+    //
+    // It talks to Android AICore, the system service that hosts Gemini Nano.
+    // No model ships inside the APK; nothing leaves the device.
+    "nanoImplementation"("com.google.mlkit:genai-prompt:1.0.0-beta4")
 }

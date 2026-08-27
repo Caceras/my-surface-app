@@ -18,9 +18,14 @@
 
 ## What this is
 
-Select text in any app on your Pixel, tap **Summarise**, and get an answer from
-a model running on the phone itself. No account, no API key, no network — turn
-off wifi and mobile data and it still works.
+Select text in any app on your Pixel, tap **Ask Nano**, and type whatever you
+want to ask about it. The answer streams back from a model running on the phone
+itself — no account, no API key, no network. Turn off wifi and mobile data and
+it still works.
+
+It is a prompt box, not a fixed menu. Summarise, Proofread and Make professional
+are there too, but they are ordinary prompts with a system instruction, defined
+in one small file you can edit.
 
 Getting there normally means Android Studio, an SDK install, a Gradle fight and
 a pile of AICore boilerplate. Here it is one script and a push. Roughly five
@@ -40,10 +45,11 @@ failures which would otherwise cost you a CI round trip each.
 
 | | `core` | `nano` |
 |---|---|---|
-| Dependencies | **none** | 3 ML Kit GenAI artifacts |
-| Text-selection actions | Uppercase | **Summarise, Proofread, Make professional** |
+| Dependencies | **none** | one: `com.google.mlkit:genai-prompt` |
+| Text-selection actions | Uppercase | **Ask** + Summarise, Proofread, Make professional |
+| Prompting | — | **free-form**, streaming, with system instructions |
 | Model | none | Gemini Nano, via Android AICore |
-| APK size | ~2.6 MB | ~10 MB |
+| APK size | ~2.6 MB | ~20 MB |
 | Runs on | any Android 10+ device | supported Pixels with AICore |
 | Network | never | **never** |
 
@@ -71,9 +77,10 @@ tile and the widget have no idea which implementation they got.
 | Share sheet target | `share` | Share anything → app row | all |
 | Text selection action | `processtext` | Select text → popup overflow | 23+ |
 
-In the `nano` build these stop being demos: the tile reports whether Nano is
-present and downloads it on tap, the widget shows the last result, and anything
-shared into the app can be summarised on device.
+In the `nano` build these stop being demos: the launcher screen is a working
+prompt box, the tile reports whether Nano is present and downloads it on tap,
+the widget shows the last answer, and anything shared into the app arrives as
+material for a prompt.
 
 **One activity, several menu items.** The text-selection popup shows one entry
 per exported `<activity-alias>`, so three actions cost three manifest entries
@@ -88,23 +95,27 @@ Glance, Quick Share), which saves you going looking.
 
 ---
 
-## Read this before you expect it to work in Swedish
+## Why the Prompt API and not the task APIs
 
-The on-device models have a fixed language list and it is short:
+ML Kit also ships `genai-summarization`, `genai-proofreading` and
+`genai-rewriting`: one narrow client per task. They are easier to reach for and
+they are a trap — each is **capped at English, Japanese and Korean** (four more
+European languages for proofread and rewrite) and cannot be asked anything
+outside its one job.
 
-| Task | Languages |
-|---|---|
-| Summarise | English, Japanese, Korean |
-| Proofread / Rewrite | English, Japanese, Korean, German, French, Italian, Spanish |
+`genai-prompt` is the same model with the lid off: any prompt, any language,
+system instructions, temperature, streaming, and multimodal input. This repo
+uses it exclusively, which is also why `nano` has exactly one dependency.
 
-No Swedish, no Nordic languages at all. The app detects likely Swedish input and
-says so rather than handing back confident nonsense. If you need Swedish on
-device, the path is a bundled open-weights model through MediaPipe or LiteRT-LM,
-not these APIs — see [`docs/ai.md`](docs/ai.md).
+That is not a promise of quality in every language. Nano is a small model
+trained mostly on English, and it will answer Swedish fluently enough to be
+misleading. The app notes that once, on likely Nordic input, and gets out of the
+way. If Swedish output quality actually matters, the path is a bundled
+open-weights model through MediaPipe or LiteRT-LM — see [`docs/ai.md`](docs/ai.md).
 
-Gemini Nano also needs a supported Pixel with a **locked bootloader** and a
-current Android AICore. On anything else the app degrades to a clear message
-instead of a crash.
+Gemini Nano needs a supported Pixel with a **locked bootloader** and a current
+Android AICore. On anything else the app degrades to a clear message instead of
+a crash.
 
 ---
 
@@ -140,7 +151,8 @@ here, in `app/src/nano/`.
 3. Allow installs from Chrome when prompted.
 4. Open the app and press **Check / prepare on-device model**. First run
    downloads the feature; after that it is offline forever.
-5. Select some English text anywhere and look in the popup overflow.
+5. Type something in the **Ask** box to confirm it answers.
+6. Then select text anywhere in any app and look in the popup overflow.
 
 > **Why the release and not the artifact?** GitHub always serves workflow
 > artifacts as a `.zip`, and Android will not install a zip. A release asset is
@@ -182,9 +194,9 @@ CI runs both scripts before it will start a build.
 ```
 ├── app/
 │   └── src/
-│       ├── main/         shared: surfaces, SurfaceBrain interface, storage
+│       ├── main/         surfaces, SurfaceBrain interface, Prompts.kt, storage
 │       ├── core/         zero-dependency brain + its manifest entry
-│       └── nano/         Gemini Nano brain + its three manifest entries
+│       └── nano/         Prompt API brain + its four manifest entries
 ├── tools/
 │   ├── scaffold.py       generates a new surface app
 │   ├── verify.py         static pre-flight checks
@@ -209,9 +221,13 @@ APIs only, and `verify.py` enforces it, so a stray `import androidx.…` fails
 locally in two seconds rather than in CI in three minutes. Every dependency in
 this project lives in exactly one place: the `nano` flavour.
 
-**No model in the APK.** The GenAI APIs call Android AICore, a system service.
+**No model in the APK.** The Prompt API calls Android AICore, a system service.
 Nothing is bundled and nothing is downloaded by this app — which is why `nano`
-is 10 MB rather than several hundred.
+is 20 MB rather than several hundred.
+
+**Presets are data, not features.** Every built-in action is a system
+instruction in `Prompts.kt`. Adding one is an enum entry, a line of prompt text
+and a manifest alias. No new classes, no changes to any surface.
 
 **No Gradle wrapper.** The workflow installs Gradle directly via
 `gradle/actions/setup-gradle`, avoiding a committed binary `gradle-wrapper.jar`.

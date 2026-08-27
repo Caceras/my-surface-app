@@ -4,6 +4,18 @@
     <application>
 
         <activity-alias
+            android:name=".Ask"
+            android:targetActivity=".ProcessTextActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_surface"
+            android:label="@string/task_ask">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
             android:name=".Summarize"
             android:targetActivity=".ProcessTextActivity"
             android:exported="true"

@@ -31,6 +31,8 @@ private object CoreBrain : SurfaceBrain {
         context: Context,
         task: Task,
         input: String,
+        instruction: String,
+        onPartial: (String) -> Unit,
         onResult: (BrainResult) -> Unit
     ) {
         onResult(BrainResult(input.uppercase(Locale.getDefault()), ok = true))

@@ -4,9 +4,14 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.text.InputType
+import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 
 /**
@@ -14,74 +19,141 @@ import android.widget.Toast
  * <activity-alias> the flavour registers. Which alias was tapped is read back
  * off the incoming component name, so one activity serves every task.
  *
+ * "Ask" opens a prompt box first: the selection is the material, the user
+ * supplies the question. The presets skip that step and send a fixed system
+ * instruction instead.
+ *
  * Returning EXTRA_PROCESS_TEXT replaces the selection in place, but only when
  * the source field is editable -- EXTRA_PROCESS_TEXT_READONLY says which case
  * this is, and getting it wrong is how these actions silently do nothing.
  */
 class ProcessTextActivity : Activity() {
 
-    private var working: AlertDialog? = null
+    private var dialog: AlertDialog? = null
+    private var readOnly = false
+    private lateinit var selection: String
+    private lateinit var task: Task
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val selected = intent
+        selection = intent
             .getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
             ?.toString()
             .orEmpty()
             .trim()
 
-        val readOnly = intent
-            .getBooleanExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false)
+        readOnly = intent.getBooleanExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false)
+        task = Task.fromComponent(componentName?.className)
 
-        if (selected.isEmpty()) {
+        if (selection.isEmpty()) {
             Toast.makeText(this, R.string.nothing_selected, Toast.LENGTH_SHORT).show()
             finish()
             return
         }
 
-        val task = Task.fromComponent(componentName?.className)
+        if (task == Task.ASK) ask() else send("")
+    }
 
-        working = AlertDialog.Builder(this, DIALOG_THEME)
-            .setMessage(getString(R.string.working))
+    /** Free-form: the user writes the prompt, the selection is the material. */
+    private fun ask() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.ask_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or
+                InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            maxLines = 4
+        }
+
+        val preview = TextView(this).apply {
+            text = if (selection.length > 220) selection.take(217) + "..." else selection
+            textSize = 13f
+            alpha = 0.6f
+            setPadding(0, 24, 0, 0)
+        }
+
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(56, 32, 56, 0)
+            addView(input)
+            addView(preview)
+        }
+
+        dialog = AlertDialog.Builder(this, DIALOG_THEME)
+            .setTitle(R.string.ask_title)
+            .setView(body)
+            .setPositiveButton(R.string.send) { _, _ ->
+                send(input.text.toString())
+            }
+            .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
+            .setOnDismissListener { if (dialog != null) finish() }
+            .show()
+    }
+
+    private fun send(instruction: String) {
+        dialog?.setOnDismissListener(null)
+        dialog?.dismiss()
+
+        // The streaming dialog is the progress indicator: text lands in it as
+        // the model produces it, so there is never a blank spinner.
+        val stream = TextView(this).apply {
+            text = getString(R.string.working)
+            textSize = 15f
+            setPadding(56, 32, 56, 16)
+        }
+        val scroll = ScrollView(this).apply {
+            addView(
+                stream,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        dialog = AlertDialog.Builder(this, DIALOG_THEME)
+            .setTitle(task.alias)
+            .setView(scroll)
             .setCancelable(false)
+            .setNegativeButton(R.string.close) { d, _ -> d.dismiss() }
+            .setOnDismissListener { finish() }
             .show()
 
-        BrainProvider.get().run(this, task, selected) { result ->
-            working?.dismiss()
-            working = null
-
-            if (result.ok) {
-                ResultStore.save(this, task, result.text)
+        BrainProvider.get().run(
+            context = this,
+            task = task,
+            input = selection,
+            instruction = instruction,
+            onPartial = { partial ->
+                stream.text = partial
+                scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
             }
-
-            val caveat = result.note ?: Lang.caveat(task, selected)
+        ) { result ->
+            if (result.ok) ResultStore.save(this, task, result.text)
+            val note = result.note ?: Lang.caveat(task, selection)
 
             // Replacing the selection is the better outcome, but only when
             // there is nothing the user needs to read first.
-            if (!readOnly && result.ok && caveat == null) {
+            if (!readOnly && result.ok && note == null && task != Task.ASK) {
+                dialog?.setOnDismissListener(null)
+                dialog?.dismiss()
                 setResult(
                     RESULT_OK,
                     Intent().putExtra(Intent.EXTRA_PROCESS_TEXT, result.text)
                 )
                 finish()
             } else {
-                show(task, result, caveat, readOnly)
+                dialog?.setOnDismissListener(null)
+                dialog?.dismiss()
+                show(result, note)
             }
         }
     }
 
-    private fun show(
-        task: Task,
-        result: BrainResult,
-        caveat: String?,
-        readOnly: Boolean
-    ) {
+    private fun show(result: BrainResult, note: String?) {
         val body = buildString {
             if (result.ok) append(result.text)
-            if (caveat != null) {
+            if (note != null) {
                 if (isNotEmpty()) append("\n\n")
-                append(caveat)
+                append(note)
             }
         }
 
@@ -93,8 +165,8 @@ class ProcessTextActivity : Activity() {
 
         if (result.ok) {
             builder.setPositiveButton(R.string.copy) { d, _ ->
-                val clip = getSystemService(ClipboardManager::class.java)
-                clip.setPrimaryClip(ClipData.newPlainText(task.alias, result.text))
+                getSystemService(ClipboardManager::class.java)
+                    .setPrimaryClip(ClipData.newPlainText(task.alias, result.text))
                 d.dismiss()
             }
             if (!readOnly) {
@@ -108,13 +180,14 @@ class ProcessTextActivity : Activity() {
             }
         }
 
-        builder.show()
+        dialog = builder.show()
     }
 
     override fun onDestroy() {
         // A dialog still showing when the activity goes away leaks its window.
-        working?.dismiss()
-        working = null
+        dialog?.setOnDismissListener(null)
+        dialog?.dismiss()
+        dialog = null
         super.onDestroy()
     }
 

@@ -188,14 +188,14 @@ pointing at an activity that already exists.
 ```
 
 The activity reads `componentName.className` to learn which alias was tapped.
-Three actions, three manifest entries, zero extra classes.
+Four actions, four manifest entries, zero extra classes.
 
 Two traps:
 
 - The **target** activity must be declared in the manifest too, and can be
   `android:exported="false"` — the alias carries the export.
 - Put the aliases in a **flavour** manifest and the menu differs per build,
-  which is how `core` shows one action and `nano` shows three. The merger
+  which is how `core` shows one action and `nano` shows four. The merger
   combines them; nothing in `src/main` needs to know.
 
 Labels are truncated hard in that popup. Two words is the practical limit.

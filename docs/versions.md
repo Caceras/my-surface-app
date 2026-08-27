@@ -14,7 +14,7 @@ Gradle, AGP, the JDK and `compileSdk` all constrain each other. Nearly every
 | Java source/target | 17 | `app/build.gradle.kts` |
 | compileSdk / targetSdk | 36 | `app/build.gradle.kts` |
 | minSdk | 29 | `app/build.gradle.kts` |
-| ML Kit GenAI | 1.0.0-beta1 | `app/build.gradle.kts` (`nano` only) |
+| ML Kit Prompt API | 1.0.0-beta4 | `app/build.gradle.kts` (`nano` only) |
 
 `compileSdk 37` is available. 36 is deliberate: it is the current-minus-one that
 every CI image and local SDK already has, and bumping it is a one-line change
@@ -52,10 +52,16 @@ The workflow is missing `permissions: contents: write`. `verify.py` checks for
 this because the error message does not say it.
 
 **`compileNanoDebugKotlin` fails with unresolved ML Kit symbols**
-The dependency lines are `"nanoImplementation"(...)`, in quotes, because the
-flavour configurations do not exist until the flavours are declared. Moving them
+The dependency line is `"nanoImplementation"(...)`, in quotes, because the
+flavour configurations do not exist until the flavours are declared. Moving it
 to plain `implementation(...)` would pull ML Kit into `core` and break the
 zero-dependency invariant.
+
+**Mixing `genai-prompt` with `genai-summarization` and friends**
+They are on different release trains (beta4 versus beta1) and share
+`genai-common`, so Gradle resolves one `genai-common` for both and the older
+clients can break against it. Pick one family. This repo uses `genai-prompt`
+alone.
 
 ## Bumping safely
 
