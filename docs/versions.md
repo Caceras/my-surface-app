@@ -1,69 +1,65 @@
-# Toolchain versions and build failures
+# Toolchain versions
 
-The versions pinned in `scripts/scaffold.py` were current when the skill was
-written and will age. Android's build tooling is tightly coupled — Gradle, the
-Android Gradle Plugin (AGP), the Kotlin plugin, the JDK, and `compileSdk` each
-constrain the others — so the majority of first-build failures are version skew
-rather than anything wrong with the generated code.
+Gradle, AGP, the JDK and `compileSdk` all constrain each other. Nearly every
+"this repo is broken" report is version skew, not code.
 
-## Current pins
+## What this repo builds with
 
-| Component | Value | Constrained by |
+| Piece | Version | Set in |
 |---|---|---|
-| Gradle | 8.9 | AGP requires a minimum Gradle version |
-| AGP | 8.6.0 | Determines the maximum supported `compileSdk` |
-| Kotlin plugin | 2.0.20 | Must be compatible with AGP |
-| JDK | 17 | AGP 8.x requires 17+ |
-| `compileSdk` / `targetSdk` | 35 | Must be ≤ what AGP supports |
-| `minSdk` | 26 | Chosen for API availability, not a constraint |
+| Gradle | 9.7.1 | `.github/workflows/build.yml`, `tools/scaffold.py` |
+| Android Gradle Plugin | 9.3.2 | `build.gradle.kts` |
+| Kotlin | built into AGP 9 | — |
+| JDK (build) | 21 | `.github/workflows/build.yml` |
+| Java source/target | 17 | `app/build.gradle.kts` |
+| compileSdk / targetSdk | 36 | `app/build.gradle.kts` |
+| minSdk | 29 | `app/build.gradle.kts` |
+| ML Kit GenAI | 1.0.0-beta1 | `app/build.gradle.kts` (`nano` only) |
 
-Change these in the constants block near the top of `scripts/scaffold.py`.
+`compileSdk 37` is available. 36 is deliberate: it is the current-minus-one that
+every CI image and local SDK already has, and bumping it is a one-line change
+when you want it.
 
-## Mapping errors to fixes
+## Error → fix
 
-**"Android Gradle plugin requires Java 17 to run. You are currently using Java N"**
-Raise `java-version` in the workflow's `setup-java` step.
+**`Minimum supported Gradle version is 9.5.0. Current version is 9.4.1.`**
+AGP 9.3 requires Gradle 9.5+. Raise the `gradle-version` in the workflow, and
+locally `brew upgrade gradle` (or your equivalent). There is no wrapper in this
+repo by design, so your own Gradle is the one that matters.
 
-**"Minimum supported Gradle version is X. Current version is Y"**
-Raise `GRADLE_VERSION` to at least X.
+**`The 'org.jetbrains.kotlin.android' plugin is no longer required for Kotlin
+support since AGP 9.0.`**
+Not a warning — the build fails. Delete the plugin from both `build.gradle.kts`
+files. AGP 9 has Kotlin built in and takes its JVM target from `compileOptions`,
+so the old `kotlinOptions { jvmTarget = "17" }` block goes too.
 
-**"compileSdk N is not supported by this version of the Android Gradle Plugin"**
-Either raise `AGP_VERSION`, or lower `COMPILE_SDK` to what the current AGP
-supports. As a stopgap, `android.suppressUnsupportedCompileSdk=<N>` in
-`gradle.properties` silences the check — useful to get unblocked, but it is
-suppressing a real incompatibility, so prefer bumping AGP.
+**`Unsupported class file major version` / `Unsupported Java`**
+The JDK is newer or older than the AGP expects. Use Temurin 21 for AGP 9.
 
-**"This version of the Kotlin Gradle plugin is not compatible with AGP"**
-Move `KOTLIN_VERSION` to a release that matches the AGP major version.
+**`Installed Build Tools revision X is corrupted`**
+Delete `~/Library/Android/sdk/build-tools/X` and let the build re-download it.
 
-**"Could not resolve com.android.tools.build:gradle:X"**
-Usually a version that does not exist — check the exact AGP version string, and
-confirm `google()` is present in `settings.gradle.kts` `pluginManagement`.
+**`INSTALL_FAILED_UPDATE_INCOMPATIBLE`**
+The APK on the phone was signed with a different key — usually a local build
+meeting a CI build. Uninstall first. See `delivery.md`.
 
-**"SDK location not found" (local builds only)**
-Android Studio writes `local.properties`; it is gitignored deliberately. The CI
-build does not need it because `setup-android` sets `ANDROID_HOME`.
+**`Failed to find Build Tools revision` in CI**
+`android-actions/setup-android@v3` installs what `compileSdk` asks for. If you
+raise `compileSdk`, nothing else needs to change.
 
-**"INSTALL_FAILED_UPDATE_INCOMPATIBLE" (on the phone, not in CI)**
-Not a build failure. The installed app was signed with a different key.
-Uninstall the existing app first. This commonly happens when switching between
-a locally built APK and a CI-built one, because the debug keystores differ.
+**Release step fails with 403**
+The workflow is missing `permissions: contents: write`. `verify.py` checks for
+this because the error message does not say it.
 
-**"App not installed" with no further detail**
-Usually the downloaded file was a workflow artifact `.zip` rather than the
-release `.apk`. Check what was actually downloaded before debugging further.
+**`compileNanoDebugKotlin` fails with unresolved ML Kit symbols**
+The dependency lines are `"nanoImplementation"(...)`, in quotes, because the
+flavour configurations do not exist until the flavours are declared. Moving them
+to plain `implementation(...)` would pull ML Kit into `core` and break the
+zero-dependency invariant.
 
-## Verifying a version combination
+## Bumping safely
 
-Rather than guessing at compatible versions, check the AGP release notes, which
-state the required Gradle version and supported `compileSdk` for each release.
-If the user has web access available, look it up rather than iterating through
-failed CI runs — each round trip is several minutes.
-
-## Making CI faster
-
-The first run is slow because it downloads Gradle, the SDK, and the platform
-JAR. `gradle/actions/setup-gradle` caches Gradle distributions and build caches
-across runs automatically, so subsequent pushes are substantially quicker. If
-iteration speed becomes the bottleneck, building locally in Android Studio and
-installing over USB beats waiting on CI.
+1. Change one thing.
+2. `python tools/verify.py . && python tools/test_verify.py`
+3. `gradle assembleCoreDebug assembleNanoDebug`
+4. Commit. If CI disagrees with your machine, the JDK is the usual difference.

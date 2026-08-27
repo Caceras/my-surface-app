@@ -163,3 +163,39 @@ They are not, and it saves time to say so directly:
   but not extensible in place. App Actions via `shortcuts.xml` capabilities are
   the supported hook, and the surface has been repeatedly reworked.
 - **Lock screen** — no general widget support on modern Android.
+
+---
+
+## Several menu items from one activity
+
+The text-selection popup renders one entry per exported component with a
+`PROCESS_TEXT` filter. That does **not** mean one class per action: an
+`<activity-alias>` is a manifest-only entry with its own label and filter,
+pointing at an activity that already exists.
+
+```xml
+<activity-alias
+    android:name=".Summarize"
+    android:targetActivity=".ProcessTextActivity"
+    android:exported="true"
+    android:label="@string/task_summarize">
+    <intent-filter>
+        <action android:name="android.intent.action.PROCESS_TEXT" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="text/plain" />
+    </intent-filter>
+</activity-alias>
+```
+
+The activity reads `componentName.className` to learn which alias was tapped.
+Three actions, three manifest entries, zero extra classes.
+
+Two traps:
+
+- The **target** activity must be declared in the manifest too, and can be
+  `android:exported="false"` — the alias carries the export.
+- Put the aliases in a **flavour** manifest and the menu differs per build,
+  which is how `core` shows one action and `nano` shows three. The merger
+  combines them; nothing in `src/main` needs to know.
+
+Labels are truncated hard in that popup. Two words is the practical limit.

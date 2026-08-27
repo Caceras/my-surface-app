@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Tests for verify.py: prove it actually catches what it claims to.
+
+A checker nobody tests is a checker that quietly stops checking. Each case
+below scaffolds a throwaway project, breaks exactly one thing, and asserts a
+non-zero exit.
+
+Usage:
+    python tools/test_verify.py
+"""
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+PY = sys.executable
+
+
+def scaffold(dest):
+    subprocess.run(
+        [PY, os.path.join(HERE, "scaffold.py"),
+         "--out", dest,
+         "--package", "com.example.probe",
+         "--app-name", "Probe",
+         "--surface", "tile"],
+        check=True, capture_output=True,
+    )
+
+
+def verify(project):
+    return subprocess.run(
+        [PY, os.path.join(HERE, "verify.py"), project],
+        capture_output=True, text=True,
+    )
+
+
+def edit(path, find, replace):
+    with open(path, encoding="utf-8") as fh:
+        body = fh.read()
+    assert find in body, f"fixture drifted: {find!r} not in {path}"
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(body.replace(find, replace, 1))
+
+
+def case(name, break_it):
+    work = tempfile.mkdtemp(prefix="verify-test-")
+    project = os.path.join(work, "probe")
+    try:
+        scaffold(project)
+        clean = verify(project)
+        if clean.returncode != 0:
+            return f"FAIL {name}: the untouched scaffold did not pass\n{clean.stdout}"
+        break_it(project)
+        broken = verify(project)
+        if broken.returncode == 0:
+            return f"FAIL {name}: the broken project still passed"
+        return f"ok   {name}"
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def kotlin_file(project):
+    src = os.path.join(project, "app", "src", "main", "java")
+    for base, _, names in os.walk(src):
+        for n in names:
+            if n.endswith(".kt"):
+                return os.path.join(base, n)
+    raise AssertionError("no Kotlin source in the scaffold")
+
+
+def manifest(project):
+    return os.path.join(project, "app", "src", "main", "AndroidManifest.xml")
+
+
+def dangling_resource(project):
+    path = kotlin_file(project)
+    with open(path, encoding="utf-8") as fh:
+        body = fh.read()
+    body = body.replace("R.string.app_name", "R.string.does_not_exist")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(body)
+
+
+def forbidden_import(project):
+    path = kotlin_file(project)
+    with open(path, encoding="utf-8") as fh:
+        body = fh.read()
+    lines = body.split("\n")
+    for i, line in enumerate(lines):
+        if line.startswith("import "):
+            lines.insert(i, "import androidx.core.app.NotificationCompat")
+            break
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines))
+
+
+def broken_xml(project):
+    with open(manifest(project), "a", encoding="utf-8") as fh:
+        fh.write("<not-closed>")
+
+
+def missing_exported(project):
+    edit(manifest(project), 'android:exported="true"', 'android:label="@string/app_name"')
+
+
+def missing_launcher(project):
+    edit(manifest(project), "android.intent.category.LAUNCHER",
+         "android.intent.category.DEFAULT")
+
+
+def workflow_without_permission(project):
+    path = os.path.join(project, ".github", "workflows", "build.yml")
+    edit(path, "contents: write", "contents: read")
+
+
+CASES = [
+    ("dangling resource reference", dangling_resource),
+    ("import with no dependency", forbidden_import),
+    ("malformed XML", broken_xml),
+    ("intent-filter without exported", missing_exported),
+    ("no launcher activity", missing_launcher),
+    ("workflow without contents: write", workflow_without_permission),
+]
+
+
+def main():
+    results = [case(name, fn) for name, fn in CASES]
+    for line in results:
+        print(line)
+    failures = [r for r in results if r.startswith("FAIL")]
+    print()
+    print(f"{len(results) - len(failures)}/{len(results)} passed")
+    sys.exit(1 if failures else 0)
+
+
+if __name__ == "__main__":
+    main()

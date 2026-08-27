@@ -1,4 +1,4 @@
-package com.example.surfacelab
+package com.caceras.surfacelab
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -12,8 +12,9 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Home screen widget. Tapping it fires a broadcast back to this provider,
- * which refreshes the timestamp -- enough to prove the round trip works.
+ * Home screen widget showing the most recent result. A widget has no process
+ * of its own, so everything it displays has to come from storage -- see
+ * ResultStore. Tapping it refreshes via a broadcast back to this provider.
  */
 class DemoWidgetProvider : AppWidgetProvider() {
 
@@ -37,8 +38,10 @@ class DemoWidgetProvider : AppWidgetProvider() {
     }
 
     private fun push(context: Context, manager: AppWidgetManager, id: Int) {
-        val stamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-            .format(Date())
+        val last = ResultStore.lastText(context)
+        val title = ResultStore.lastTask(context) ?: context.getString(R.string.app_name)
+        val value = last?.let { if (it.length > 160) it.take(157) + "..." else it }
+            ?: SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
 
         val refresh = Intent(context, DemoWidgetProvider::class.java)
             .setAction(ACTION_REFRESH)
@@ -53,11 +56,8 @@ class DemoWidgetProvider : AppWidgetProvider() {
         )
 
         val views = RemoteViews(context.packageName, R.layout.widget).apply {
-            setTextViewText(
-                R.id.widget_title,
-                context.getString(R.string.app_name)
-            )
-            setTextViewText(R.id.widget_value, stamp)
+            setTextViewText(R.id.widget_title, title)
+            setTextViewText(R.id.widget_value, value)
             setOnClickPendingIntent(R.id.widget_root, pending)
         }
 
@@ -65,6 +65,6 @@ class DemoWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        const val ACTION_REFRESH = "com.example.surfacelab.WIDGET_REFRESH"
+        const val ACTION_REFRESH = "com.caceras.surfacelab.WIDGET_REFRESH"
     }
 }

@@ -1,0 +1,37 @@
+name: On-device AI problem
+description: Gemini Nano is unavailable, or a result is wrong
+labels: ["ai"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [docs/ai.md](../../blob/main/docs/ai.md) first. The two most common
+        answers: the language is not supported (there is no Swedish), or the
+        device has an unlocked bootloader.
+  - type: input
+    id: status
+    attributes:
+      label: What the tile subtitle or the app's status line says
+      placeholder: "Model not downloaded - tap to fetch it"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: "Pixel 10 Pro XL"
+    validations:
+      required: true
+  - type: dropdown
+    id: task
+    attributes:
+      label: Task
+      options: ["Summarise", "Proofread", "Make professional", "All of them"]
+    validations:
+      required: true
+  - type: input
+    id: language
+    attributes:
+      label: Language of the selected text
+    validations:
+      required: true

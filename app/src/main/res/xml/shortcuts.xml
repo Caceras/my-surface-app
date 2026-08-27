@@ -8,8 +8,8 @@
         android:shortcutShortLabel="@string/shortcut_alpha">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetClass="com.example.surfacelab.MainActivity"
-            android:targetPackage="com.example.surfacelab" />
+            android:targetClass="com.caceras.surfacelab.MainActivity"
+            android:targetPackage="com.caceras.surfacelab" />
     </shortcut>
 
     <shortcut
@@ -19,8 +19,8 @@
         android:shortcutShortLabel="@string/shortcut_beta">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetClass="com.example.surfacelab.MainActivity"
-            android:targetPackage="com.example.surfacelab" />
+            android:targetClass="com.caceras.surfacelab.MainActivity"
+            android:targetPackage="com.caceras.surfacelab" />
     </shortcut>
 
 </shortcuts>

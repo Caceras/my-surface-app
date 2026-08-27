@@ -1,0 +1,39 @@
+name: Build failure
+description: The build fails locally or in CI
+labels: ["build"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most build failures are toolchain version skew. Please check
+        [docs/versions.md](../../blob/main/docs/versions.md) first — it maps the
+        common error strings to the fix.
+  - type: input
+    id: error
+    attributes:
+      label: The exact error line
+      placeholder: "Minimum supported Gradle version is 9.5.0."
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: Output of `gradle --version` and `java -version`
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options: ["Local", "GitHub Actions", "Both"]
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: "`python tools/verify.py .` passes"
+        - label: "`python tools/test_verify.py` passes"

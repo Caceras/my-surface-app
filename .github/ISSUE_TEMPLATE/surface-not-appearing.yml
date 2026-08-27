@@ -1,0 +1,38 @@
+name: A surface does not appear
+description: The tile, widget, shortcut, share target or text action is missing
+labels: ["surface"]
+body:
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface
+      options:
+        - Quick Settings tile
+        - Home screen widget
+        - App shortcuts
+        - Share sheet target
+        - Text selection action
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: "Pixel 10 Pro XL, Android 16"
+    validations:
+      required: true
+  - type: dropdown
+    id: flavour
+    attributes:
+      label: Which build
+      options: ["core", "nano", "both"]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Where you looked
+      description: |
+        docs/surfaces.md lists where each surface appears and what hides it.
+    validations:
+      required: true

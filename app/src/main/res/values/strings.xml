@@ -3,4 +3,17 @@
     <string name="app_name">Pixel Surface Lab</string>
     <string name="shortcut_alpha">First shortcut</string>
     <string name="shortcut_beta">Second shortcut</string>
+
+    <!-- Labels shown in the text-selection popup. Keep them short: the
+         popup truncates hard and the overflow is already crowded. -->
+    <string name="task_uppercase">Uppercase</string>
+    <string name="task_summarize">Summarise</string>
+    <string name="task_proofread">Proofread</string>
+    <string name="task_rewrite">Make professional</string>
+
+    <string name="working">Working on device\u2026</string>
+    <string name="copy">Copy</string>
+    <string name="close">Close</string>
+    <string name="replace">Replace selection</string>
+    <string name="nothing_selected">Nothing selected.</string>
 </resources>

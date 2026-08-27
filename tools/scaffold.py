@@ -24,16 +24,16 @@ SURFACES = ["tile", "widget", "shortcuts", "share", "processtext"]
 
 # Toolchain versions. If a build fails with a plugin/compileSdk compatibility
 # error, bump these together -- see references/versions.md.
-GRADLE_VERSION = "8.9"
-AGP_VERSION = "8.6.0"
-KOTLIN_VERSION = "2.0.20"
+GRADLE_VERSION = "9.7.1"
+AGP_VERSION = "9.3.2"
 JAVA_VERSION = "17"
+CI_JDK = "21"
 
 # minSdk 29 is deliberate, not arbitrary: Tile.setSubtitle() is API 29 and
 # Context.getMainExecutor() is API 28. Lowering it still compiles but crashes
 # at runtime on older devices with NoSuchMethodError.
-COMPILE_SDK = 35
-TARGET_SDK = 35
+COMPILE_SDK = 36
+TARGET_SDK = 36
 MIN_SDK = 29
 
 BRAND_ACCENT = "#2E7D9A"
@@ -124,8 +124,9 @@ def skeleton(files, pkg, app_name):
 
     w(files, "build.gradle.kts", f"""
         plugins {{
+            // AGP 9 ships Kotlin support built in. Applying the separate
+            // org.jetbrains.kotlin.android plugin now fails the build.
             id("com.android.application") version "{AGP_VERSION}" apply false
-            id("org.jetbrains.kotlin.android") version "{KOTLIN_VERSION}" apply false
         }}
     """)
 
@@ -140,7 +141,6 @@ def skeleton(files, pkg, app_name):
     w(files, "app/build.gradle.kts", f"""
         plugins {{
             id("com.android.application")
-            id("org.jetbrains.kotlin.android")
         }}
 
         android {{
@@ -166,12 +166,8 @@ def skeleton(files, pkg, app_name):
                 targetCompatibility = JavaVersion.VERSION_{JAVA_VERSION}
             }}
 
-            // Deprecated in Kotlin 2.0, removed in 2.2. If KOTLIN_VERSION is
-            // raised to 2.2+, replace this with a top-level:
-            //   kotlin {{ compilerOptions {{ jvmTarget.set(JvmTarget.JVM_{JAVA_VERSION}) }} }}
-            kotlinOptions {{
-                jvmTarget = "{JAVA_VERSION}"
-            }}
+            // AGP 9's built-in Kotlin takes its JVM target from
+            // compileOptions above, so there is nothing else to set.
         }}
 
         // Deliberately no dependencies: everything here uses framework APIs only,
@@ -279,7 +275,7 @@ def workflow(files, app_name, slug):
               - uses: actions/setup-java@v4
                 with:
                   distribution: temurin
-                  java-version: "{JAVA_VERSION}"
+                  java-version: "{CI_JDK}"
 
               - uses: android-actions/setup-android@v3
 

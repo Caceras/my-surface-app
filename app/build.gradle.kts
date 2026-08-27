@@ -1,18 +1,34 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 android {
-    namespace = "com.example.surfacelab"
-    compileSdk = 35
+    namespace = "com.caceras.surfacelab"
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.surfacelab"
+        applicationId = "com.caceras.surfacelab"
         minSdk = 29
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 36
+        versionCode = 2
+        versionName = "2.0"
+    }
+
+    // Two builds of the same app. "core" is the original zero-dependency
+    // template. "nano" adds on-device Gemini Nano and is the only place any
+    // dependency is allowed to exist. The suffixed application id lets both
+    // sit on the phone at once for a side-by-side comparison.
+    flavorDimensions += "brain"
+    productFlavors {
+        create("core") {
+            dimension = "brain"
+            versionNameSuffix = "-core"
+        }
+        create("nano") {
+            dimension = "brain"
+            applicationIdSuffix = ".nano"
+            versionNameSuffix = "-nano"
+        }
     }
 
     buildTypes {
@@ -25,16 +41,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    // Deprecated in Kotlin 2.0, removed in 2.2. If KOTLIN_VERSION is
-    // raised to 2.2+, replace this with a top-level:
-    //   kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 }
 
-// Deliberately no dependencies: everything here uses framework APIs only,
-// which keeps the build fast and gives dependency resolution nothing to
-// break on.
-dependencies { }
+dependencies {
+    // "core" declares nothing, on purpose -- that invariant is enforced by
+    // tools/verify.py and is the reason this template builds first time.
+    //
+    // The GenAI APIs talk to Android AICore, the system service that hosts
+    // Gemini Nano. No model ships inside the APK; nothing leaves the device.
+    "nanoImplementation"("com.google.mlkit:genai-summarization:1.0.0-beta1")
+    "nanoImplementation"("com.google.mlkit:genai-proofreading:1.0.0-beta1")
+    "nanoImplementation"("com.google.mlkit:genai-rewriting:1.0.0-beta1")
+}

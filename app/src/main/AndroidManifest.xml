@@ -41,24 +41,24 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.example.surfacelab.WIDGET_REFRESH" />
+                <action android:name="com.caceras.surfacelab.WIDGET_REFRESH" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
         </receiver>
 
+        <!--
+            The worker behind every text-selection action. It is not exported
+            and carries no intent-filter of its own: each flavour supplies its
+            own <activity-alias> entries, which is what puts one menu item per
+            task into the selection popup.
+        -->
         <activity
             android:name=".ProcessTextActivity"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter>
-                <action android:name="android.intent.action.PROCESS_TEXT" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
     </application>
 
