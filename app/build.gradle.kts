@@ -37,6 +37,15 @@ android {
         }
     }
 
+    testOptions {
+        unitTests {
+            // Robolectric renders the real layouts, so it needs the real
+            // resources. Without this every findViewById comes back null and
+            // the failures look like bugs in the app.
+            isIncludeAndroidResources = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -55,4 +64,12 @@ dependencies {
     // It talks to Android AICore, the system service that hosts Gemini Nano.
     // No model ships inside the APK; nothing leaves the device.
     "nanoImplementation"("com.google.mlkit:genai-prompt:1.0.0-beta4")
+
+    // Test-only, so nothing here reaches an APK and the zero-dependency
+    // invariant is untouched. Robolectric runs the activities on the JVM,
+    // which is the only way this project sees its own UI without a phone.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("androidx.test:core:1.7.0")
+    testImplementation("androidx.test.ext:junit:1.3.0")
 }

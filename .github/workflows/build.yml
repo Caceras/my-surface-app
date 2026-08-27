@@ -28,6 +28,31 @@ jobs:
       - run: python tools/verify.py .
       - run: python tools/test_verify.py
 
+  test:
+    name: JVM tests
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.7.1"
+      # Robolectric renders the real activities on the JVM. Run against the
+      # core flavour, whose brain is deterministic -- the nano brain would
+      # need AICore, which exists on no CI runner and no emulator.
+      - name: Unit tests
+        run: gradle testCoreDebugUnitTest --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-report
+          path: app/build/reports/tests/
+
   build:
     name: Build ${{ matrix.flavour }}
     needs: verify
@@ -71,7 +96,7 @@ jobs:
 
   release:
     name: Publish rolling release
-    needs: build
+    needs: [build, test]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

@@ -5,6 +5,7 @@
 ```bash
 python tools/verify.py .
 python tools/test_verify.py
+gradle testCoreDebugUnitTest
 gradle assembleCoreDebug assembleNanoDebug
 ```
 
@@ -21,6 +22,16 @@ biggest source of first-run build failures in Android projects, and keeping the
 default path free of it is why this template builds on a machine with nothing
 installed. Anything that needs a dependency goes in `app/src/nano/`, or in a new
 flavour beside it.
+
+## Test dependencies are exempt
+
+`testImplementation` does not reach an APK, so Robolectric and JUnit live
+alongside the zero-dependency rule rather than breaking it. `verify.py` skips
+any source set whose name starts with `test` or `androidTest`.
+
+If you touch a layout, add a test that fails without your change. Everything in
+this app is built in code, where the compiler checks nothing about spacing,
+insets or whether a view was ever attached.
 
 ## Adding a surface
 

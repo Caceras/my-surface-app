@@ -167,8 +167,9 @@ forever.
 ## Verify before you push
 
 ```bash
-python tools/verify.py .        # two seconds
+python tools/verify.py .        # two seconds, no Android SDK needed
 python tools/test_verify.py     # proves the checker still checks
+gradle testCoreDebugUnitTest    # renders the real screens on the JVM
 ```
 
 A CI round trip costs about three minutes. `verify.py` needs no Android SDK and
@@ -185,7 +186,19 @@ catches the failures that would otherwise burn that trip:
 
 Exit code is non-zero on failure, so it chains: `python tools/verify.py . && git push`
 
-CI runs both scripts before it will start a build.
+CI runs all three before it will start a build.
+
+**The JVM tests render the actual activities**, via Robolectric, because three
+layout bugs shipped that a compile and a static check both waved through:
+padding set in pixels rather than dp (so the app got *tighter* as screen density
+rose), no window-insets handling on an edge-to-edge target (so the title sat
+under the status bar), and a row of prompt suggestions that was written and
+never added to a view. Each of those now has a test that fails without the fix.
+
+They run against the `core` flavour, whose brain is deterministic. The `nano`
+brain needs AICore, which exists on no CI runner and no emulator — the AI path
+can only be exercised on a real Pixel. That gap is real, and worth naming rather
+than papering over.
 
 ---
 

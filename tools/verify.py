@@ -43,8 +43,10 @@ FRAMEWORK_PREFIXES = ("@android:", "?android:", "@*android:")
 # time on a machine with nothing installed.
 DEPENDENCY_FREE = {"main", "core"}
 
-# Test source sets are not part of the shipped app.
-IGNORED_SETS = {"test", "androidTest", "testFixtures"}
+# Test source sets are not part of the shipped app. Flavour-specific test
+# sets are named testCore, androidTestNano and so on, so the prefix is what
+# matters rather than an exact list.
+IGNORED_PREFIXES = ("test", "androidTest")
 
 # "android.R.style.Foo" is the framework's own resource table, not this
 # project's, so the lookbehind keeps it out of the results.
@@ -66,7 +68,8 @@ def source_sets(project):
         return []
     found = [
         name for name in sorted(os.listdir(root))
-        if os.path.isdir(os.path.join(root, name)) and name not in IGNORED_SETS
+        if os.path.isdir(os.path.join(root, name))
+        and not name.startswith(IGNORED_PREFIXES)
     ]
     return sorted(found, key=lambda n: (n != "main", n))
 
