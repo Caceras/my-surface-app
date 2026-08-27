@@ -41,12 +41,12 @@ object ResultStore {
         val app = context.applicationContext
         val manager = AppWidgetManager.getInstance(app)
         val ids = manager.getAppWidgetIds(
-            ComponentName(app, DemoWidgetProvider::class.java)
+            ComponentName(app, SurfaceWidgetProvider::class.java)
         )
         if (ids.isEmpty()) return
         app.sendBroadcast(
-            Intent(app, DemoWidgetProvider::class.java)
-                .setAction(DemoWidgetProvider.ACTION_REFRESH)
+            Intent(app, SurfaceWidgetProvider::class.java)
+                .setAction(SurfaceWidgetProvider.ACTION_REFRESH)
         )
     }
 }

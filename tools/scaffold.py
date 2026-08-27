@@ -267,7 +267,21 @@ def workflow(files, app_name, slug):
           cancel-in-progress: true
 
         jobs:
+          # Two seconds here, versus three minutes to discover the same
+          # dangling resource reference at the end of a Gradle build.
+          verify:
+            name: Static pre-flight
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@v4
+              - uses: actions/setup-python@v5
+                with:
+                  python-version: "3.12"
+              - run: pip install pyyaml
+              - run: python tools/verify.py .
+
           build:
+            needs: verify
             runs-on: ubuntu-latest
             steps:
               - uses: actions/checkout@v4
@@ -311,8 +325,10 @@ def workflow(files, app_name, slug):
                 env:
                   GH_TOKEN: ${{{{ github.token }}}}
                 run: |
-                  gh release delete debug-latest --yes --cleanup-tag || true
+                  gh release delete debug-latest --repo "$GITHUB_REPOSITORY" \\
+                    --yes --cleanup-tag || true
                   gh release create debug-latest \\
+                    --repo "$GITHUB_REPOSITORY" \\
                     "{slug}-debug.apk" \\
                     --title "{xml_text(app_name)} debug (build ${{{{ github.run_number }}}})" \\
                     --notes "Open this page on your phone and tap the .apk to install."
@@ -324,7 +340,7 @@ def workflow(files, app_name, slug):
 # --------------------------------------------------------------------------
 
 def surface_tile(files, pkg, src, app_name):
-    w(files, f"{src}/DemoTileService.kt", f"""
+    w(files, f"{src}/SurfaceTileService.kt", f"""
         package {pkg}
 
         import android.graphics.drawable.Icon
@@ -337,7 +353,7 @@ def surface_tile(files, pkg, src, app_name):
          * Quick Settings tile. The system binds this service only while the shade
          * is open, so keep the work here trivial.
          */
-        class DemoTileService : TileService() {{
+        class SurfaceTileService : TileService() {{
 
             private var active = false
 
@@ -377,7 +393,7 @@ def surface_tile(files, pkg, src, app_name):
     return {
         "manifest": """
         <service
-            android:name=".DemoTileService"
+            android:name=".SurfaceTileService"
             android:exported="true"
             android:icon="@drawable/ic_surface"
             android:label="@string/app_name"
@@ -392,7 +408,7 @@ def surface_tile(files, pkg, src, app_name):
 
 
 def surface_widget(files, pkg, src, app_name):
-    w(files, f"{src}/DemoWidgetProvider.kt", f"""
+    w(files, f"{src}/SurfaceWidgetProvider.kt", f"""
         package {pkg}
 
         import android.app.PendingIntent
@@ -410,7 +426,7 @@ def surface_widget(files, pkg, src, app_name):
          * Home screen widget. Tapping it fires a broadcast back to this provider,
          * which refreshes the timestamp -- enough to prove the round trip works.
          */
-        class DemoWidgetProvider : AppWidgetProvider() {{
+        class SurfaceWidgetProvider : AppWidgetProvider() {{
 
             override fun onUpdate(
                 context: Context,
@@ -425,7 +441,7 @@ def surface_widget(files, pkg, src, app_name):
                 if (intent.action == ACTION_REFRESH) {{
                     val manager = AppWidgetManager.getInstance(context)
                     val ids = manager.getAppWidgetIds(
-                        ComponentName(context, DemoWidgetProvider::class.java)
+                        ComponentName(context, SurfaceWidgetProvider::class.java)
                     )
                     onUpdate(context, manager, ids)
                 }}
@@ -435,7 +451,7 @@ def surface_widget(files, pkg, src, app_name):
                 val stamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
                     .format(Date())
 
-                val refresh = Intent(context, DemoWidgetProvider::class.java)
+                val refresh = Intent(context, SurfaceWidgetProvider::class.java)
                     .setAction(ACTION_REFRESH)
 
                 // A mutability flag is mandatory on API 31+; omitting both
@@ -521,7 +537,7 @@ def surface_widget(files, pkg, src, app_name):
     return {
         "manifest": f"""
         <receiver
-            android:name=".DemoWidgetProvider"
+            android:name=".SurfaceWidgetProvider"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -696,7 +712,7 @@ def main_activity(files, pkg, src, app_name, chosen, parts):
                         .requestAddTileService(
                             ComponentName(
                                 this@MainActivity,
-                                DemoTileService::class.java
+                                SurfaceTileService::class.java
                             ),
                             getString(R.string.app_name),
                             Icon.createWithResource(
@@ -904,6 +920,24 @@ Uninstall first when switching.
 
 # --------------------------------------------------------------------------
 
+def bundle_checker(files):
+    """Copy verify.py into the generated project.
+
+    Without this the project's own README tells you to run a checker that
+    only exists in the template you generated from, and its CI has no
+    pre-flight at all. Copying rather than templating means the two can
+    never drift apart.
+    """
+    source = os.path.join(os.path.dirname(os.path.abspath(__file__)), "verify.py")
+    try:
+        with open(source, encoding="utf-8") as fh:
+            files["tools/verify.py"] = fh.read()
+    except OSError:
+        # Generating from a stripped copy of the tools directory is not fatal;
+        # the project still builds, it just loses its pre-flight.
+        print("  note: verify.py not found next to scaffold.py, not bundled")
+
+
 def validate_package(pkg):
     if not re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+", pkg):
         sys.exit(f"Invalid package name: {pkg!r}\n"
@@ -956,6 +990,7 @@ def main():
 
     skeleton(files, pkg, app_name)
     workflow(files, app_name, slug)
+    bundle_checker(files)
 
     parts = {s: BUILDERS[s](files, pkg, src, app_name) for s in chosen}
 

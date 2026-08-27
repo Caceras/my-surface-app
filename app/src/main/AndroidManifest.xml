@@ -26,7 +26,7 @@
         </activity>
 
         <service
-            android:name=".DemoTileService"
+            android:name=".SurfaceTileService"
             android:exported="true"
             android:icon="@drawable/ic_surface"
             android:label="@string/app_name"
@@ -37,7 +37,7 @@
         </service>
 
         <receiver
-            android:name=".DemoWidgetProvider"
+            android:name=".SurfaceWidgetProvider"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

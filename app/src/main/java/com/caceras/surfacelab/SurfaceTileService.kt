@@ -15,7 +15,7 @@ import android.widget.Toast
  * is actually present on the device, and to trigger the one-time feature
  * download without hunting through system settings.
  */
-class DemoTileService : TileService() {
+class SurfaceTileService : TileService() {
 
     override fun onStartListening() {
         super.onStartListening()

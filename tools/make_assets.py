@@ -38,7 +38,7 @@ MID_GREY = "#6B7280"
 # Optional wordmark. Drop a transparent PNG at this path to brand the assets;
 # without it an eyebrow label is drawn instead.
 WORDMARK = "wordmark.png"
-EYEBROW = "ANDROID SYSTEM SURFACES"
+EYEBROW = "ON-DEVICE AI SURFACES"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -115,7 +115,7 @@ def build_banner(path, width=1280, height=420):
 
     draw.text((64, 132), "Pixel Surface Lab", font=medium(78), fill=WHITE)
     draw.text((64, 232),
-              "Ship a real Android system surface to your Pixel in minutes.",
+              "Prompt a model that runs on your Pixel. From any text selection.",
               font=light(30), fill=SKY)
 
     x = 64
@@ -145,9 +145,9 @@ def build_social(path, width=1280, height=640):
     draw.text((80, 170), "Pixel", font=medium(112), fill=WHITE)
     draw.text((80, 288), "Surface Lab", font=medium(112), fill=ACCENT)
     draw.text((80, 436),
-              "Scaffold, verify and sideload Android system surfaces",
+              "Select text anywhere. Ask Gemini Nano. Offline.",
               font=light(32), fill=SKY)
-    draw.text((80, 480), "Quick Settings - Widgets - Shortcuts - Share - Text",
+    draw.text((80, 480), "Tile - Widget - Shortcuts - Share - Text selection",
               font=regular(24), fill=(255, 255, 255, 170))
 
     img.save(path)
@@ -215,9 +215,9 @@ def build_pipeline_gif(path, width=900, height=420):
         ("2  Verify", "python tools/verify.py .",
          "Catches broken refs before CI", TEAL),
         ("3  Push", "git push",
-         "GitHub Actions builds the APK", SKY),
-        ("4  Install", "Releases -> tap the .apk",
-         "The tile appears on your Pixel", YELLOW),
+         "CI builds and publishes the APK", SKY),
+        ("4  Ask", "Select text -> Ask Nano",
+         "Answers on the phone, radios off", YELLOW),
     ]
 
     frames = []

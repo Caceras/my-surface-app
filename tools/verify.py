@@ -16,6 +16,9 @@ Checks performed:
   7. Any component with an intent-filter sets android:exported (a hard error
      from API 31 on).
   8. The manifest declares a launcher activity.
+  8b. Every <activity-alias> matches a case of the Task enum, and every Task
+      case is registered by some flavour. A mismatch here compiles, installs,
+      and then silently runs the wrong task.
   9. Source sets that are meant to have no dependencies really have none.
  10. The workflow parses and references APK paths that the build produces.
 
@@ -292,6 +295,97 @@ def check_manifests(project, sets, class_names, problems):
         fail(problems, "No launcher activity declared in any manifest")
 
 
+# Matches an enum constant carrying a single string argument, e.g.
+#   SUMMARIZE("Summarize"),
+TASK_CONSTANT = re.compile(r'^\s*([A-Z][A-Z0-9_]*)\("([^"]+)"\)', re.M)
+
+
+def strip_comments(source):
+    """Blank out // and /* */ comments, preserving line structure."""
+    out = []
+    i, n = 0, len(source)
+    while i < n:
+        if source.startswith("//", i):
+            end = source.find("\n", i)
+            if end == -1:
+                break
+            i = end
+        elif source.startswith("/*", i):
+            end = source.find("*/", i + 2)
+            if end == -1:
+                break
+            out.append("\n" * source.count("\n", i, end))
+            i = end + 2
+        else:
+            out.append(source[i])
+            i += 1
+    return "".join(out)
+
+
+def task_aliases(project, sets):
+    """The alias strings declared by the Task enum, if the project has one."""
+    for source_set in sets:
+        for path in kotlin_sources(project, source_set):
+            with open(path, encoding="utf-8") as fh:
+                body = fh.read()
+            marker = "enum class Task("
+            if marker not in body:
+                continue
+            # Comments are stripped before looking for the terminating ";" --
+            # a semicolon inside a KDoc line would otherwise cut the enum
+            # short and silently hide half its cases from this check.
+            region = strip_comments(body[body.index(marker):])
+            end = region.find(";")
+            if end != -1:
+                region = region[:end]
+            names = {m.group(2) for m in TASK_CONSTANT.finditer(region)}
+            return names, os.path.relpath(path, project)
+    return None, None
+
+
+def manifest_aliases(project, sets):
+    """Every <activity-alias> simple name, mapped to the manifest declaring it."""
+    found = {}
+    for source_set in sets:
+        path = os.path.join(project, "app", "src", source_set, "AndroidManifest.xml")
+        if not os.path.isfile(path):
+            continue
+        try:
+            root = ET.parse(path).getroot()
+        except ET.ParseError:
+            continue
+        app = root.find("application")
+        if app is None:
+            continue
+        for component in app.findall("activity-alias"):
+            name = component.get(f"{ANDROID_NS}name") or ""
+            found[name.lstrip(".").rsplit(".", 1)[-1]] = os.path.relpath(path, project)
+    return found
+
+
+def check_task_parity(project, sets, problems):
+    """The alias name is the only link between a manifest entry and the code
+    that handles it. Get it wrong and the app compiles, installs, shows the
+    menu item, and then quietly runs whichever task the fallback picked."""
+    declared, where = task_aliases(project, sets)
+    if declared is None:
+        return  # a project without the Task enum, e.g. a fresh scaffold
+
+    registered = manifest_aliases(project, sets)
+
+    for alias, manifest in sorted(registered.items()):
+        if alias not in declared:
+            fail(problems,
+                 f"{manifest}: <activity-alias> \"{alias}\" matches no case of "
+                 f"the Task enum in {where} -- it will fall back to the wrong "
+                 "task at runtime")
+
+    for alias in sorted(declared - set(registered)):
+        fail(problems,
+             f"{where}: Task alias \"{alias}\" is never registered by any "
+             "flavour manifest, so nothing can reach it")
+
+
 def check_workflow(project, problems):
     path = os.path.join(project, ".github", "workflows", "build.yml")
     if not os.path.isfile(path):
@@ -351,6 +445,7 @@ def main():
                      all_sources[source_set], problems)
 
     check_flavour_parity(project, sets, per_set, problems)
+    check_task_parity(project, sets, problems)
     xml_files = check_xml(project, all_resources, problems)
     check_manifests(project, sets, class_names, problems)
     check_workflow(project, problems)

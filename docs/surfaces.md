@@ -15,7 +15,7 @@ API 24+. A `TileService` bound by the system only while the shade is open.
 
 ```xml
 <service
-    android:name=".DemoTileService"
+    android:name=".SurfaceTileService"
     android:exported="true"
     android:icon="@drawable/ic_surface"
     android:label="@string/app_name"

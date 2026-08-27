@@ -139,7 +139,7 @@ class MainActivity : Activity() {
                         .requestAddTileService(
                             ComponentName(
                                 this@MainActivity,
-                                DemoTileService::class.java
+                                SurfaceTileService::class.java
                             ),
                             getString(R.string.app_name),
                             Icon.createWithResource(

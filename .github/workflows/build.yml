@@ -98,7 +98,7 @@ jobs:
             --title "Debug build ${{ github.run_number }}" \
             --notes "Open this page on your phone and tap an .apk to install.
 
-          - **nano** - on-device Gemini Nano. Summarise, proofread and rewrite from the text-selection menu, offline.
-          - **core** - the zero-dependency template, no model, no dependencies.
+          - **nano** - Gemini Nano on the device. Select text anywhere, tap Ask, and prompt it freely. Summarise, Proofread and Make professional are presets. Works with the radios off.
+          - **core** - the zero-dependency template. No model, no dependencies.
 
           Both can be installed side by side."

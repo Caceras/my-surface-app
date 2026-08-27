@@ -16,7 +16,7 @@ import java.util.Locale
  * of its own, so everything it displays has to come from storage -- see
  * ResultStore. Tapping it refreshes via a broadcast back to this provider.
  */
-class DemoWidgetProvider : AppWidgetProvider() {
+class SurfaceWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(
         context: Context,
@@ -31,7 +31,7 @@ class DemoWidgetProvider : AppWidgetProvider() {
         if (intent.action == ACTION_REFRESH) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(
-                ComponentName(context, DemoWidgetProvider::class.java)
+                ComponentName(context, SurfaceWidgetProvider::class.java)
             )
             onUpdate(context, manager, ids)
         }
@@ -43,7 +43,7 @@ class DemoWidgetProvider : AppWidgetProvider() {
         val value = last?.let { if (it.length > 160) it.take(157) + "..." else it }
             ?: SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
 
-        val refresh = Intent(context, DemoWidgetProvider::class.java)
+        val refresh = Intent(context, SurfaceWidgetProvider::class.java)
             .setAction(ACTION_REFRESH)
 
         // A mutability flag is mandatory on API 31+; omitting both
