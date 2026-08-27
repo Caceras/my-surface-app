@@ -49,7 +49,7 @@ failures which would otherwise cost you a CI round trip each.
 | Text-selection actions | Uppercase | **Ask** + Summarise, Proofread, Make professional |
 | Prompting | — | **free-form**, streaming, with system instructions |
 | Model | none | Gemini Nano, via Android AICore |
-| APK size | ~2.6 MB | ~20 MB |
+| APK size | ~2.5 MB | ~12 MB |
 | Runs on | any Android 10+ device | supported Pixels with AICore |
 | Network | never | **never** |
 
@@ -223,7 +223,7 @@ this project lives in exactly one place: the `nano` flavour.
 
 **No model in the APK.** The Prompt API calls Android AICore, a system service.
 Nothing is bundled and nothing is downloaded by this app — which is why `nano`
-is 20 MB rather than several hundred.
+is 12 MB rather than several hundred.
 
 **Presets are data, not features.** Every built-in action is a system
 instruction in `Prompts.kt`. Adding one is an enum entry, a line of prompt text

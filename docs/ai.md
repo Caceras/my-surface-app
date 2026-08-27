@@ -10,7 +10,7 @@ The `nano` flavour uses the **ML Kit Prompt API** (`com.google.mlkit:genai-promp
 a general generative client for **Gemini Nano**, hosted by **Android AICore** —
 a system service, not a library. Three consequences:
 
-- No model ships inside the APK. The `nano` build is ~20 MB and none of that is
+- No model ships inside the APK. The `nano` build is ~12 MB and none of that is
   weights.
 - The first call may need a one-time feature download, handled by the system.
   After that it works with the radios off.
