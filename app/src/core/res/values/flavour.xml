@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="brain_name">Core</string>
+    <string name="brain_name">Surface Lab</string>
     <string name="brain_blurb">Zero dependencies. Framework APIs only.</string>
 </resources>

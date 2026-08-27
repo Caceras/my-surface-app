@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -65,17 +66,33 @@ class ProcessTextActivity : Activity() {
             maxLines = 4
         }
 
+        // A blank box is a worse prompt than a bad suggestion.
+        val chips = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            padDp(0, 4, 0, 4)
+        }
+        Prompts.SUGGESTIONS.forEach { suggestion ->
+            chips.addView(suggestionButton(this, suggestion) {
+                input.setText(suggestion)
+                input.setSelection(suggestion.length)
+            })
+        }
+
         val preview = TextView(this).apply {
             text = if (selection.length > 220) selection.take(217) + "..." else selection
             textSize = 13f
             alpha = 0.6f
-            setPadding(0, 24, 0, 0)
+            padDp(0, 8, 0, 0)
         }
 
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(56, 32, 56, 0)
+            padDp(20, 12, 20, 0)
             addView(input)
+            addView(HorizontalScrollView(this@ProcessTextActivity).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(chips)
+            })
             addView(preview)
         }
 
@@ -99,7 +116,7 @@ class ProcessTextActivity : Activity() {
         val stream = TextView(this).apply {
             text = getString(R.string.working)
             textSize = 15f
-            setPadding(56, 32, 56, 16)
+            padDp(20, 12, 20, 6)
         }
         val scroll = ScrollView(this).apply {
             addView(

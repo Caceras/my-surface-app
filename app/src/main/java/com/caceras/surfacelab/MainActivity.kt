@@ -11,6 +11,7 @@ import android.text.InputType
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -18,7 +19,10 @@ import android.widget.TextView
 /**
  * The launcher screen. It reports what the app registered, exposes the brain's
  * own state, and -- when the brain can take a free-form prompt -- is a plain
- * chat box against a model running on this phone.
+ * prompt box against a model running on this phone.
+ *
+ * Every dimension goes through dp(): setPadding takes pixels, and using raw
+ * numbers made the whole screen shrink as density rose.
  */
 class MainActivity : Activity() {
 
@@ -32,7 +36,7 @@ class MainActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(56, 120, 56, 56)
+            padDp(20, 16, 20, 32)
         }
 
         fun label(text: String, size: Float, dim: Boolean = false) =
@@ -42,8 +46,11 @@ class MainActivity : Activity() {
                 if (dim) alpha = 0.7f
             }
 
+        fun section(title: String) =
+            label(title, 18f).apply { padDp(0, 24, 0, 4) }
+
         fun row(title: String, hint: String) {
-            root.addView(label(title, 18f).apply { setPadding(0, 24, 0, 0) })
+            root.addView(label(title, 16f).apply { padDp(0, 12, 0, 0) })
             root.addView(label(hint, 14f, dim = true))
         }
 
@@ -53,7 +60,7 @@ class MainActivity : Activity() {
             14f, dim = true
         ))
 
-        val statusLine = label("Checking...", 15f).apply { setPadding(0, 24, 0, 8) }
+        val statusLine = label("Checking...", 15f).apply { padDp(0, 16, 0, 8) }
         root.addView(statusLine)
         brain.status(this) { statusLine.text = it.label }
 
@@ -67,7 +74,7 @@ class MainActivity : Activity() {
 
         // ---- the actual point: type anything, get an answer, offline -------
         if (brain.tasks.contains(Task.ASK)) {
-            root.addView(label("Ask", 18f).apply { setPadding(0, 40, 0, 0) })
+            root.addView(section("Ask"))
             root.addView(label(
                 "Runs on this phone. Works in aeroplane mode.", 14f, dim = true
             ))
@@ -82,7 +89,23 @@ class MainActivity : Activity() {
             }
             root.addView(prompt)
 
-            val answer = label("", 15f).apply { setPadding(0, 24, 0, 0) }
+            // A blank box is a worse prompt than a bad suggestion.
+            val chips = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                padDp(0, 4, 0, 4)
+            }
+            Prompts.SUGGESTIONS.forEach { suggestion ->
+                chips.addView(suggestionButton(this, suggestion) {
+                    prompt.setText(suggestion)
+                    prompt.setSelection(suggestion.length)
+                })
+            }
+            root.addView(HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(chips)
+            })
+
+            val answer = label("", 15f).apply { padDp(0, 16, 0, 0) }
             val send = Button(this).apply { text = "Send" }
 
             send.setOnClickListener {
@@ -109,7 +132,7 @@ class MainActivity : Activity() {
 
             if (shared.isNotEmpty()) {
                 root.addView(label("Shared in:", 14f, dim = true)
-                    .apply { setPadding(0, 24, 0, 0) })
+                    .apply { padDp(0, 16, 0, 0) })
                 root.addView(label(
                     if (shared.length > 400) shared.take(397) + "..." else shared,
                     13f, dim = true
@@ -119,11 +142,11 @@ class MainActivity : Activity() {
             root.addView(answer)
         } else if (shared.isNotEmpty()) {
             root.addView(label("Shared in: " + shared, 14f, dim = true)
-                .apply { setPadding(0, 32, 0, 0) })
+                .apply { padDp(0, 16, 0, 0) })
         }
 
         // ---- where everything else lives ----------------------------------
-        root.addView(label("Surfaces", 18f).apply { setPadding(0, 48, 0, 0) })
+        root.addView(section("Surfaces"))
         row("Text selection", "Select text anywhere: " +
             brain.tasks.joinToString(", ") { it.alias })
         row("Quick Settings tile", "Shade, Edit tiles -- or the button below.")
@@ -152,12 +175,16 @@ class MainActivity : Activity() {
             })
         }
 
-        setContentView(ScrollView(this).apply {
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
             addView(
                 root,
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
-        })
+        }
+        setContentView(scroll)
+        scroll.padForSystemBars()
     }
 }
