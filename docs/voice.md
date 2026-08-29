@@ -202,7 +202,18 @@ promises, so it is worth being exact.
   a qualified resource *replaces* the default rather than merging with it, so
   that file has to carry the existing shortcuts as well; a v31 file holding
   only the voice entry silently deletes the other two on every device that
-  loads it. The tile
+  loads it. And copy that file's existing entries with care: they hard-code
+  `android:targetPackage="com.caceras.surfacelab"`, while `nano` carries
+  `applicationIdSuffix = ".nano"`. A `res/xml` resource takes no manifest
+  placeholder, so the honest options are a flavour-specific `shortcuts.xml`
+  or a dynamic shortcut built from the real application id.
+
+  Worth knowing before you get there: **this already affects the two
+  shortcuts in the repo today.** In the `nano` APK both point at
+  `com.caceras.surfacelab`, which is a different app — the core build, if it
+  happens to be installed, and nothing at all if it is not. It is a
+  pre-existing bug rather than one voice introduces, and it is not fixed
+  here, because a document should not be quietly changing the manifest. The tile
   reports it in its subtitle like any other unavailable state, and
   `VoiceActivity` opens on that status rather than a mic it cannot use. A
   shortcut promising "tap, talk" on a Pixel 4 is worse than no shortcut.
@@ -260,14 +271,19 @@ catches that one for free.
 4. **`ERROR_NO_MATCH` and `ERROR_SPEECH_TIMEOUT` are the normal "you said
    nothing" path**, not failures. Return to idle and show nothing. Treating them
    as errors produces a toast storm.
-5. **TTS init is asynchronous.** `speak()` before `onInit` is silently dropped,
+5. **Every `speak()` needs a unique, non-null utterance id.** With a null id
+   the engine still makes noise but dispatches no progress callbacks at all,
+   so `onDone` never arrives, `SPEAKING` never returns to `IDLE`, and a
+   synthesis failure is invisible. The state machine at the top of this
+   document depends on those callbacks; without ids it has no way back.
+6. **TTS init is asynchronous.** `speak()` before `onInit` is silently dropped,
    and by then the brain may already have streamed several sentences. Hold the
    pending chunks in a queue and flush them in order on init — one slot that
    each new chunk overwrites starts the answer from the middle.
-6. **Set the TTS locale from what was recognised, not the device default**, or
+7. **Set the TTS locale from what was recognised, not the device default**, or
    Swedish gets read back in an English accent. `Lang.looksNordic` already
    exists — reuse it rather than adding a second language guess.
-7. **`SurfaceBrain.run` cannot be cancelled.** It returns nothing and takes no
+8. **`SurfaceBrain.run` cannot be cancelled.** It returns nothing and takes no
    token: the callbacks arrive later on the main thread whether or not anyone
    is still listening. Leave `VoiceActivity` mid-answer and a chunk lands on a
    dead view, `speak()` is called on an engine already shut down, and a result
