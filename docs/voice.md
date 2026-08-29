@@ -78,9 +78,16 @@ proving the plumbing before a model is near it.
 Quick Settings tile, talk, hear the answer. `minSdk` is 29, so the tile has to
 branch: `startActivityAndCollapse(PendingIntent)` from API 34, and the `Intent`
 overload — deprecated there, but the only one that exists below it — under
-that. The `PendingIntent` needs `FLAG_IMMUTABLE`, same as the widget's: from
-API 31 a `PendingIntent` built with neither mutability flag throws. See
-[`surfaces.md`](surfaces.md).
+that. The `PendingIntent` needs `FLAG_IMMUTABLE`, same as the widget's — from
+API 31 a `PendingIntent` built with neither mutability flag throws — and the
+intent inside it needs `FLAG_ACTIVITY_NEW_TASK`, because a service is not an
+activity and cannot start one without it. See [`surfaces.md`](surfaces.md).
+
+A tile is tappable **on the lock screen**, which for this tile means opening a
+microphone and writing the answer to `ResultStore`, where the widget shows it.
+Wrap the launch in `isSecure()` and `unlockAndRun()` (both API 24) so a locked
+phone asks for the PIN first. Nothing else in this app has needed that, because
+nothing else in this app started a private session from the shade.
 
 The answer still goes through `ResultStore.save()`, so what you asked in the
 kitchen is on the home screen widget afterwards. That falls out for free.
@@ -191,7 +198,11 @@ promises, so it is worth being exact.
   is declared in the manifest and is on the launcher from the moment the app
   installs, before a line of app code runs, so disabling it through
   `ShortcutManager` is too late — the voice entry belongs in an
-  `xml-v31/shortcuts.xml` that older devices never load, or nowhere. The tile
+  `xml-v31/shortcuts.xml` that older devices never load, or nowhere. Note that
+  a qualified resource *replaces* the default rather than merging with it, so
+  that file has to carry the existing shortcuts as well; a v31 file holding
+  only the voice entry silently deletes the other two on every device that
+  loads it. The tile
   reports it in its subtitle like any other unavailable state, and
   `VoiceActivity` opens on that status rather than a mic it cannot use. A
   shortcut promising "tap, talk" on a Pixel 4 is worse than no shortcut.
@@ -274,6 +285,14 @@ that problem: Robolectric 4.16 ships `ShadowSpeechRecognizer`
 `getLastRecognizerIntent`) and `ShadowTextToSpeech` (`getSpokenTextList`,
 `getQueueMode`, `isShutdown`). The whole path runs on the JVM against `core`,
 whose brain is deterministic — speak, and it uppercases and reads it back.
+
+With one gap worth naming, because it is the difference between the tests
+existing and the tests meaning anything: `CoreBrain.run` answers synchronously
+through `onResult` and never calls `onPartial`. The two tests that matter most
+here — speaking the first sentence early, and barge-in while the answer is
+still arriving — have no stream to run against. They need a fake `SurfaceBrain`
+in the test source set that emits partials on demand, which is a dozen lines
+and costs the app nothing, since it never ships.
 
 Worth a test each:
 
