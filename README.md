@@ -217,6 +217,7 @@ than papering over.
 │   └── make_assets.py    regenerates the branded images
 ├── docs/
 │   ├── ai.md             on-device AI: availability, languages, alternatives
+│   ├── voice.md          proposed: on-device speech in and out, and its traps
 │   ├── surfaces.md       every surface, its gotchas and constraints
 │   ├── versions.md       toolchain matrix + error→fix mapping
 │   └── delivery.md       signing, install prompts, private repos
