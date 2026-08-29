@@ -109,8 +109,12 @@ as they are recognised; `onRmsChanged` scales a single dot. Same principle the
 process-text dialog already states: the stream *is* the progress indicator, so
 there is never a blank spinner.
 
-**3. Silence is the send button.** `onResults` goes straight into `brain.run`.
-No confirm step, no send tap. One tap total, at the start.
+**3. Silence is the send button — hands-free only.** In `VoiceActivity` there is
+no screen to look at, so `onResults` goes straight into `brain.run`: one tap
+total, at the start. In the launcher and the selection dialog the transcript
+lands in the box you were already looking at and Send stays where it is,
+because the promise there is that a misheard word is a fix rather than a redo.
+The surface decides, the same way it decides the modality.
 
 **4. Barge-in.** Any touch, and the mic button itself, calls `tts.stop()`
 immediately. `stop()` only clears what is already queued, though, and the brain
@@ -156,8 +160,11 @@ promises, so it is worth being exact.
   Voice status belongs on the same launcher status line and the same tile
   subtitle as the model status.
 - **Say which locale is being asked for.** There is no settings screen, so the
-  recognizer gets `EXTRA_LANGUAGE` from the device's current input locale, and
-  the same value is what a support check or a download applies to — check for
+  recognizer gets `EXTRA_LANGUAGE` from the device's current input locale,
+  alongside `EXTRA_LANGUAGE_MODEL` (`LANGUAGE_MODEL_FREE_FORM` — the reference
+  marks this extra *required*) and `EXTRA_PARTIAL_RESULTS`. Build that intent
+  once and reuse the same instance for the support check, the download and
+  `startListening`, because that is the request they each answer for — check for
   one language and download another and the Swedish speaker still gets
   `ERROR_LANGUAGE_UNAVAILABLE`. Framework language *detection*
   (`EXTRA_ENABLE_LANGUAGE_DETECTION`, `DETECTED_LANGUAGE`) is API 34+, so it
@@ -165,7 +172,12 @@ promises, so it is worth being exact.
   below that, which is the second reason to reuse it rather than write a new
   guess.
 - Below API 31 there is no on-device recognizer API at all, so there is no mic
-  button. `minSdk` stays at 29.
+  button. `minSdk` stays at 29. Hiding a button covers the launcher and the
+  dialog but not the entry points that live outside the app: disable the voice
+  shortcut through `ShortcutManager` at runtime, report it in the tile's
+  subtitle like any other unavailable state, and have `VoiceActivity` open on
+  that status rather than a mic it cannot use. A shortcut promising "tap,
+  talk" on a Pixel 4 is worse than no shortcut.
 - Nothing is recorded to disk. "No audio is ever written" is a stronger claim
   than a privacy policy and it costs nothing to keep.
 
@@ -227,6 +239,14 @@ catches that one for free.
 6. **Set the TTS locale from what was recognised, not the device default**, or
    Swedish gets read back in an English accent. `Lang.looksNordic` already
    exists — reuse it rather than adding a second language guess.
+7. **`SurfaceBrain.run` cannot be cancelled.** It returns nothing and takes no
+   token: the callbacks arrive later on the main thread whether or not anyone
+   is still listening. Leave `VoiceActivity` mid-answer and a chunk lands on a
+   dead view, `speak()` is called on an engine already shut down, and a result
+   the user walked away from is saved to the widget. Teardown must set a
+   cancelled flag that `onPartial` and `onResult` check first. Putting real
+   cancellation in the interface would be the better fix and a wider change
+   than voice should make on its own.
 
 ## This part is testable, unlike the AI path
 
@@ -249,6 +269,7 @@ Worth a test each:
 - the recognizer is destroyed and the TTS engine shut down when the activity
   finishes (the mic-leak and engine-leak regressions)
 - `ERROR_NO_MATCH` returns to idle without a dialog
+- a brain callback arriving after the activity is destroyed changes nothing
 
 Two checks worth adding to `verify.py`, both catching silent runtime failures,
 which is what that script is for: Kotlin referencing `SpeechRecognizer` implies
