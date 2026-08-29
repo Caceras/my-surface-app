@@ -72,7 +72,9 @@ feels cluttered rather than magic.
 Quick Settings tile, talk, hear the answer. `minSdk` is 29, so the tile has to
 branch: `startActivityAndCollapse(PendingIntent)` from API 34, and the `Intent`
 overload — deprecated there, but the only one that exists below it — under
-that. See [`surfaces.md`](surfaces.md).
+that. The `PendingIntent` needs `FLAG_IMMUTABLE`, same as the widget's: from
+API 31 a `PendingIntent` built with neither mutability flag throws. See
+[`surfaces.md`](surfaces.md).
 
 The answer still goes through `ResultStore.save()`, so what you asked in the
 kitchen is on the home screen widget afterwards. That falls out for free.
@@ -129,8 +131,11 @@ promises, so it is worth being exact.
 - `RecognizerIntent.EXTRA_PREFER_OFFLINE` is a *hint* the service may ignore. A
   hint is not a promise, and this app's promise is absolute.
 - Text-to-speech the same way: pick a `Voice` whose `isNetworkConnectionRequired`
-  is false. If the only voices available are network ones, print the answer and
-  do not speak it.
+  is false **and** whose `features` do not contain
+  `TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED` — that key means "local, but
+  the data still has to be downloaded", which with the radios off is a voice
+  that cannot speak. If nothing qualifies, print the answer and stay quiet
+  rather than half-succeeding.
 - **No fallback to cloud recognition, ever.** Two failures live here and they
   are easy to conflate:
   - *No on-device recognizer at all.* `createOnDeviceSpeechRecognizer()` throws
@@ -142,10 +147,23 @@ promises, so it is worth being exact.
     `RecognitionSupport`, whose `getSupportedOnDeviceLanguages()` means
     "supported, needs downloading" — that, and not the case above, is what
     `triggerModelDownload()` is for. This is the real mirror of Nano's
-    `download()`.
+    `download()`. Both are API 33, so on 31 and 32 there is no support query
+    and no download to offer: `ERROR_LANGUAGE_UNAVAILABLE` exists from 31, so
+    the honest move there is to report it and send the user to the system's
+    own voice-input language settings — not to guess, and still not to fall
+    back to the cloud.
 
   Voice status belongs on the same launcher status line and the same tile
   subtitle as the model status.
+- **Say which locale is being asked for.** There is no settings screen, so the
+  recognizer gets `EXTRA_LANGUAGE` from the device's current input locale, and
+  the same value is what a support check or a download applies to — check for
+  one language and download another and the Swedish speaker still gets
+  `ERROR_LANGUAGE_UNAVAILABLE`. Framework language *detection*
+  (`EXTRA_ENABLE_LANGUAGE_DETECTION`, `DETECTED_LANGUAGE`) is API 34+, so it
+  cannot be the mechanism here; `Lang` on the transcript picks the TTS voice
+  below that, which is the second reason to reuse it rather than write a new
+  guess.
 - Below API 31 there is no on-device recognizer API at all, so there is no mic
   button. `minSdk` stays at 29.
 - Nothing is recorded to disk. "No audio is ever written" is a stronger claim
@@ -190,6 +208,9 @@ catches that one for free.
 1. **Every `SpeechRecognizer` method must be called from the main thread**, and
    `destroy()` is mandatory. Skip it and the mic stays held after the activity
    is gone, which breaks recognition in *other* apps until the process dies.
+   `Mouth` needs the same discipline: `tts.stop()` is barge-in, not teardown —
+   `onDestroy` has to call `shutdown()`, or every trip through the tile leaves
+   another engine connection bound.
 2. **Recognizer callbacks arrive on the main thread; TTS
    `UtteranceProgressListener` callbacks do not.** Post back, exactly as the
    nano brain does with `DownloadCallback`.
@@ -225,7 +246,8 @@ Worth a test each:
 - the first sentence is spoken before the answer completes
 - a final sentence with no full stop is still spoken when the answer completes
 - barge-in stays silent while the answer is still streaming
-- the recognizer is destroyed when the activity finishes (the mic-leak regression)
+- the recognizer is destroyed and the TTS engine shut down when the activity
+  finishes (the mic-leak and engine-leak regressions)
 - `ERROR_NO_MATCH` returns to idle without a dialog
 
 Two checks worth adding to `verify.py`, both catching silent runtime failures,
