@@ -62,11 +62,17 @@ feels cluttered rather than magic.
 
 | Surface | Mic | Why |
 |---|---|---|
-| Launcher **Ask** box | yes | obvious, and the transcript stays editable so a misheard word is a fix, not a redo |
-| **Text selection** Ask dialog | yes | the highest-value one: your hands already did the selecting, so asking out loud is genuinely faster |
+| Launcher **Ask** box *(nano)* | yes | obvious, and the transcript stays editable so a misheard word is a fix, not a redo |
+| **Text selection** Ask dialog *(nano)* | yes | the highest-value one: your hands already did the selecting, so asking out loud is genuinely faster |
 | New `VoiceActivity` (translucent) | it *is* the mic | one class, reached from the tile, an app shortcut, and the widget |
 | Presets (Summarise, Proofread, Rewrite) | no | a preset needs no words |
 | Share sheet | no | you are already holding the phone and the text |
+
+The first two rows are nano-only, and not by choice: `MainActivity` builds the
+Ask box only when `brain.tasks` contains `Task.ASK`, and the `.Ask` alias lives
+in the nano manifest, so in `core` neither surface exists to put a mic on.
+Core's voice is the hands-free path — which is enough for what `core` is for,
+proving the plumbing before a model is near it.
 
 `VoiceActivity` is the hands-free path and the only new component: tap the
 Quick Settings tile, talk, hear the answer. `minSdk` is 29, so the tile has to
@@ -150,9 +156,14 @@ promises, so it is worth being exact.
     the one worth handling. `checkRecognitionSupport()` (API 33) hands back a
     `RecognitionSupport`, whose `getSupportedOnDeviceLanguages()` means
     "supported, needs downloading" — that, and not the case above, is what
-    `triggerModelDownload()` is for. This is the real mirror of Nano's
-    `download()`. Both are API 33, so on 31 and 32 there is no support query
-    and no download to offer: `ERROR_LANGUAGE_UNAVAILABLE` exists from 31, so
+    `triggerModelDownload()` is for. It is a looser mirror of Nano's
+    `download()` than it first looks: the API 33 overload takes an intent and
+    nothing else, and the reference says to verify the outcome by calling
+    `checkRecognitionSupport()` again — the progress-and-completion listener
+    is API 34. So on 33, trigger, then re-check before believing speech is
+    ready; call `startListening()` straight after the trigger and it still
+    fails with `ERROR_LANGUAGE_UNAVAILABLE`. Both methods are API 33, so on 31
+    and 32 there is no support query and no download to offer: `ERROR_LANGUAGE_UNAVAILABLE` exists from 31, so
     the honest move there is to report it and send the user to the system's
     own voice-input language settings — not to guess, and still not to fall
     back to the cloud.
@@ -168,16 +179,22 @@ promises, so it is worth being exact.
   one language and download another and the Swedish speaker still gets
   `ERROR_LANGUAGE_UNAVAILABLE`. Framework language *detection*
   (`EXTRA_ENABLE_LANGUAGE_DETECTION`, `DETECTED_LANGUAGE`) is API 34+, so it
-  cannot be the mechanism here; `Lang` on the transcript picks the TTS voice
-  below that, which is the second reason to reuse it rather than write a new
-  guess.
+  cannot be the mechanism here. The requested locale is the answer instead: it
+  is a real BCP-47 tag, it is what the recognizer was asked for, and it is
+  what the TTS voice should be chosen from. `Lang` is the fallback for when
+  there is no requested or detected locale to use — it only tells Nordic from
+  not-Nordic, so leaning on it would read Spanish and French back in the
+  device default.
 - Below API 31 there is no on-device recognizer API at all, so there is no mic
   button. `minSdk` stays at 29. Hiding a button covers the launcher and the
-  dialog but not the entry points that live outside the app: disable the voice
-  shortcut through `ShortcutManager` at runtime, report it in the tile's
-  subtitle like any other unavailable state, and have `VoiceActivity` open on
-  that status rather than a mic it cannot use. A shortcut promising "tap,
-  talk" on a Pixel 4 is worse than no shortcut.
+  dialog but not the entry points that live outside the app. A static shortcut
+  is declared in the manifest and is on the launcher from the moment the app
+  installs, before a line of app code runs, so disabling it through
+  `ShortcutManager` is too late — the voice entry belongs in an
+  `xml-v31/shortcuts.xml` that older devices never load, or nowhere. The tile
+  reports it in its subtitle like any other unavailable state, and
+  `VoiceActivity` opens on that status rather than a mic it cannot use. A
+  shortcut promising "tap, talk" on a Pixel 4 is worse than no shortcut.
 - Nothing is recorded to disk. "No audio is ever written" is a stronger claim
   than a privacy policy and it costs nothing to keep.
 
