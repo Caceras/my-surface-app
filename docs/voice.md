@@ -48,6 +48,13 @@ Five states, one enum. That is the entire state model.
 alias, so a `Task.SPEAK` would either fail the checker or put a junk item in
 the selection popup. Voice rides on `Task.ASK` and stays orthogonal.
 
+Hands-free there is no selection, so the transcript arrives as the
+`instruction` with `input` empty. That is right for `Prompts.user`, and wrong
+for `CoreBrain`, which uppercases `input` and ignores `instruction` — core
+voice would answer with nothing. Fix it in the brain rather than the activity:
+`(input.ifBlank { instruction }).uppercase(…)` is one line, and it preserves
+the rule that no surface ever branches on which brain it got.
+
 ## Where the mic goes
 
 Three places, not five. A mic on every surface is the version of this that
@@ -62,9 +69,10 @@ feels cluttered rather than magic.
 | Share sheet | no | you are already holding the phone and the text |
 
 `VoiceActivity` is the hands-free path and the only new component: tap the
-Quick Settings tile, talk, hear the answer. The tile launches it with
-`startActivityAndCollapse(PendingIntent)` — the `Intent` overload is deprecated
-from API 34, see [`surfaces.md`](surfaces.md).
+Quick Settings tile, talk, hear the answer. `minSdk` is 29, so the tile has to
+branch: `startActivityAndCollapse(PendingIntent)` from API 34, and the `Intent`
+overload — deprecated there, but the only one that exists below it — under
+that. See [`surfaces.md`](surfaces.md).
 
 The answer still goes through `ResultStore.save()`, so what you asked in the
 kitchen is on the home screen widget afterwards. That falls out for free.
@@ -89,7 +97,10 @@ fun nextChunk(text: String, from: Int): Pair<String, Int> {
 }
 ```
 
-Pure function, no Android, tested in `LogicTest`.
+Pure function, no Android, tested in `LogicTest`. `onResult` then flushes
+whatever is left past the cursor, terminator or not — without that, "Sure" and
+every answer whose last sentence lacks a full stop is printed and never spoken,
+which breaks the inheritance rule in the case the user notices most.
 
 **2. Never a silent listening screen.** `onPartialResults` puts words on screen
 as they are recognised; `onRmsChanged` scales a single dot. Same principle the
@@ -100,7 +111,10 @@ there is never a blank spinner.
 No confirm step, no send tap. One tap total, at the start.
 
 **4. Barge-in.** Any touch, and the mic button itself, calls `tts.stop()`
-immediately. Not being able to shut it up is what makes a voice assistant feel
+immediately. `stop()` only clears what is already queued, though, and the brain
+is very likely still streaming — so barge-in must also set a muted flag the
+chunker checks, or the next sentence boundary starts it talking again half a
+second later. Not being able to shut it up is what makes a voice assistant feel
 like an appliance.
 
 ## Keeping the offline promise literally true
@@ -117,9 +131,19 @@ promises, so it is worth being exact.
 - Text-to-speech the same way: pick a `Voice` whose `isNetworkConnectionRequired`
   is false. If the only voices available are network ones, print the answer and
   do not speak it.
-- **No fallback to cloud recognition, ever.** If on-device speech is missing,
-  degrade the way the brain already does — an honest status line, and on API 33+
-  `triggerModelDownload()`, which is the exact mirror of Nano's `download()`.
+- **No fallback to cloud recognition, ever.** Two failures live here and they
+  are easy to conflate:
+  - *No on-device recognizer at all.* `createOnDeviceSpeechRecognizer()` throws
+    `UnsupportedOperationException` when `isOnDeviceRecognitionAvailable()` is
+    false, so there is no instance to call a download on. No mic button, honest
+    status line, stop.
+  - *Recognizer present, language pack missing.* This is the Swedish case, and
+    the one worth handling. `checkRecognitionSupport()` (API 33) hands back a
+    `RecognitionSupport`, whose `getSupportedOnDeviceLanguages()` means
+    "supported, needs downloading" — that, and not the case above, is what
+    `triggerModelDownload()` is for. This is the real mirror of Nano's
+    `download()`.
+
   Voice status belongs on the same launcher status line and the same tile
   subtitle as the model status.
 - Below API 31 there is no on-device recognizer API at all, so there is no mic
@@ -175,8 +199,10 @@ catches that one for free.
 4. **`ERROR_NO_MATCH` and `ERROR_SPEECH_TIMEOUT` are the normal "you said
    nothing" path**, not failures. Return to idle and show nothing. Treating them
    as errors produces a toast storm.
-5. **TTS init is asynchronous.** `speak()` before `onInit` is silently dropped.
-   Hold one pending utterance and flush it on init.
+5. **TTS init is asynchronous.** `speak()` before `onInit` is silently dropped,
+   and by then the brain may already have streamed several sentences. Hold the
+   pending chunks in a queue and flush them in order on init — one slot that
+   each new chunk overwrites starts the answer from the middle.
 6. **Set the TTS locale from what was recognised, not the device default**, or
    Swedish gets read back in an English accent. `Lang.looksNordic` already
    exists — reuse it rather than adding a second language guess.
@@ -197,6 +223,8 @@ Worth a test each:
 - partials reach the screen while listening
 - `onResults` runs the brain exactly once
 - the first sentence is spoken before the answer completes
+- a final sentence with no full stop is still spoken when the answer completes
+- barge-in stays silent while the answer is still streaming
 - the recognizer is destroyed when the activity finishes (the mic-leak regression)
 - `ERROR_NO_MATCH` returns to idle without a dialog
 
