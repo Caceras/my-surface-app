@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The shortcut intent is explicit, so android:targetPackage has to be this
+    build's real applicationId, and "nano" carries an applicationIdSuffix.
+    A res/xml resource cannot take a ${applicationId} manifest placeholder,
+    so this file lives once per flavour rather than once in src/main.
+
+    Get it wrong and the shortcuts still appear in the launcher. They just
+    open the other build, or nothing at all when it is not installed.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_surface"
+        android:shortcutId="alpha"
+        android:shortcutShortLabel="@string/shortcut_alpha">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.caceras.surfacelab.MainActivity"
+            android:targetPackage="com.caceras.surfacelab" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_surface"
+        android:shortcutId="beta"
+        android:shortcutShortLabel="@string/shortcut_beta">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.caceras.surfacelab.MainActivity"
+            android:targetPackage="com.caceras.surfacelab" />
+    </shortcut>
+
+</shortcuts>

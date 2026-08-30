@@ -11,7 +11,12 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 2
-        versionName = "2.0"
+
+        // The build number comes from CI (-PbuildNumber=<run number>) and
+        // falls back to "dev" for a local build. The launcher screen shows
+        // it, which is the whole point: after a change is pushed you can
+        // tell at a glance whether the APK on the phone is the new one.
+        versionName = "2.0." + (project.findProperty("buildNumber") ?: "dev")
     }
 
     // Two builds of the same app. "core" is the original zero-dependency

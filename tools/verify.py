@@ -19,6 +19,9 @@ Checks performed:
   8b. Every <activity-alias> matches a case of the Task enum, and every Task
       case is registered by some flavour. A mismatch here compiles, installs,
       and then silently runs the wrong task.
+  8c. Every shortcut's android:targetPackage matches the applicationId of the
+      build it ships in -- a flavour with an applicationIdSuffix cannot share
+      one shortcuts.xml from src/main.
   9. Source sets that are meant to have no dependencies really have none.
  10. The workflow parses and references APK paths that the build produces.
 
@@ -389,6 +392,85 @@ def check_task_parity(project, sets, problems):
              "flavour manifest, so nothing can reach it")
 
 
+def application_ids(project):
+    """Map source set -> the applicationId that build produces.
+
+    A shortcut intent is explicit, so its android:targetPackage has to match
+    the id of the build it ships in. Flavours that carry an
+    applicationIdSuffix therefore cannot share one shortcuts.xml from
+    src/main, and a res/xml resource takes no ${applicationId} placeholder.
+    """
+    path = os.path.join(project, "app", "build.gradle.kts")
+    if not os.path.isfile(path):
+        return {}
+
+    with open(path, encoding="utf-8") as fh:
+        body = fh.read()
+
+    base = re.search(r'applicationId\s*=\s*"([^"]+)"', body)
+    if not base:
+        return {}
+    base = base.group(1)
+
+    ids = {"main": base}
+    for flavour, block in re.findall(
+        r'create\("(\w+)"\)\s*\{(.*?)\n        \}', body, re.S
+    ):
+        suffix = re.search(r'applicationIdSuffix\s*=\s*"([^"]+)"', block)
+        ids[flavour] = base + (suffix.group(1) if suffix else "")
+    return ids
+
+
+def check_shortcut_packages(project, sets, problems):
+    """Every shortcut points at the applicationId of its own build.
+
+    This one is invisible until you long-press the launcher icon on a phone:
+    the shortcuts appear, and open a different app -- or nothing, when that
+    app is not installed.
+    """
+    ids = application_ids(project)
+    if len(ids) < 2:
+        return  # single-flavour project, nothing to get wrong
+
+    suffixed = {s for s, app_id in ids.items() if s != "main" and app_id != ids["main"]}
+
+    for source_set in sets:
+        path = os.path.join(project, "app", "src", source_set,
+                            "res", "xml", "shortcuts.xml")
+        if not os.path.isfile(path):
+            continue
+        try:
+            root = ET.parse(path).getroot()
+        except ET.ParseError:
+            continue  # already reported by the XML check
+
+        rel = os.path.relpath(path, project)
+
+        # One message per file, not one per shortcut: the fix is the same
+        # for every entry in it.
+        targets = {
+            intent.get(ANDROID_NS + "targetPackage")
+            for intent in root.iter("intent")
+        } - {None}
+
+        if source_set == "main" and suffixed and targets:
+            names = sorted(suffixed)
+            which = names[0] if len(names) == 1 else ", ".join(names)
+            verb = "changes" if len(names) == 1 else "change"
+            fail(problems,
+                 f"{rel}: hard-codes android:targetPackage in src/main, but "
+                 f"{which} {verb} the applicationId. Give each flavour its "
+                 f"own shortcuts.xml.")
+            continue
+
+        expected = ids.get(source_set)
+        for target in sorted(t for t in targets if expected and t != expected):
+            fail(problems,
+                 f"{rel}: android:targetPackage=\"{target}\" is not this "
+                 f"build's applicationId ({expected}), so the shortcut opens "
+                 f"another app or nothing at all.")
+
+
 def check_workflow(project, problems):
     path = os.path.join(project, ".github", "workflows", "build.yml")
     if not os.path.isfile(path):
@@ -451,6 +533,7 @@ def main():
     check_task_parity(project, sets, problems)
     xml_files = check_xml(project, all_resources, problems)
     check_manifests(project, sets, class_names, problems)
+    check_shortcut_packages(project, sets, problems)
     check_workflow(project, problems)
 
     total_sources = sum(len(v) for v in all_sources.values())

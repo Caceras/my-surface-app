@@ -109,6 +109,16 @@ class ScreenTest {
     }
 
     @Test
+    fun `the launcher screen names the build it came from`() {
+        // The iteration loop is: change it, push it, install it, look. That
+        // last step needs something on screen to look at, or you cannot tell
+        // a new APK from the one already on the phone.
+        val body = texts(launchMain().get().findViewById(android.R.id.content))
+        assertTrue("no build label on screen",
+            body.any { it.startsWith("Build ") && it.length > "Build ".length })
+    }
+
+    @Test
     fun `the brain reports its state on the launcher screen`() {
         val body = texts(launchMain().get().findViewById(android.R.id.content))
         assertTrue("status line never resolved",

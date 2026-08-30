@@ -1,5 +1,38 @@
 # Getting the APK onto the phone
 
+## The iteration loop
+
+The point of all of this is a short loop: say what should change, and try it on
+the phone. Everything below exists to keep that loop to one tap at your end.
+
+```
+you say what to change
+      │
+      ▼
+change lands on main ──► CI: verify, test, build both flavours (~3 min)
+                                        │
+                                        ▼
+                          rolling release "debug-latest" is replaced
+                                        │
+                                        ▼
+              phone bookmark /releases/latest ──► tap the .apk ──► install
+```
+
+Three things make it survivable:
+
+- **The download URL never changes.** One rolling tag, reused. Bookmark
+  `/releases/latest` on the phone once and never think about it again.
+- **A broken change never reaches the phone.** The release job needs `build`
+  *and* `test` to pass first, so a red build simply leaves the previous APK in
+  place.
+- **The build number is on screen.** `versionName` carries the CI run number,
+  the launcher screen shows it, and the release is titled with the same number.
+  After installing you can see whether the install actually took, which is the
+  one question a rolling tag makes hard to answer.
+
+An install over the top keeps your data and settings; it is an upgrade, not a
+fresh install, as long as the signing key does not change (see **Signing**).
+
 ## Why the release, not the artifact
 
 The workflow publishes the APK twice, and the distinction matters more than it
