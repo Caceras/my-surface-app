@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The same shortcuts as res/xml/shortcuts.xml, plus the voice entry.
+
+    Two things about this file are easy to get wrong and invisible until you
+    long-press the launcher icon on a real phone:
+
+    A qualified resource REPLACES the default rather than merging with it, so
+    this file has to carry the existing shortcuts as well. A v31 file holding
+    only the voice entry silently deletes the other two on every device that
+    loads it.
+
+    And the voice entry is here rather than in res/xml because the on-device
+    recogniser API starts at API 31. A static shortcut is on the launcher from
+    the moment the app installs, before a line of app code runs, so disabling
+    it through ShortcutManager would be far too late, a shortcut promising
+    "tap, talk" on a Pixel 4 is worse than no shortcut. Devices below 31 never
+    load this file and so never see it.
+
+    android:targetPackage is this build's own applicationId; "nano" carries an
+    applicationIdSuffix, and a res/xml resource takes no ${applicationId}
+    placeholder. verify.py check 8c fails the build if these ever disagree.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_mic"
+        android:shortcutId="voice"
+        android:shortcutShortLabel="@string/shortcut_voice">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.caceras.surfacelab.VoiceActivity"
+            android:targetPackage="com.caceras.surfacelab" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_surface"
+        android:shortcutId="alpha"
+        android:shortcutShortLabel="@string/shortcut_alpha">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.caceras.surfacelab.MainActivity"
+            android:targetPackage="com.caceras.surfacelab" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_surface"
+        android:shortcutId="beta"
+        android:shortcutShortLabel="@string/shortcut_beta">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.caceras.surfacelab.MainActivity"
+            android:targetPackage="com.caceras.surfacelab" />
+    </shortcut>
+
+</shortcuts>

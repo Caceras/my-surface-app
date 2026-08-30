@@ -43,6 +43,18 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!--
+            Hands-free. Exported because the launcher process starts it from
+            a static shortcut and the tile starts it from outside the app; it
+            carries no intent-filter, because every caller names it outright.
+        -->
+        <activity
+            android:name=".VoiceActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <service
             android:name=".SurfaceTileService"
             android:exported="true"

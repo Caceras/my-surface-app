@@ -40,6 +40,28 @@ interface SurfaceBrain {
 }
 
 /**
+ * The one place a surface asks for a brain.
+ *
+ * It exists so the JVM tests can stand in a brain that streams. The two voice
+ * behaviours worth testing -- speaking the first sentence before the answer
+ * finishes, and barge-in while it is still arriving -- have no stream to run
+ * against otherwise: CoreBrain answers synchronously through onResult and
+ * never calls onPartial, and the nano brain needs AICore, which exists on no
+ * CI runner. Nothing but a test ever sets this.
+ */
+object Brains {
+
+    private var standIn: SurfaceBrain? = null
+
+    fun get(): SurfaceBrain = standIn ?: BrainProvider.get()
+
+    /** Test-only. Pass null to go back to the flavour's own brain. */
+    fun useForTest(brain: SurfaceBrain?) {
+        standIn = brain
+    }
+}
+
+/**
  * One entry in the text-selection popup. The alias name is the manifest
  * <activity-alias> that produced the intent, which is how a single activity
  * serves several menu items.

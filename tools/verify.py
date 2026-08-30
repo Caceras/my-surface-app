@@ -21,9 +21,15 @@ Checks performed:
       and then silently runs the wrong task.
   8c. Every shortcut's android:targetPackage matches the applicationId of the
       build it ships in -- a flavour with an applicationIdSuffix cannot share
-      one shortcuts.xml from src/main.
+      one shortcuts.xml from src/main. Qualified copies (res/xml-v31/) are
+      checked too: a qualifier replaces the default file rather than merging
+      with it, so a stale copy is a second place to get this wrong.
   9. Source sets that are meant to have no dependencies really have none.
  10. The workflow parses and references APK paths that the build produces.
+ 11. Kotlin that uses SpeechRecognizer is backed by a RECORD_AUDIO permission.
+ 12. Kotlin that uses SpeechRecognizer or TextToSpeech has the matching
+     <queries> entry. Package visibility applies from targetSdk 30, and
+     without the entry the service simply never binds -- silently.
 
 Usage:
     python verify.py <project-dir>
@@ -421,6 +427,27 @@ def application_ids(project):
     return ids
 
 
+def shortcut_files(project, sets):
+    """Every shortcuts.xml, including qualified copies like res/xml-v31/.
+
+    A qualified resource replaces the default rather than merging with it, so
+    res/xml-v31/shortcuts.xml has to carry the entries res/xml/shortcuts.xml
+    carries -- and has to get android:targetPackage right all over again.
+    """
+    found = []
+    for source_set in sets:
+        res_dir = os.path.join(project, "app", "src", source_set, "res")
+        if not os.path.isdir(res_dir):
+            continue
+        for entry in sorted(os.listdir(res_dir)):
+            if entry != "xml" and not entry.startswith("xml-"):
+                continue
+            path = os.path.join(res_dir, entry, "shortcuts.xml")
+            if os.path.isfile(path):
+                found.append((source_set, path))
+    return found
+
+
 def check_shortcut_packages(project, sets, problems):
     """Every shortcut points at the applicationId of its own build.
 
@@ -434,11 +461,7 @@ def check_shortcut_packages(project, sets, problems):
 
     suffixed = {s for s, app_id in ids.items() if s != "main" and app_id != ids["main"]}
 
-    for source_set in sets:
-        path = os.path.join(project, "app", "src", source_set,
-                            "res", "xml", "shortcuts.xml")
-        if not os.path.isfile(path):
-            continue
+    for source_set, path in shortcut_files(project, sets):
         try:
             root = ET.parse(path).getroot()
         except ET.ParseError:
@@ -469,6 +492,70 @@ def check_shortcut_packages(project, sets, problems):
                  f"{rel}: android:targetPackage=\"{target}\" is not this "
                  f"build's applicationId ({expected}), so the shortcut opens "
                  f"another app or nothing at all.")
+
+
+# Kotlin that touches these classes needs something in the manifest that no
+# compiler and no static resource check will ever ask for. Both failures are
+# silent at runtime, which is exactly what this script is for.
+SPEECH_REQUIREMENTS = (
+    ("SpeechRecognizer", "android.speech.RecognitionService"),
+    ("TextToSpeech", "android.intent.action.TTS_SERVICE"),
+)
+
+
+def manifest_text(project, sets):
+    """Every manifest concatenated. Flavour manifests merge into main's, so
+    for these two checks it does not matter which file carries the entry."""
+    body = []
+    for source_set in sets:
+        path = os.path.join(project, "app", "src", source_set,
+                            "AndroidManifest.xml")
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8") as fh:
+                body.append(fh.read())
+    return "\n".join(body)
+
+
+def check_speech(project, sets, all_sources, problems):
+    """Speech needs a permission and two package-visibility entries.
+
+    Miss the permission and startListening() fails with
+    ERROR_INSUFFICIENT_PERMISSIONS. Miss the <queries> entry and, from
+    targetSdk 30 on, the recogniser or the engine cannot be resolved at all
+    and simply never binds -- with nothing in the log worth reading. Neither
+    shows up in a compile, a resource check, or an emulator running an older
+    API level.
+    """
+    used = {}
+    for source_set, paths in all_sources.items():
+        for path in paths:
+            with open(path, encoding="utf-8") as fh:
+                body = strip_comments(fh.read())
+            for symbol, _ in SPEECH_REQUIREMENTS:
+                if symbol in body:
+                    used.setdefault(symbol, os.path.relpath(path, project))
+
+    if not used:
+        return
+
+    manifest = manifest_text(project, sets)
+
+    if "android.permission.RECORD_AUDIO" not in manifest:
+        where = used.get("SpeechRecognizer")
+        if where:
+            fail(problems,
+                 f"{where}: uses SpeechRecognizer, but no manifest declares "
+                 "<uses-permission android:name=\"android.permission."
+                 "RECORD_AUDIO\" /> -- startListening() will fail with "
+                 "ERROR_INSUFFICIENT_PERMISSIONS")
+
+    for symbol, action in SPEECH_REQUIREMENTS:
+        where = used.get(symbol)
+        if where and action not in manifest:
+            fail(problems,
+                 f"{where}: uses {symbol}, but no manifest has a <queries> "
+                 f"entry for {action} -- package visibility will stop it "
+                 "binding, silently")
 
 
 def check_workflow(project, problems):
@@ -534,6 +621,7 @@ def main():
     xml_files = check_xml(project, all_resources, problems)
     check_manifests(project, sets, class_names, problems)
     check_shortcut_packages(project, sets, problems)
+    check_speech(project, sets, all_sources, problems)
     check_workflow(project, problems)
 
     total_sources = sum(len(v) for v in all_sources.values())

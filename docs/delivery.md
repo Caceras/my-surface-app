@@ -33,6 +33,27 @@ Three things make it survivable:
 An install over the top keeps your data and settings; it is an upgrade, not a
 fresh install, as long as the signing key does not change (see **Signing**).
 
+## Trying a branch before it merges
+
+The loop above starts at "change lands on main", which is the wrong place to
+find out that a change is not what you wanted. So every push to any branch
+publishes its own release as well:
+
+```
+/releases/tag/preview-<branch>
+```
+
+Same two APKs, same rolling-tag trick — the tag is replaced on every push to
+that branch, so the URL is stable for the life of the branch — and the same
+debug key, so it installs straight over whatever is on the phone.
+
+It is created with `--prerelease`, and that flag is the whole reason this is
+safe to add: GitHub excludes prereleases from `/releases/latest`, so the
+bookmark on the phone keeps meaning "the build from `main`" no matter how many
+branches are in flight. Deleting the branch does not delete its preview; do
+that by hand, or leave it, since a prerelease is invisible to the bookmark
+either way.
+
 ## Why the release, not the artifact
 
 The workflow publishes the APK twice, and the distinction matters more than it

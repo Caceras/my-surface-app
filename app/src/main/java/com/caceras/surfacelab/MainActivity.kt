@@ -49,10 +49,19 @@ class MainActivity : Activity() {
     private var listening = false
     private var busy = false
 
+    /**
+     * Set on the way out, and checked by every brain callback.
+     *
+     * SurfaceBrain.run takes no cancellation token, so its callbacks arrive
+     * later whether or not this screen is still here -- landing text on a
+     * dead view and saving an answer nobody is waiting for.
+     */
+    private var gone = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val brain = BrainProvider.get()
+        val brain = Brains.get()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(color(R.color.chat_bg))
@@ -305,18 +314,20 @@ class MainActivity : Activity() {
 
         if (aloud) speaker().begin(ears.locale())
 
-        val brain = BrainProvider.get()
+        val brain = Brains.get()
         brain.run(
             context = this,
             task = Task.ASK,
             input = "",
             instruction = text,
             onPartial = { partial ->
+                if (gone) return@run
                 answer.text = partial
                 if (aloud) mouth?.follow(partial)
                 scrollToEnd()
             }
         ) { result ->
+            if (gone) return@run
             busy = false
             val note = if (result.ok) Lang.caveat(Task.ASK, text) else null
             answer.text = when {
@@ -391,6 +402,7 @@ class MainActivity : Activity() {
         input.hint = getString(R.string.listening)
 
         ears.listen(
+            onLevel = { level(it) },
             onPartial = { partial ->
                 // Words appear as they are recognised, so the screen is
                 // never blank while you are talking.
@@ -409,15 +421,47 @@ class MainActivity : Activity() {
                 listening = false
                 setMicActive(false)
                 input.hint = getString(R.string.chat_hint)
-                if (problem != null) status.text = problem
+                if (problem != null) report(problem)
             }
         )
+    }
+
+    /**
+     * The status line doubles as the voice status line -- there is only one,
+     * and both answer the same question. The missing-language case is the
+     * only speech failure with something to do about it, so it is the only
+     * one that leaves something to tap.
+     */
+    private fun report(problem: VoiceProblem) {
+        status.text = problem.message
+        if (!problem.languageMissing || !ears.canFetchLanguage()) {
+            status.setOnClickListener(null)
+            return
+        }
+        status.text = problem.message + " " + getString(R.string.get_offline_speech)
+        status.setOnClickListener {
+            status.setOnClickListener(null)
+            status.text = getString(R.string.working)
+            ears.fetchLanguage { outcome -> if (!gone) status.text = outcome }
+        }
     }
 
     private fun setMicActive(active: Boolean) {
         mic?.setColorFilter(
             color(if (active) R.color.listening else R.color.text_dim)
         )
+        if (!active) level(0f)
+    }
+
+    /**
+     * The microphone button is the level meter. rmsdB runs from roughly -2 to
+     * 10, and only the loud half of that is worth showing -- the point is
+     * that the screen is never blank while you are talking.
+     */
+    private fun level(rms: Float) {
+        val scale = 1f + (rms.coerceIn(0f, 10f) / 20f)
+        mic?.scaleX = scale
+        mic?.scaleY = scale
     }
 
     override fun onRequestPermissionsResult(
@@ -445,6 +489,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        gone = true
         ears.cancel()
         mouth?.close()
         mouth = null

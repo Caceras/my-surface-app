@@ -14,7 +14,13 @@ import java.util.Locale
 /**
  * Home screen widget showing the most recent result. A widget has no process
  * of its own, so everything it displays has to come from storage -- see
- * ResultStore. Tapping it refreshes via a broadcast back to this provider.
+ * ResultStore.
+ *
+ * Tapping it opens the hands-free screen, which is the third entry point to
+ * voice alongside the tile and the app shortcut: ask from the home screen and
+ * the answer is written back here, because every surface saves through
+ * ResultStore. On a phone with no on-device recogniser the tap falls back to
+ * the refresh broadcast this provider has always handled.
  */
 class SurfaceWidgetProvider : AppWidgetProvider() {
 
@@ -43,17 +49,29 @@ class SurfaceWidgetProvider : AppWidgetProvider() {
         val value = last?.let { if (it.length > 160) it.take(157) + "..." else it }
             ?: SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
 
-        val refresh = Intent(context, SurfaceWidgetProvider::class.java)
-            .setAction(ACTION_REFRESH)
-
         // A mutability flag is mandatory on API 31+; omitting both
         // FLAG_IMMUTABLE and FLAG_MUTABLE throws here.
-        val pending = PendingIntent.getBroadcast(
-            context,
-            0,
-            refresh,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+
+        val pending = if (Ears(context).available()) {
+            // A widget is not an activity either, so the same NEW_TASK rule
+            // as the tile applies.
+            PendingIntent.getActivity(
+                context,
+                0,
+                Intent(context, VoiceActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                flags
+            )
+        } else {
+            PendingIntent.getBroadcast(
+                context,
+                0,
+                Intent(context, SurfaceWidgetProvider::class.java)
+                    .setAction(ACTION_REFRESH),
+                flags
+            )
+        }
 
         val views = RemoteViews(context.packageName, R.layout.widget).apply {
             setTextViewText(R.id.widget_title, title)
