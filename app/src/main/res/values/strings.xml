@@ -21,4 +21,15 @@
     <string name="send">Send</string>
     <string name="cancel">Cancel</string>
     <string name="ask_title">Ask Nano</string>
+
+    <!-- The chat screen. -->
+    <string name="chat_hint">Ask anything</string>
+    <string name="listening">Listening\u2026</string>
+    <string name="mic">Speak</string>
+    <string name="mic_denied">Microphone permission was declined.</string>
+    <string name="more">More</string>
+    <string name="prepare_model">Check / prepare on-device model</string>
+    <string name="add_tile">Add tile to Quick Settings</string>
+    <string name="failed">That did not work.</string>
+    <string name="build_label">Build %1$s</string>
 </resources>

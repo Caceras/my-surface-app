@@ -35,6 +35,11 @@ private object CoreBrain : SurfaceBrain {
         onPartial: (String) -> Unit,
         onResult: (BrainResult) -> Unit
     ) {
-        onResult(BrainResult(input.uppercase(Locale.getDefault()), ok = true))
+        // The chat and the hands-free path have no selection, so the words
+        // arrive as the instruction. Handling that here rather than in the
+        // activity keeps the rule that no surface branches on which brain
+        // it happens to be talking to.
+        val material = input.ifBlank { instruction }
+        onResult(BrainResult(material.uppercase(Locale.getDefault()), ok = true))
     }
 }

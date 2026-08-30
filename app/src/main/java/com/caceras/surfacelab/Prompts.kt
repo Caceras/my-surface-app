@@ -35,13 +35,31 @@ object Prompts {
         else -> selection
     }
 
-    /** Pre-filled in the Ask box so the first tap is not a blank page. */
-    val SUGGESTIONS = listOf(
+    /**
+     * Two sets, because the two places that offer them are not the same
+     * place. "What is this actually saying?" is a fine thing to tap when you
+     * have just selected a paragraph, and nonsense on an empty chat screen
+     * where there is no "this" -- the model can only answer by asking what
+     * you meant, which is exactly what it did.
+     */
+
+    /** Offered next to a selection. There is always material to refer to. */
+    val ABOUT_SELECTION = listOf(
         "Explain this simply",
         "What is this actually saying?",
         "Translate this to English",
         "Turn this into a checklist",
         "What is wrong with this argument?",
         "Reply to this politely"
+    )
+
+    /** Offered on the empty chat screen. Each one stands on its own. */
+    val OPENERS = listOf(
+        "Explain a hard idea simply",
+        "Help me word a message",
+        "Give me three ideas for",
+        "What should I ask about",
+        "Translate to English",
+        "Write a short summary of"
     )
 }

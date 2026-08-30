@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Asked for at the moment the microphone is first tapped, never on
+         launch. Audio is transcribed on this phone and never written down. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!--
+        Package visibility, from Android 11. Without these the speech
+        recogniser and the text-to-speech engine cannot be resolved and both
+        fail to bind, silently, with nothing in the log worth reading.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

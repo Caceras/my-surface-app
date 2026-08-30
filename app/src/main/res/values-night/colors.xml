@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark values for every colour in values/colors.xml that is not an icon. -->
+<resources>
+    <color name="chat_bg">#0D141C</color>
+    <color name="bubble_you">#2A5A73</color>
+    <color name="bubble_you_text">#FFFFFF</color>
+    <color name="bubble_ai">#17212B</color>
+    <color name="bubble_ai_text">#E7EDF3</color>
+    <color name="composer_bg">#17212B</color>
+    <color name="chip_bg">#1E2A36</color>
+    <color name="text_primary">#E7EDF3</color>
+    <color name="text_dim">#8C9AA8</color>
+    <color name="accent">#5FD3C4</color>
+    <color name="listening">#FF6B6B</color>
+</resources>
