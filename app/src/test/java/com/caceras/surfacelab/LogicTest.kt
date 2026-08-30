@@ -65,10 +65,41 @@ class LogicTest {
 
     @Test
     fun `there are suggestions and they are short enough to be tappable`() {
-        assertTrue(Prompts.SUGGESTIONS.isNotEmpty())
-        Prompts.SUGGESTIONS.forEach {
-            assertTrue("suggestion too long to fit a chip: $it", it.length <= 34)
+        listOf(Prompts.ABOUT_SELECTION, Prompts.OPENERS).forEach { set ->
+            assertTrue(set.isNotEmpty())
+            set.forEach {
+                assertTrue("suggestion too long to fit a chip: $it", it.length <= 34)
+            }
         }
+    }
+
+    @Test
+    fun `the chat openers do not refer to a selection that is not there`() {
+        // "What is this actually saying?" on an empty chat screen has no
+        // "this" to refer to, and the model can only answer by asking what
+        // you meant. The openers are the set that has to stand alone.
+        Prompts.OPENERS.forEach {
+            assertFalse("opener refers to absent material: $it",
+                Regex("\\bthis\\b", RegexOption.IGNORE_CASE).containsMatchIn(it))
+        }
+    }
+
+    @Test
+    fun `a spoken sentence is spoken as soon as it is complete`() {
+        val (first, cursor) = Speech.nextChunk("Yes. And then", 0)
+        assertEquals("Yes.", first)
+        assertTrue(cursor > 0)
+        // nothing new until the next terminator arrives
+        assertEquals("", Speech.nextChunk("Yes. And then", cursor).first)
+        assertEquals("And then more.", Speech.nextChunk("Yes. And then more.", cursor).first)
+    }
+
+    @Test
+    fun `an answer with no full stop is still spoken at the end`() {
+        // "Sure" printed but never spoken is the version of this bug that
+        // the user notices, because it is the shortest answers that break.
+        assertEquals("", Speech.nextChunk("Sure", 0).first)
+        assertEquals(0, Speech.nextChunk("Sure", 0).second)
     }
 
     private fun assertNotNull(value: Any?) = assertTrue(value != null)

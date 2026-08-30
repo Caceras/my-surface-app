@@ -71,7 +71,7 @@ class ProcessTextActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             padDp(0, 4, 0, 4)
         }
-        Prompts.SUGGESTIONS.forEach { suggestion ->
+        Prompts.ABOUT_SELECTION.forEach { suggestion ->
             chips.addView(suggestionButton(this, suggestion) {
                 input.setText(suggestion)
                 input.setSelection(suggestion.length)

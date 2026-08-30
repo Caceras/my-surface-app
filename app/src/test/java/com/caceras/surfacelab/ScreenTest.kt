@@ -41,23 +41,62 @@ class ScreenTest {
     private fun texts(root: View) =
         descendants(root).filterIsInstance<TextView>().map { it.text.toString() }
 
+    /** A hidden view is still a descendant, so visibility has to be walked. */
+    private fun showing(view: View): Boolean {
+        var node: View? = view
+        while (node != null) {
+            if (node.visibility != View.VISIBLE) return false
+            node = node.parent as? View
+        }
+        return true
+    }
+
+    private fun visibleTexts(root: View) =
+        descendants(root).filterIsInstance<TextView>()
+            .filter { showing(it) }
+            .map { it.text.toString() }
+
     // ---------------------------------------------------------------- main
 
     private fun launchMain(): ActivityController<MainActivity> =
         Robolectric.buildActivity(MainActivity::class.java).setup()
 
+    private fun content(activity: android.app.Activity): View =
+        activity.findViewById(android.R.id.content)
+
+    private fun root(activity: android.app.Activity): View =
+        (content(activity) as ViewGroup).getChildAt(0)
+
+    /** The composer's text field: the only EditText on the screen. */
+    private fun composer(activity: android.app.Activity): EditText =
+        descendants(content(activity)).filterIsInstance<EditText>().first()
+
+    private fun button(activity: android.app.Activity, label: String) =
+        descendants(content(activity))
+            .filterIsInstance<android.widget.ImageButton>()
+            .first { it.contentDescription == label }
+
+    /** Bubbles live in the column inside the transcript scroller. */
+    private fun bubbles(activity: android.app.Activity): List<String> {
+        val scroll = descendants(content(activity))
+            .filterIsInstance<ScrollView>().first()
+        val column = scroll.getChildAt(0) as ViewGroup
+        return (0 until column.childCount)
+            .map { column.getChildAt(it) }
+            .filterIsInstance<TextView>()
+            .map { it.text.toString() }
+    }
+
     @Test
     fun `spacing is density-scaled, not raw pixels`() {
         val activity = launchMain().get()
-        val scroll = activity.findViewById<View>(android.R.id.content)
-            .let { descendants(it).filterIsInstance<ScrollView>().first() }
-        val column = scroll.getChildAt(0)
+        val header = (root(activity) as ViewGroup).getChildAt(0)
 
         val density = activity.resources.displayMetrics.density
         val expected = (20 * density).toInt()
 
-        assertEquals("left padding is not dp-scaled", expected, column.paddingLeft)
-        assertEquals("right padding is not dp-scaled", expected, column.paddingRight)
+        assertEquals("left padding is not dp-scaled", expected, header.paddingLeft)
+        assertEquals("right padding is not dp-scaled", expected, header.paddingRight)
     }
 
     private fun bars(top: Int, bottom: Int) = WindowInsets.Builder()
@@ -65,22 +104,22 @@ class ScreenTest {
         .build()
 
     @Test
-    fun `the scroll container consumes the system bars`() {
+    fun `the screen consumes the system bars`() {
         // Targeting SDK 35+ means edge-to-edge whether the app asks or not, so
-        // without this the first row sits under the status bar. Asserted by
-        // behaviour: hand it real insets and check the padding tracks them.
+        // without this the title sits under the status bar and the composer
+        // under the navigation bar. Asserted by behaviour: hand it real
+        // insets and check the padding tracks them.
         val activity = launchMain().get()
-        val scroll = descendants(activity.findViewById(android.R.id.content))
-            .filterIsInstance<ScrollView>().first()
+        val view = root(activity)
 
-        scroll.dispatchApplyWindowInsets(bars(0, 0))
-        val baseTop = scroll.paddingTop
-        val baseBottom = scroll.paddingBottom
+        view.dispatchApplyWindowInsets(bars(0, 0))
+        val baseTop = view.paddingTop
+        val baseBottom = view.paddingBottom
 
-        scroll.dispatchApplyWindowInsets(bars(100, 50))
+        view.dispatchApplyWindowInsets(bars(100, 50))
 
-        assertEquals("status bar inset not applied", baseTop + 100, scroll.paddingTop)
-        assertEquals("navigation bar inset not applied", baseBottom + 50, scroll.paddingBottom)
+        assertEquals("status bar inset not applied", baseTop + 100, view.paddingTop)
+        assertEquals("navigation bar inset not applied", baseBottom + 50, view.paddingBottom)
     }
 
     @Test
@@ -89,40 +128,107 @@ class ScreenTest {
         // of this bug: the content creeps down the screen on every rotation,
         // keyboard open, or theme change.
         val activity = launchMain().get()
-        val scroll = descendants(activity.findViewById(android.R.id.content))
-            .filterIsInstance<ScrollView>().first()
+        val view = root(activity)
 
-        scroll.dispatchApplyWindowInsets(bars(100, 50))
-        val once = scroll.paddingTop
-        repeat(4) { scroll.dispatchApplyWindowInsets(bars(100, 50)) }
+        view.dispatchApplyWindowInsets(bars(100, 50))
+        val once = view.paddingTop
+        repeat(4) { view.dispatchApplyWindowInsets(bars(100, 50)) }
 
-        assertEquals("padding grew on repeated inset passes", once, scroll.paddingTop)
+        assertEquals("padding grew on repeated inset passes", once, view.paddingTop)
     }
 
     @Test
-    fun `the launcher screen names every surface`() {
-        val body = texts(launchMain().get().findViewById(android.R.id.content))
-        listOf("Text selection", "Quick Settings tile", "Home screen widget",
-               "App shortcuts", "Share sheet").forEach { surface ->
-            assertTrue("missing: $surface", body.any { it.contains(surface) })
+    fun `the screen opens on a conversation, not a form`() {
+        // The regression this guards against is the screen drifting back
+        // into a list of surfaces with a prompt box bolted on. What should
+        // be visible first is somewhere to type and a way to send.
+        val activity = launchMain().get()
+        assertTrue("no composer on screen",
+            descendants(content(activity)).filterIsInstance<EditText>().isNotEmpty())
+        assertEquals("the conversation did not start empty", 0, bubbles(activity).size)
+
+        val body = visibleTexts(content(activity))
+        listOf("Quick Settings tile", "Home screen widget", "Share sheet").forEach { entry ->
+            assertTrue("$entry should be behind More, not on the chat screen",
+                body.none { line -> line.contains(entry) })
         }
     }
 
     @Test
-    fun `the launcher screen names the build it came from`() {
-        // The iteration loop is: change it, push it, install it, look. That
-        // last step needs something on screen to look at, or you cannot tell
-        // a new APK from the one already on the phone.
-        val body = texts(launchMain().get().findViewById(android.R.id.content))
-        assertTrue("no build label on screen",
+    fun `sending a message puts both sides in the conversation`() {
+        val activity = launchMain().get()
+        composer(activity).setText("hello there")
+        button(activity, activity.getString(R.string.send)).performClick()
+
+        val said = bubbles(activity)
+        assertEquals("expected a question and an answer", 2, said.size)
+        assertEquals("hello there", said[0])
+        // The core brain is a deterministic echo, which is the point of it.
+        assertEquals("HELLO THERE", said[1])
+        assertEquals("the composer was not cleared", "", composer(activity).text.toString())
+    }
+
+    @Test
+    fun `an empty message sends nothing`() {
+        val activity = launchMain().get()
+        composer(activity).setText("   ")
+        button(activity, activity.getString(R.string.send)).performClick()
+        assertEquals(0, bubbles(activity).size)
+    }
+
+    @Test
+    fun `openers fill the composer and step aside once talking has started`() {
+        val activity = launchMain().get()
+        val opener = descendants(content(activity))
+            .filterIsInstance<TextView>()
+            .first { it.text.toString() == Prompts.OPENERS.first() }
+
+        opener.performClick()
+        assertTrue("opener did not reach the composer",
+            composer(activity).text.toString().startsWith(Prompts.OPENERS.first()))
+
+        composer(activity).setText("something")
+        button(activity, activity.getString(R.string.send)).performClick()
+
+        val row = descendants(content(activity))
+            .filterIsInstance<android.widget.HorizontalScrollView>().first()
+        assertEquals("openers still showing mid-conversation", View.GONE, row.visibility)
+    }
+
+    @Test
+    fun `no microphone is offered when speech cannot stay on the device`() {
+        // Never a button that quietly ships audio somewhere: without an
+        // on-device recogniser there is no microphone at all.
+        val activity = launchMain().get()
+        val mics = descendants(content(activity))
+            .filterIsInstance<android.widget.ImageButton>()
+            .filter { it.contentDescription == activity.getString(R.string.mic) }
+        assertTrue("a mic was offered with no on-device recogniser", mics.isEmpty())
+    }
+
+    @Test
+    fun `the reference material is one tap away, not in the way`() {
+        val activity = launchMain().get()
+        val more = descendants(content(activity))
+            .filterIsInstance<TextView>()
+            .first { it.text.toString() == activity.getString(R.string.more) }
+
+        more.performClick()
+
+        val body = visibleTexts(content(activity))
+        listOf("Text selection", "Quick Settings tile", "Home screen widget",
+               "App shortcuts", "Share sheet").forEach { surface ->
+            assertTrue("missing after More: $surface", body.any { it.contains(surface) })
+        }
+        assertTrue("no build label behind More",
             body.any { it.startsWith("Build ") && it.length > "Build ".length })
     }
 
     @Test
-    fun `the brain reports its state on the launcher screen`() {
-        val body = texts(launchMain().get().findViewById(android.R.id.content))
+    fun `the brain reports its state on the chat screen`() {
+        val body = texts(content(launchMain().get()))
         assertTrue("status line never resolved",
-            body.none { it == "Checking..." })
+            body.none { it == "Working on device\u2026" })
     }
 
     // ------------------------------------------------------- text selection
@@ -167,7 +273,7 @@ class ScreenTest {
 
         val root = dialog.window!!.decorView
         val buttons = descendants(root).filterIsInstance<Button>()
-        Prompts.SUGGESTIONS.forEach { suggestion ->
+        Prompts.ABOUT_SELECTION.forEach { suggestion ->
             assertTrue(
                 "suggestion not offered: $suggestion",
                 buttons.any { it.text.toString() == suggestion }
@@ -184,11 +290,11 @@ class ScreenTest {
         val root = dialog.window!!.decorView
         val input = descendants(root).filterIsInstance<EditText>().first()
         val chip = descendants(root).filterIsInstance<Button>()
-            .first { it.text.toString() == Prompts.SUGGESTIONS.first() }
+            .first { it.text.toString() == Prompts.ABOUT_SELECTION.first() }
 
         chip.performClick()
 
-        assertEquals(Prompts.SUGGESTIONS.first(), input.text.toString())
+        assertEquals(Prompts.ABOUT_SELECTION.first(), input.text.toString())
     }
 
     @Test
@@ -202,6 +308,6 @@ class ScreenTest {
             .firstOrNull()
         assertTrue("suggestions are not in a horizontal scroller", row != null)
         assertTrue((row!!.getChildAt(0) as LinearLayout).childCount ==
-            Prompts.SUGGESTIONS.size)
+            Prompts.ABOUT_SELECTION.size)
     }
 }

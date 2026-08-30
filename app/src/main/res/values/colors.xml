@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    One palette, two files. values-night/ overrides these, so nothing in the
+    code ever asks which theme is running: the framework picks the file.
+    Hard-coding #FFFFFF anywhere is how an app ends up unreadable at night.
+-->
 <resources>
     <color name="ic_launcher_background">#1F3B4D</color>
+
+    <color name="chat_bg">#F2F4F8</color>
+    <color name="bubble_you">#1F3B4D</color>
+    <color name="bubble_you_text">#FFFFFF</color>
+    <color name="bubble_ai">#FFFFFF</color>
+    <color name="bubble_ai_text">#16202A</color>
+    <color name="composer_bg">#FFFFFF</color>
+    <color name="chip_bg">#E4E8EF</color>
+    <color name="text_primary">#16202A</color>
+    <color name="text_dim">#5F6C7B</color>
+    <color name="accent">#1F3B4D</color>
+    <color name="listening">#D93A3A</color>
 </resources>
