@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.StatusBarManager
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
@@ -25,6 +26,18 @@ import android.widget.TextView
  * numbers made the whole screen shrink as density rose.
  */
 class MainActivity : Activity() {
+
+    /**
+     * The version this APK was built from. Shown on screen because the whole
+     * loop -- change it, push it, install it -- is worth nothing if you
+     * cannot tell which build you are looking at.
+     */
+    private fun buildLabel(): String =
+        try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
+        } catch (e: PackageManager.NameNotFoundException) {
+            "unknown"
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,6 +72,7 @@ class MainActivity : Activity() {
             getString(R.string.brain_name) + " - " + getString(R.string.brain_blurb),
             14f, dim = true
         ))
+        root.addView(label("Build " + buildLabel(), 13f, dim = true))
 
         val statusLine = label("Checking...", 15f).apply { padDp(0, 16, 0, 8) }
         root.addView(statusLine)

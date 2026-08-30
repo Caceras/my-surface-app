@@ -82,7 +82,7 @@ jobs:
           gradle-version: "9.7.1"
 
       - name: Build
-        run: gradle ${{ matrix.task }} --no-daemon --stacktrace
+        run: gradle ${{ matrix.task }} -PbuildNumber=${{ github.run_number }} --no-daemon --stacktrace
 
       # Naming the APK after the flavour stops downloads from piling up as
       # "app-debug(1).apk" in the phone's Downloads folder.
@@ -122,6 +122,9 @@ jobs:
             apks/*.apk \
             --title "Debug build ${{ github.run_number }}" \
             --notes "Open this page on your phone and tap an .apk to install.
+
+          This is build **${{ github.run_number }}**. The app shows the same number on its
+          first screen, so you can tell at a glance whether the install took.
 
           - **nano** - Gemini Nano on the device. Select text anywhere, tap Ask, and prompt it freely. Summarise, Proofread and Make professional are presets. Works with the radios off.
           - **core** - the zero-dependency template. No model, no dependencies.
