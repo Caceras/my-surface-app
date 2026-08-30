@@ -1,6 +1,7 @@
 package com.caceras.surfacelab
 
 import android.app.Activity
+import android.os.Build
 import android.content.Intent
 import android.graphics.Insets
 import android.view.View
@@ -14,10 +15,12 @@ import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowSpeechRecognizer
 import org.robolectric.android.controller.ActivityController
 
 /**
@@ -195,15 +198,29 @@ class ScreenTest {
         assertEquals("openers still showing mid-conversation", View.GONE, row.visibility)
     }
 
+    private fun mics(activity: android.app.Activity) =
+        descendants(content(activity))
+            .filterIsInstance<android.widget.ImageButton>()
+            .filter { it.contentDescription == activity.getString(R.string.mic) }
+
     @Test
     fun `no microphone is offered when speech cannot stay on the device`() {
         // Never a button that quietly ships audio somewhere: without an
-        // on-device recogniser there is no microphone at all.
+        // on-device recogniser there is no microphone at all. Set both ways
+        // explicitly rather than trusting a default -- the first version of
+        // this test assumed the default was false, and it is not.
+        ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(false)
         val activity = launchMain().get()
-        val mics = descendants(content(activity))
-            .filterIsInstance<android.widget.ImageButton>()
-            .filter { it.contentDescription == activity.getString(R.string.mic) }
-        assertTrue("a mic was offered with no on-device recogniser", mics.isEmpty())
+        assertTrue("a mic was offered with no on-device recogniser",
+            mics(activity).isEmpty())
+    }
+
+    @Test
+    fun `the microphone appears when speech can stay on the device`() {
+        assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+        val activity = launchMain().get()
+        assertEquals("expected exactly one mic", 1, mics(activity).size)
     }
 
     @Test
