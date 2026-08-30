@@ -208,15 +208,15 @@ promises, so it is worth being exact.
   placeholder, so the honest options are a flavour-specific `shortcuts.xml`
   or a dynamic shortcut built from the real application id.
 
-  Worth knowing before you get there: **this already affects the two
-  shortcuts in the repo today.** In the `nano` APK both point at
-  `com.caceras.surfacelab`, which is a different app — the core build, if it
-  happens to be installed, and nothing at all if it is not. It is a
-  pre-existing bug rather than one voice introduces, and it is not fixed
-  here, because a document should not be quietly changing the manifest. The tile
-  reports it in its subtitle like any other unavailable state, and
+  The tile reports it in its subtitle like any other unavailable state, and
   `VoiceActivity` opens on that status rather than a mic it cannot use. A
   shortcut promising "tap, talk" on a Pixel 4 is worse than no shortcut.
+
+  That last hazard was already real, and is now fixed: in the `nano` APK both
+  existing shortcuts pointed at `com.caceras.surfacelab`, a different
+  application. `shortcuts.xml` lives once per flavour, and `verify.py` check
+  8c fails the build if a shortcut ever points anywhere but its own build's
+  `applicationId`.
 - Nothing is recorded to disk. "No audio is ever written" is a stronger claim
   than a privacy policy and it costs nothing to keep.
 
