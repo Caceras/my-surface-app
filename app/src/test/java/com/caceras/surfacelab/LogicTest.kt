@@ -127,6 +127,70 @@ class LogicTest {
         assertTrue(spoken.contains("Ukraine War:"))
     }
 
+    // ------------------------------------------------------- conversation
+
+    @Test
+    fun `one question on its own is sent exactly as typed`() {
+        assertEquals("list 10 more",
+            Prompts.conversation(emptyList(), "list 10 more"))
+    }
+
+    @Test
+    fun `the history is sent oldest first with the new question last`() {
+        val history = listOf(
+            Turn("give me three ideas", "one, two, three"),
+            Turn("which is cheapest", "the second")
+        )
+        val prompt = Prompts.conversation(history, "list 10 more")
+
+        assertTrue(prompt.indexOf("give me three ideas") <
+            prompt.indexOf("which is cheapest"))
+        assertTrue(prompt.indexOf("which is cheapest") <
+            prompt.indexOf("list 10 more"))
+        assertTrue("the new question must come last",
+            prompt.trimEnd().endsWith("list 10 more"))
+        assertTrue("the answers are context too", prompt.contains("one, two, three"))
+    }
+
+    @Test
+    fun `an old conversation is trimmed from the front, not the back`() {
+        // Nano's context is small and it has to fit its answer in there too,
+        // so something has to go. It must not be the turn just before the
+        // question, which is the one the question refers to.
+        val history = (1..60).map { Turn("question $it", "answer $it ${"x".repeat(60)}") }
+        val prompt = Prompts.conversation(history, "and now")
+
+        assertFalse("the oldest turn should have been dropped",
+            prompt.contains("question 1" + "\n"))
+        assertTrue("the most recent turn must survive", prompt.contains("question 60"))
+        assertTrue("the budget was blown: ${prompt.length}", prompt.length < 2000)
+    }
+
+    @Test
+    fun `a single turn too big for the budget is cut short rather than dropped`() {
+        // Dropping it entirely would send the follow-up with no context at
+        // all, which is the bug this whole thing exists to fix.
+        val history = listOf(Turn("summarise this", "y".repeat(5000)))
+        val prompt = Prompts.conversation(history, "shorter please")
+
+        assertTrue("the turn was dropped instead of trimmed",
+            prompt.contains("summarise this"))
+        assertTrue("nothing of the answer survived", prompt.contains("yyyy"))
+        assertTrue("the budget was blown: ${prompt.length}", prompt.length < 2000)
+        assertTrue(prompt.trimEnd().endsWith("shorter please"))
+    }
+
+    @Test
+    fun `a speaker label the model copied is stripped from the answer`() {
+        // Give a model a transcript and it will sometimes write the next
+        // line of it, name included.
+        assertEquals("hello back", Prompts.reply("Assistant: hello back"))
+        assertEquals("hello back", Prompts.reply("AI: hello back"))
+        assertEquals("an ordinary answer", Prompts.reply("an ordinary answer"))
+        assertEquals("Assistants are useful",
+            Prompts.reply("Assistants are useful"))
+    }
+
     private fun assertNotNull(value: Any?) = assertTrue(value != null)
     private fun assertNull(value: Any?) = assertTrue("expected null, got $value", value == null)
 }
