@@ -5,7 +5,15 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Plain JVM tests -- no Android, no Robolectric, instant. */
+/**
+ * Plain JVM tests -- no Android, no Robolectric, instant.
+ *
+ * Which means nothing here may touch a real framework class. Against the stub
+ * android.jar every method throws "not mocked", so a test that reaches for one
+ * fails for a reason that has nothing to do with what it was checking.
+ * Markdown.render() builds a SpannableStringBuilder and so is tested in
+ * MarkdownTest; Markdown.strip() is pure Kotlin and stays here.
+ */
 class LogicTest {
 
     @Test
@@ -103,30 +111,11 @@ class LogicTest {
     }
 
     @Test
-    fun `markdown punctuation does not reach the screen`() {
-        // The phone showed: *   **Ukraine War:** Fighting remains intense
-        // -- asterisks and all, because the model writes Markdown whether or
-        // not anyone asked it to.
-        val rendered = Markdown.render("*   **Ukraine War:** Fighting is intense").toString()
-        assertFalse("asterisks survived: $rendered", rendered.contains("*"))
-        assertTrue(rendered.startsWith("\u2022"))
-        assertTrue(rendered.contains("Ukraine War:"))
-        assertTrue(rendered.contains("Fighting is intense"))
-    }
-
-    @Test
-    fun `headings and bold lose their marks but keep their words`() {
-        val rendered = Markdown.render("## Today\n**Bold** and plain").toString()
-        assertFalse(rendered.contains("#"))
-        assertFalse(rendered.contains("*"))
-        assertTrue(rendered.contains("Today"))
-        assertTrue(rendered.contains("Bold and plain"))
-    }
-
-    @Test
-    fun `ordinary text passes through untouched`() {
+    fun `plain text is left exactly as it is`() {
+        // strip() is pure Kotlin, so it belongs here. Everything that builds
+        // a SpannableStringBuilder lives in MarkdownTest instead -- see the
+        // note at the top of this file.
         val plain = "No markdown here, just a sentence."
-        assertEquals(plain, Markdown.render(plain).toString())
         assertEquals(plain, Markdown.strip(plain))
     }
 

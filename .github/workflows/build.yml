@@ -38,7 +38,16 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # Pinned rather than defaulted, because the default package list is
+      # "tools platform-tools" and "tools" is an obsolete meta-package that
+      # drags in the ~1 GB Android Emulator. Nothing here needs it: the JVM
+      # tests run on Robolectric and the builds never start a device. It cost
+      # a red build once already, when that download unzipped corrupt --
+      # "Error on ZipFile unknown archive" -- and took the whole job with it
+      # before a single test ran.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.7.1"
@@ -75,7 +84,16 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      # Pinned rather than defaulted, because the default package list is
+      # "tools platform-tools" and "tools" is an obsolete meta-package that
+      # drags in the ~1 GB Android Emulator. Nothing here needs it: the JVM
+      # tests run on Robolectric and the builds never start a device. It cost
+      # a red build once already, when that download unzipped corrupt --
+      # "Error on ZipFile unknown archive" -- and took the whole job with it
+      # before a single test ran.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
 
       - uses: gradle/actions/setup-gradle@v4
         with:
