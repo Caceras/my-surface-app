@@ -161,8 +161,7 @@ class LogicTest {
         val prompt = Prompts.conversation(history, "and now")
 
         assertFalse("the oldest turn should have been dropped",
-            prompt.contains("question 1
-"))
+            prompt.contains("question 1" + "\n"))
         assertTrue("the most recent turn must survive", prompt.contains("question 60"))
         assertTrue("the budget was blown: ${prompt.length}", prompt.length < 2000)
     }

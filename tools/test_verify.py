@@ -156,6 +156,27 @@ def speech_without_queries(project):
     add_speech(project, PERMISSION)
 
 
+def unterminated_string(project):
+    """A string literal broken across two lines, exactly as one shipped.
+
+    A heredoc turned a \\n into a real newline, the checker had nothing to
+    say about it, and the compile error arrived from CI two minutes later.
+    """
+    path = kotlin_file(project)
+    with open(path, encoding="utf-8") as fh:
+        body = fh.read()
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(body + '\n\nprivate val broken = "not closed\n"\n')
+
+
+def unterminated_string_in_a_test(project):
+    """The same thing in a test source set, which the other checks skip."""
+    path = os.path.join(project, "app", "src", "test", "java", "Probe.kt")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write('class Probe {\n    val x = "not closed\n"\n}\n')
+
+
 def workflow_without_permission(project):
     path = os.path.join(project, ".github", "workflows", "build.yml")
     edit(path, "contents: write", "contents: read")
@@ -170,6 +191,8 @@ CASES = [
     ("workflow without contents: write", workflow_without_permission),
     ("speech without RECORD_AUDIO", speech_without_permission),
     ("speech without a <queries> entry", speech_without_queries),
+    ("string literal split across lines", unterminated_string),
+    ("the same, in a test source set", unterminated_string_in_a_test),
 ]
 
 

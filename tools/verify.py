@@ -30,6 +30,8 @@ Checks performed:
  12. Kotlin that uses SpeechRecognizer or TextToSpeech has the matching
      <queries> entry. Package visibility applies from targetSdk 30, and
      without the entry the service simply never binds -- silently.
+ 13. Every Kotlin string literal closes on the line it opens. Test sources
+     included, since that is where this last went wrong.
 
 Usage:
     python verify.py <project-dir>
@@ -558,6 +560,69 @@ def check_speech(project, sets, all_sources, problems):
                  "binding, silently")
 
 
+def all_kotlin(project):
+    """Every .kt under app/src, test source sets included.
+
+    The other checks skip test sources on purpose -- they are allowed
+    dependencies the shipped sets are not. Syntax is not a dependency.
+    """
+    root = os.path.join(project, "app", "src")
+    found = []
+    for base, _, names in os.walk(root):
+        found.extend(os.path.join(base, n) for n in sorted(names)
+                     if n.endswith(".kt"))
+    return sorted(found)
+
+
+def check_kotlin_strings(project, problems):
+    """Every string literal closes on the line it opens.
+
+    A literal broken across two lines is a compile error, and the compiler
+    is a CI round trip away: this repo has no Android SDK to build against
+    locally, so a stray newline inside a "..." costs a full red build to
+    find out about. It has cost one already.
+
+    Kotlin allows multi-line strings only in a raw \"\"\"...\"\"\" block, so
+    outside one an odd number of unescaped quotes on a line is always wrong.
+    Comments are stripped first, because prose quotes legitimately span
+    lines in a KDoc.
+    """
+    for path in all_kotlin(project):
+        rel = os.path.relpath(path, project)
+        raw = False
+        block = False
+        with open(path, encoding="utf-8") as handle:
+            for number, line in enumerate(handle, 1):
+                if not raw:
+                    code = line
+                    if block:
+                        if "*/" in code:
+                            code = code.split("*/", 1)[1]
+                            block = False
+                        else:
+                            continue
+                    code = re.sub(r"/\*.*?\*/", "", code)
+                    if "/*" in code:
+                        code = code.split("/*", 1)[0]
+                        block = True
+                else:
+                    code = line
+
+                if line.count('"""') % 2 == 1:
+                    raw = not raw
+                    continue
+                if raw:
+                    continue
+
+                code = re.sub(r"//.*", "", code)
+                code = re.sub(r"\\.", "", code)      # escapes, including \"
+                code = re.sub(r"'.'", "", code)      # the char literal '"'
+                if code.count('"') % 2 == 1:
+                    fail(problems,
+                         f"{rel}:{number}: string literal is not closed on "
+                         f"this line -- {line.strip()[:60]}")
+
+
 def check_workflow(project, problems):
     path = os.path.join(project, ".github", "workflows", "build.yml")
     if not os.path.isfile(path):
@@ -622,6 +687,7 @@ def main():
     check_manifests(project, sets, class_names, problems)
     check_shortcut_packages(project, sets, problems)
     check_speech(project, sets, all_sources, problems)
+    check_kotlin_strings(project, problems)
     check_workflow(project, problems)
 
     total_sources = sum(len(v) for v in all_sources.values())
