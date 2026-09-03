@@ -28,6 +28,7 @@
     <string name="mic">Speak</string>
     <string name="mic_denied">Microphone permission was declined.</string>
     <string name="more">More</string>
+    <string name="new_chat">New</string>
     <string name="prepare_model">Check / prepare on-device model</string>
     <string name="add_tile">Add tile to Quick Settings</string>
     <string name="failed">That did not work.</string>

@@ -44,6 +44,16 @@ class MainActivity : Activity() {
     private val ears by lazy { Ears(this) }
     private var mouth: Mouth? = null
 
+    /**
+     * Every exchange on this screen, oldest first.
+     *
+     * Held here and on disk, because it is both what gets drawn and what
+     * gets sent: a chat screen that shows the conversation but does not
+     * send it is the bug this fixes, and one that sends it but forgets on
+     * rotation is the same bug with extra steps.
+     */
+    private val history = mutableListOf<Turn>()
+
     /** True while the pending question came from the microphone. */
     private var askedAloud = false
     private var listening = false
@@ -78,6 +88,16 @@ class MainActivity : Activity() {
         root.padForSystemBars()
 
         brain.status(this) { status.text = it.label }
+
+        history.addAll(Chat.load(this))
+        history.forEach { turn ->
+            addBubble(turn.you, fromUser = true)
+            addBubble(turn.reply, fromUser = false).text = Markdown.render(turn.reply)
+        }
+        if (history.isNotEmpty()) {
+            openers.visibility = View.GONE
+            scrollToEnd()
+        }
 
         // Anything shared into the app becomes the next thing you send,
         // rather than a read-only block of text to look at.
@@ -124,11 +144,22 @@ class MainActivity : Activity() {
                 if (panel.visibility == View.GONE) View.VISIBLE else View.GONE
         }
 
+        // Now that the screen remembers, it needs a way to stop remembering:
+        // stale context makes later answers worse, not better.
+        val fresh = TextView(this).apply {
+            text = getString(R.string.new_chat)
+            textSize = 14f
+            setTextColor(color(R.color.text_dim))
+            padDp(4, 8, 4, 8)
+            setOnClickListener { newChat() }
+        }
+
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(titles, LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(fresh)
             addView(more)
         }
 
@@ -319,7 +350,7 @@ class MainActivity : Activity() {
             context = this,
             task = Task.ASK,
             input = "",
-            instruction = text,
+            instruction = Prompts.conversation(history, text),
             onPartial = { partial ->
                 if (gone) return@run
                 answer.text = Markdown.render(partial)
@@ -330,17 +361,39 @@ class MainActivity : Activity() {
             if (gone) return@run
             busy = false
             val note = if (result.ok) Lang.caveat(Task.ASK, text) else null
+            val said = Prompts.reply(result.text)
+
+            // Rendered, not raw. The streaming path above already rendered
+            // each partial, and this line used to hand back the unrendered
+            // string at the end -- so every finished answer on the phone
+            // showed its own asterisks no matter what the partials did.
             answer.text = when {
-                result.ok && note == null -> result.text
-                result.ok -> result.text + "\n\n" + note
-                else -> result.note ?: getString(R.string.failed)
+                result.ok && note == null -> Markdown.render(said)
+                result.ok -> Markdown.render(said + "\n\n" + note)
+                else -> Markdown.render(result.note ?: getString(R.string.failed))
             }
             if (result.ok) {
-                ResultStore.save(this, Task.ASK, result.text)
-                if (aloud) mouth?.finish(Markdown.strip(result.text))
+                remember(Turn(text, said))
+                ResultStore.save(this, Task.ASK, said)
+                if (aloud) mouth?.finish(Markdown.strip(said))
             }
             scrollToEnd()
         }
+    }
+
+    private fun remember(turn: Turn) {
+        history.add(turn)
+        Chat.save(this, history)
+    }
+
+    /** Forget the conversation and start over, on screen and on disk. */
+    private fun newChat() {
+        mouth?.hush()
+        history.clear()
+        Chat.clear(this)
+        messages.removeAllViews()
+        openers.visibility = View.VISIBLE
+        input.setText("")
     }
 
     private fun addBubble(text: String, fromUser: Boolean): TextView {

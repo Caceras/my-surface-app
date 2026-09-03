@@ -37,6 +37,16 @@ import org.robolectric.android.controller.ActivityController
 @RunWith(AndroidJUnit4::class)
 class ScreenTest {
 
+    /**
+     * The chat screen now restores its conversation from disk on launch, so
+     * a test that counts bubbles is only counting its own if the store is
+     * empty when it starts.
+     */
+    @org.junit.Before
+    fun startWithNoConversation() {
+        Chat.clear(org.robolectric.RuntimeEnvironment.getApplication())
+    }
+
     private fun descendants(view: View): List<View> =
         if (view !is ViewGroup) listOf(view)
         else listOf(view) + (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) }

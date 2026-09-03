@@ -335,8 +335,12 @@ class VoiceTest {
  * Twelve lines, and it never ships: CoreBrain answers synchronously through
  * onResult and never calls onPartial, so without this the two tests that
  * matter most above would have no stream to run against.
+ *
+ * Internal rather than private because ScreenTest needs it too: it is the
+ * only way to see the prompt the chat screen actually sends, which is where
+ * the conversation history either is or is not.
  */
-private class StreamingBrain : SurfaceBrain {
+internal class StreamingBrain : SurfaceBrain {
 
     override val tasks = listOf(Task.ASK)
 
@@ -375,5 +379,11 @@ private class StreamingBrain : SurfaceBrain {
     fun complete(text: String) {
         done = true
         result?.invoke(BrainResult(text, ok = true))
+    }
+
+    /** The end of an answer that did not work. */
+    fun fail(note: String) {
+        done = true
+        result?.invoke(BrainResult.failure(note))
     }
 }
