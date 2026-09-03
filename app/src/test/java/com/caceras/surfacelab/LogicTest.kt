@@ -102,6 +102,42 @@ class LogicTest {
         assertEquals(0, Speech.nextChunk("Sure", 0).second)
     }
 
+    @Test
+    fun `markdown punctuation does not reach the screen`() {
+        // The phone showed: *   **Ukraine War:** Fighting remains intense
+        // -- asterisks and all, because the model writes Markdown whether or
+        // not anyone asked it to.
+        val rendered = Markdown.render("*   **Ukraine War:** Fighting is intense").toString()
+        assertFalse("asterisks survived: $rendered", rendered.contains("*"))
+        assertTrue(rendered.startsWith("\u2022"))
+        assertTrue(rendered.contains("Ukraine War:"))
+        assertTrue(rendered.contains("Fighting is intense"))
+    }
+
+    @Test
+    fun `headings and bold lose their marks but keep their words`() {
+        val rendered = Markdown.render("## Today\n**Bold** and plain").toString()
+        assertFalse(rendered.contains("#"))
+        assertFalse(rendered.contains("*"))
+        assertTrue(rendered.contains("Today"))
+        assertTrue(rendered.contains("Bold and plain"))
+    }
+
+    @Test
+    fun `ordinary text passes through untouched`() {
+        val plain = "No markdown here, just a sentence."
+        assertEquals(plain, Markdown.render(plain).toString())
+        assertEquals(plain, Markdown.strip(plain))
+    }
+
+    @Test
+    fun `the spoken version has no punctuation to read aloud`() {
+        // Otherwise the phone says "star star Ukraine War colon star star".
+        val spoken = Markdown.strip("*   **Ukraine War:** Fighting is intense")
+        assertFalse("asterisks would be spoken: $spoken", spoken.contains("*"))
+        assertTrue(spoken.contains("Ukraine War:"))
+    }
+
     private fun assertNotNull(value: Any?) = assertTrue(value != null)
     private fun assertNull(value: Any?) = assertTrue("expected null, got $value", value == null)
 }

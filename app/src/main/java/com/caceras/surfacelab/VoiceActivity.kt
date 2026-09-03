@@ -289,7 +289,7 @@ class VoiceActivity : Activity() {
             instruction = spoken,
             onPartial = { partial ->
                 if (!gone) {
-                    answer.text = partial
+                    answer.text = Markdown.render(partial)
                     if (state == State.THINKING) {
                         state = State.SPEAKING
                         status.text = getString(R.string.answering)
@@ -297,7 +297,7 @@ class VoiceActivity : Activity() {
                     // Speech starts at the first finished sentence, not at
                     // the end of the answer. This is the whole difference
                     // between immediate and slow.
-                    voice.follow(partial)
+                    voice.follow(Markdown.strip(partial))
                     scrollToEnd()
                 }
             }
@@ -316,7 +316,9 @@ class VoiceActivity : Activity() {
         }
 
         val note = Lang.caveat(Task.ASK, spoken)
-        answer.text = if (note == null) result.text else result.text + "\n\n" + note
+        answer.text = Markdown.render(
+            if (note == null) result.text else result.text + "\n\n" + note
+        )
         status.text = getString(R.string.answering)
 
         // What you asked in the kitchen is on the home screen afterwards.
@@ -324,7 +326,7 @@ class VoiceActivity : Activity() {
 
         // The tail that never got a full stop. Without this, "Sure" and every
         // short answer is printed and never spoken.
-        voice.finish(result.text)
+        voice.finish(Markdown.strip(result.text))
         scrollToEnd()
 
         // Nothing was queued -- no engine, muted by a barge-in, or an answer

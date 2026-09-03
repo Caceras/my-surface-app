@@ -322,8 +322,8 @@ class MainActivity : Activity() {
             instruction = text,
             onPartial = { partial ->
                 if (gone) return@run
-                answer.text = partial
-                if (aloud) mouth?.follow(partial)
+                answer.text = Markdown.render(partial)
+                if (aloud) mouth?.follow(Markdown.strip(partial))
                 scrollToEnd()
             }
         ) { result ->
@@ -337,7 +337,7 @@ class MainActivity : Activity() {
             }
             if (result.ok) {
                 ResultStore.save(this, Task.ASK, result.text)
-                if (aloud) mouth?.finish(result.text)
+                if (aloud) mouth?.finish(Markdown.strip(result.text))
             }
             scrollToEnd()
         }
