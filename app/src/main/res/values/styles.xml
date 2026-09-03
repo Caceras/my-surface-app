@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The stock DeviceDefault theme draws a title bar with the app name in
+        it, and the chat screen draws its own header underneath. Two titles,
+        one above the other, is the single thing that made the screen look
+        unfinished. This turns the system one off and keeps everything else
+        the platform gives us, including day/night.
+    -->
+    <style name="Chat" parent="@android:style/Theme.DeviceDefault.DayNight">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/chat_bg</item>
+    </style>
+</resources>

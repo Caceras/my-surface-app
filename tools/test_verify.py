@@ -112,6 +112,50 @@ def missing_launcher(project):
          "android.intent.category.DEFAULT")
 
 
+SPEECH_SOURCE = """package com.example.probe
+
+import android.content.Context
+import android.speech.SpeechRecognizer
+
+object Listener {
+    fun start(context: Context) {
+        SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+    }
+}
+"""
+
+QUERIES = """    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+"""
+
+PERMISSION = """    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+"""
+
+
+def add_speech(project, manifest_addition):
+    """Use the recogniser from Kotlin, with only half of what it needs.
+
+    Both halves are invisible to the compiler and to every other check here:
+    without the permission startListening() fails at runtime, and without the
+    <queries> entry the service never binds at all.
+    """
+    src = os.path.dirname(kotlin_file(project))
+    with open(os.path.join(src, "Listener.kt"), "w", encoding="utf-8") as fh:
+        fh.write(SPEECH_SOURCE)
+    edit(manifest(project), "    <application", manifest_addition + "\n    <application")
+
+
+def speech_without_permission(project):
+    add_speech(project, QUERIES)
+
+
+def speech_without_queries(project):
+    add_speech(project, PERMISSION)
+
+
 def workflow_without_permission(project):
     path = os.path.join(project, ".github", "workflows", "build.yml")
     edit(path, "contents: write", "contents: read")
@@ -124,6 +168,8 @@ CASES = [
     ("intent-filter without exported", missing_exported),
     ("no launcher activity", missing_launcher),
     ("workflow without contents: write", workflow_without_permission),
+    ("speech without RECORD_AUDIO", speech_without_permission),
+    ("speech without a <queries> entry", speech_without_queries),
 ]
 
 

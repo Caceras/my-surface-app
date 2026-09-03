@@ -1,7 +1,14 @@
 # Voice
 
-Design, not yet built. Everything here is framework-only and both flavours get
-it, which is the reason it looks the way it does.
+Built. Everything here is framework-only and both flavours get it, which is
+the reason it looks the way it does.
+
+The code is `Voice.kt` (`Ears`, `Mouth`, `Speech`) and `VoiceActivity.kt`,
+plus a microphone in the chat composer and in the text-selection Ask dialog,
+and a hands-free entry point on the tile, an app shortcut and the widget. The
+rest of this document is why each piece is shaped the way it is; it was
+written before any of it existed, and the notes that turned out to be wrong
+are marked where they were wrong.
 
 ## The rule that keeps it simple
 
@@ -49,11 +56,11 @@ alias, so a `Task.SPEAK` would either fail the checker or put a junk item in
 the selection popup. Voice rides on `Task.ASK` and stays orthogonal.
 
 Hands-free there is no selection, so the transcript arrives as the
-`instruction` with `input` empty. That is right for `Prompts.user`, and wrong
-for `CoreBrain`, which uppercases `input` and ignores `instruction` — core
-voice would answer with nothing. Fix it in the brain rather than the activity:
-`(input.ifBlank { instruction }).uppercase(…)` is one line, and it preserves
-the rule that no surface ever branches on which brain it got.
+`instruction` with `input` empty. That is right for `Prompts.user`, and was
+wrong for `CoreBrain`, which uppercased `input` and ignored `instruction` —
+core voice answered with nothing. Fixed in the brain rather than in the
+activity: `(input.ifBlank { instruction }).uppercase(…)` is one line, and it
+preserves the rule that no surface ever branches on which brain it got.
 
 ## Where the mic goes
 
@@ -68,11 +75,16 @@ feels cluttered rather than magic.
 | Presets (Summarise, Proofread, Rewrite) | no | a preset needs no words |
 | Share sheet | no | you are already holding the phone and the text |
 
-The first two rows are nano-only, and not by choice: `MainActivity` builds the
-Ask box only when `brain.tasks` contains `Task.ASK`, and the `.Ask` alias lives
-in the nano manifest, so in `core` neither surface exists to put a mic on.
-Core's voice is the hands-free path — which is enough for what `core` is for,
-proving the plumbing before a model is near it.
+Only the second row turned out to be nano-only. This was written when the
+launcher screen was a list of surfaces with a prompt box among them and the
+box appeared only if `brain.tasks` contained `Task.ASK`; the screen is a chat
+window now, and the composer is unconditional, so `core` gets the microphone
+there too and answers in shouty uppercase. The `.Ask` alias still lives in the
+nano manifest, so the text-selection microphone really is nano-only.
+
+Which leaves `core` with the chat microphone and the hands-free path — more
+than enough for what `core` is for, proving the plumbing before a model is
+near it.
 
 `VoiceActivity` is the hands-free path and the only new component: tap the
 Quick Settings tile, talk, hear the answer. `minSdk` is 29, so the tile has to
@@ -251,8 +263,12 @@ which can.
 </queries>
 ```
 
-`VoiceActivity` needs `android:exported` on its filter — `verify.py` check 7
-catches that one for free.
+`VoiceActivity` ended up with no `intent-filter` at all: the tile, the widget
+and the shortcut each name the class outright, so a filter would only be a
+second, unused way in. It still needs `android:exported="true"`, because the
+launcher process is what starts it from a static shortcut — and that is the
+one case `verify.py` check 7 does *not* cover, since check 7 keys off having a
+filter.
 
 ## Traps
 
@@ -306,27 +322,47 @@ With one gap worth naming, because it is the difference between the tests
 existing and the tests meaning anything: `CoreBrain.run` answers synchronously
 through `onResult` and never calls `onPartial`. The two tests that matter most
 here — speaking the first sentence early, and barge-in while the answer is
-still arriving — have no stream to run against. They need a fake `SurfaceBrain`
-in the test source set that emits partials on demand, which is a dozen lines
-and costs the app nothing, since it never ships.
+still arriving — have no stream to run against.
 
-Worth a test each:
+That is what `StreamingBrain` in `VoiceTest.kt` is: a `SurfaceBrain` that emits
+partials when the test says so, twenty lines, in the test source set, so it
+never ships. Reaching it needs one seam in the app — `Brains.get()`, which every
+surface now calls instead of `BrainProvider.get()` directly. That is the only
+line of shipped code voice added for the sake of the tests, and it earns its
+place: four of the twelve tests below are impossible without it.
+
+Robolectric never fires `TextToSpeech.OnInitListener` itself, which is how the
+tests found a real bug on their first run. `Mouth` set `ready = true` from
+inside the `TextToSpeech` constructor callback — at which point the `engine`
+field it then used had not been assigned, because the constructor had not
+returned. Every `speak()` went to a null engine and the phone said nothing at
+all. `onInit` is now posted to the main thread before anything touches that
+field. An engine is entitled to call back synchronously, so this was a real
+device bug rather than a shadow artefact.
+
+All twelve, and each one fails if the thing it guards is removed:
 
 - the recognizer asked for is the on-device one, with partial results enabled
+- there is no microphone at all when speech cannot stay on the device
 - partials reach the screen while listening
 - `onResults` runs the brain exactly once
 - the first sentence is spoken before the answer completes
 - a final sentence with no full stop is still spoken when the answer completes
+- sentences finished before the engine started are spoken, and in order
+- the answer is spoken in the locale that was asked for
 - barge-in stays silent while the answer is still streaming
 - the recognizer is destroyed and the TTS engine shut down when the activity
   finishes (the mic-leak and engine-leak regressions)
 - `ERROR_NO_MATCH` returns to idle without a dialog
 - a brain callback arriving after the activity is destroyed changes nothing
 
-Two checks worth adding to `verify.py`, both catching silent runtime failures,
-which is what that script is for: Kotlin referencing `SpeechRecognizer` implies
-`RECORD_AUDIO` in the manifest, and referencing either speech class implies the
-matching `<queries>` entry.
+Two checks were added to `verify.py`, both catching silent runtime failures,
+which is what that script is for. Check 11: Kotlin referencing
+`SpeechRecognizer` implies `RECORD_AUDIO` in the manifest. Check 12:
+referencing either speech class implies the matching `<queries>` entry. Check
+8c also grew to cover qualified shortcut files, because `res/xml-v31/` is now
+a second place to get `android:targetPackage` wrong. `test_verify.py` proves
+all three still catch what they claim to.
 
 ## Not building
 
@@ -357,6 +393,17 @@ path, written down, not taken today.
 
 ## Cost
 
-Two new files (`Voice.kt`, `VoiceActivity.kt`, ~250 lines), small edits to
-`MainActivity`, `ProcessTextActivity`, the tile, the manifest and `strings.xml`,
-six tests and two checker rules. One afternoon, and `core` gets voice too.
+The estimate was two new files at about 250 lines, small edits to
+`MainActivity`, `ProcessTextActivity`, the tile, the manifest and
+`strings.xml`, six tests and two checker rules.
+
+What it actually took: `Voice.kt` (~400) and `VoiceActivity.kt` (~380), edits
+to `MainActivity`, `ProcessTextActivity`, `SurfaceTileService`,
+`SurfaceWidgetProvider`, `SurfaceBrain.kt`, the manifest, `strings.xml`,
+`colors.xml` and two new `xml-v31/shortcuts.xml` files, twelve tests, three
+checker rules and two `test_verify.py` cases.
+
+The estimate was low in the places the document itself had already flagged as
+fiddly -- the shortcut qualifier, the language-pack path, and the teardown
+rules -- which is roughly the expected outcome for a design written before the
+code. And `core` does get voice too.

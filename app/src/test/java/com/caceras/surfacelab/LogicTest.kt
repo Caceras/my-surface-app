@@ -5,7 +5,15 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Plain JVM tests -- no Android, no Robolectric, instant. */
+/**
+ * Plain JVM tests -- no Android, no Robolectric, instant.
+ *
+ * Which means nothing here may touch a real framework class. Against the stub
+ * android.jar every method throws "not mocked", so a test that reaches for one
+ * fails for a reason that has nothing to do with what it was checking.
+ * Markdown.render() builds a SpannableStringBuilder and so is tested in
+ * MarkdownTest; Markdown.strip() is pure Kotlin and stays here.
+ */
 class LogicTest {
 
     @Test
@@ -100,6 +108,23 @@ class LogicTest {
         // the user notices, because it is the shortest answers that break.
         assertEquals("", Speech.nextChunk("Sure", 0).first)
         assertEquals(0, Speech.nextChunk("Sure", 0).second)
+    }
+
+    @Test
+    fun `plain text is left exactly as it is`() {
+        // strip() is pure Kotlin, so it belongs here. Everything that builds
+        // a SpannableStringBuilder lives in MarkdownTest instead -- see the
+        // note at the top of this file.
+        val plain = "No markdown here, just a sentence."
+        assertEquals(plain, Markdown.strip(plain))
+    }
+
+    @Test
+    fun `the spoken version has no punctuation to read aloud`() {
+        // Otherwise the phone says "star star Ukraine War colon star star".
+        val spoken = Markdown.strip("*   **Ukraine War:** Fighting is intense")
+        assertFalse("asterisks would be spoken: $spoken", spoken.contains("*"))
+        assertTrue(spoken.contains("Ukraine War:"))
     }
 
     private fun assertNotNull(value: Any?) = assertTrue(value != null)

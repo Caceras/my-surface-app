@@ -18,10 +18,16 @@
 
 ## What this is
 
-Select text in any app on your Pixel, tap **Ask Nano**, and type whatever you
-want to ask about it. The answer streams back from a model running on the phone
-itself — no account, no API key, no network. Turn off wifi and mobile data and
-it still works.
+Select text in any app on your Pixel, tap **Ask Nano**, and type — or say —
+whatever you want to ask about it. The answer streams back from a model running
+on the phone itself — no account, no API key, no network. Turn off wifi and
+mobile data and it still works.
+
+Speech goes the same way. The recogniser is the on-device one or there is no
+microphone at all, and the answer is read back by a voice that does not need
+the radios. Ask out loud and you hear the answer; type and you do not. There is
+no voice mode to turn on, because modality is inherited rather than
+configured.
 
 It is a prompt box, not a fixed menu. Summarise, Proofread and Make professional
 are there too, but they are ordinary prompts with a system instruction, defined
@@ -48,6 +54,7 @@ failures which would otherwise cost you a CI round trip each.
 | Dependencies | **none** | one: `com.google.mlkit:genai-prompt` |
 | Text-selection actions | Uppercase | **Ask** + Summarise, Proofread, Make professional |
 | Prompting | — | **free-form**, streaming, with system instructions |
+| Voice in and out | yes | yes |
 | Model | none | Gemini Nano, via Android AICore |
 | APK size | ~2.5 MB | ~12 MB |
 | Runs on | any Android 10+ device | supported Pixels with AICore |
@@ -82,6 +89,10 @@ prompt box, the tile reports whether Nano is present and downloads it on tap,
 the widget shows the last answer, and anything shared into the app arrives as
 material for a prompt.
 
+Once the model is ready, the tile, the widget and a **Talk** app shortcut all
+open the same hands-free screen: tap, talk, hear the answer — which is then on
+the home screen widget, because every surface saves through the same store.
+
 **One activity, several menu items.** The text-selection popup shows one entry
 per exported `<activity-alias>`, so three actions cost three manifest entries
 and zero extra classes — the activity reads back which alias was tapped. The
@@ -92,6 +103,47 @@ Not generated but documented in [`docs/surfaces.md`](docs/surfaces.md):
 notification listener, live wallpaper, accessibility service, direct share,
 deep links — plus the surfaces that **aren't** extensible (Now Playing, At a
 Glance, Quick Share), which saves you going looking.
+
+---
+
+## Voice, without breaking the offline promise
+
+The whole feature is one rule: **how you asked decides how you are answered.**
+Speak and the reply is spoken as well as printed; type and it is only printed.
+No toggle, no settings screen, no preference to persist.
+
+The offline promise is the hard part, and it is where the easy path quietly
+breaks it:
+
+- `createOnDeviceSpeechRecognizer()` only, gated on
+  `isOnDeviceRecognitionAvailable()`. Never `createSpeechRecognizer()`, whose
+  own documentation says it "is likely to stream audio to remote servers", and
+  never a cloud fallback. **No on-device recogniser means no microphone at
+  all** — not a button that quietly ships your voice somewhere.
+- `EXTRA_PREFER_OFFLINE` is a hint the service may ignore. A hint is not a
+  promise.
+- The text-to-speech voice has to be one that neither needs the network nor
+  still needs downloading. If nothing qualifies, the answer is printed and the
+  phone stays quiet rather than half-succeeding.
+- Missing a language pack is the Swedish case, and the only speech failure
+  with anything to do about it: from API 33 the app offers
+  `triggerModelDownload()` and re-checks, rather than guessing. Below that it
+  says so and points at the system's voice-input settings.
+- Nothing is recorded to disk, ever.
+
+Speech starts at the **first finished sentence**, not at the end of the answer,
+so the time to the first spoken word is one clause rather than the whole reply.
+Any touch stops it dead — and mutes the rest of the answer, since the model is
+usually still streaming.
+
+`RECORD_AUDIO` is the first runtime permission this app has ever asked for. It
+is requested on the first microphone tap, never at launch. Below API 31 there
+is no on-device recogniser API, so there is no microphone and no **Talk**
+shortcut — that entry lives in `res/xml-v31/` and older devices never load it.
+
+The reasoning, the traps and the parts deliberately not built (a wake word,
+continuous conversation, a settings screen) are in
+[`docs/voice.md`](docs/voice.md).
 
 ---
 
@@ -152,7 +204,9 @@ here, in `app/src/nano/`.
 4. Open the app and press **Check / prepare on-device model**. First run
    downloads the feature; after that it is offline forever.
 5. Type something in the **Ask** box to confirm it answers.
-6. Then select text anywhere in any app and look in the popup overflow.
+6. Tap the microphone and ask the same thing out loud. The answer should be
+   spoken back.
+7. Then select text anywhere in any app and look in the popup overflow.
 
 > **Why the release and not the artifact?** GitHub always serves workflow
 > artifacts as a `.zip`, and Android will not install a zip. A release asset is
@@ -161,6 +215,13 @@ here, in `app/src/nano/`.
 The rolling `debug-latest` tag is reused on every build, so **the download URL
 never changes** — bookmark `/releases/latest` on your phone once and re-use it
 forever.
+
+**Trying a branch before it merges.** Every push to a branch publishes its own
+prerelease at `/releases/tag/preview-<branch>`, with both APKs attached and the
+same rolling-tag trick, so a branch keeps one URL for as long as it exists. It
+is marked as a prerelease, which is what keeps `/releases/latest` meaning "the
+build from `main`". Same debug key as everything else here, so it installs
+straight over whatever is already on the phone.
 
 ---
 
@@ -182,6 +243,11 @@ catches the failures that would otherwise burn that trip:
 - a resource used from `src/main` that only some flavours define — the failure
   mode where one variant is green and the other cannot compile
 - imports that need a dependency the `core` source set deliberately refuses
+- Kotlin that uses `SpeechRecognizer` with no `RECORD_AUDIO` in the manifest
+- speech code with no matching `<queries>` entry — package visibility stops
+  the recogniser or the TTS engine binding at all, silently
+- a shortcut pointing at another app's `applicationId`, in `res/xml/` or in a
+  qualified copy like `res/xml-v31/`
 - a workflow missing `contents: write` (releases fail with a silent 403)
 
 Exit code is non-zero on failure, so it chains: `python tools/verify.py . && git push`
@@ -217,7 +283,7 @@ than papering over.
 │   └── make_assets.py    regenerates the branded images
 ├── docs/
 │   ├── ai.md             on-device AI: availability, languages, alternatives
-│   ├── voice.md          proposed: on-device speech in and out, and its traps
+│   ├── voice.md          on-device speech in and out, and its traps
 │   ├── surfaces.md       every surface, its gotchas and constraints
 │   ├── versions.md       toolchain matrix + error→fix mapping
 │   └── delivery.md       signing, install prompts, private repos

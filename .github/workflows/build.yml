@@ -38,7 +38,16 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      # Pinned rather than defaulted, because the default package list is
+      # "tools platform-tools" and "tools" is an obsolete meta-package that
+      # drags in the ~1 GB Android Emulator. Nothing here needs it: the JVM
+      # tests run on Robolectric and the builds never start a device. It cost
+      # a red build once already, when that download unzipped corrupt --
+      # "Error on ZipFile unknown archive" -- and took the whole job with it
+      # before a single test ran.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.7.1"
@@ -75,7 +84,16 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      # Pinned rather than defaulted, because the default package list is
+      # "tools platform-tools" and "tools" is an obsolete meta-package that
+      # drags in the ~1 GB Android Emulator. Nothing here needs it: the JVM
+      # tests run on Robolectric and the builds never start a device. It cost
+      # a red build once already, when that download unzipped corrupt --
+      # "Error on ZipFile unknown archive" -- and took the whole job with it
+      # before a single test ran.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -93,6 +111,50 @@ jobs:
         with:
           name: pixel-surface-lab-${{ matrix.flavour }}
           path: pixel-surface-lab-${{ matrix.flavour }}.apk
+
+  # A branch build is only useful if you can install it. Workflow artifacts
+  # are always served as a .zip and Android will not install one, so a branch
+  # gets its own release too -- marked prerelease, which keeps /releases/latest
+  # pointing at main so the bookmark on the phone still means "the real build".
+  preview:
+    name: Publish branch preview
+    needs: [build, test]
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: apks
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Branch names carry slashes and capitals; tags are happier without.
+          slug=$(printf '%s' "$GITHUB_REF_NAME" | tr '[:upper:]' '[:lower:]' \
+                 | tr -c 'a-z0-9._-' '-' | sed 's/-\+/-/g; s/^-//; s/-$//')
+          tag="preview-$slug"
+
+          # One rolling tag per branch, so the phone can keep the same URL for
+          # as long as the branch exists. --target is required because the tag
+          # does not exist yet.
+          gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            apks/*.apk \
+            --title "Preview: $GITHUB_REF_NAME (build $GITHUB_RUN_NUMBER)" \
+            --notes "Unmerged branch build of \`$GITHUB_REF_NAME\`. Open this page on your
+          phone and tap an .apk to install.
+
+          This is build **$GITHUB_RUN_NUMBER**; the app shows the same number behind
+          **More** on its first screen, so you can tell at a glance whether the install took.
+
+          A preview is signed with the same debug key as every other build here, so it
+          upgrades over an existing install of the same flavour. It is a prerelease, so
+          \`/releases/latest\` still points at the build from main."
 
   release:
     name: Publish rolling release
