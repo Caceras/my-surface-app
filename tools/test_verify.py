@@ -177,6 +177,20 @@ def unterminated_string_in_a_test(project):
         fh.write('class Probe {\n    val x = "not closed\n"\n}\n')
 
 
+def nested_block_comment(project):
+    """A path inside a KDoc, which is how this actually happened.
+
+    "app/build/screenshots/*.png" contains /*, Kotlin nests block comments,
+    and the */ meant to close the doc closes only the nested level. The
+    compiler reports "Unclosed comment" against the last line of the file.
+    """
+    path = kotlin_file(project)
+    with open(path, encoding="utf-8") as fh:
+        body = fh.read()
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("/**\n * Writes to build/screenshots/*.png\n */\n" + body)
+
+
 def workflow_without_permission(project):
     path = os.path.join(project, ".github", "workflows", "build.yml")
     edit(path, "contents: write", "contents: read")
@@ -193,6 +207,7 @@ CASES = [
     ("speech without a <queries> entry", speech_without_queries),
     ("string literal split across lines", unterminated_string),
     ("the same, in a test source set", unterminated_string_in_a_test),
+    ("a path that nests a block comment", nested_block_comment),
 ]
 
 

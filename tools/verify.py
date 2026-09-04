@@ -30,8 +30,11 @@ Checks performed:
  12. Kotlin that uses SpeechRecognizer or TextToSpeech has the matching
      <queries> entry. Package visibility applies from targetSdk 30, and
      without the entry the service simply never binds -- silently.
- 13. Every Kotlin string literal closes on the line it opens. Test sources
-     included, since that is where this last went wrong.
+ 13. Every Kotlin string literal closes on the line it opens, and every
+     block comment closes. Test sources included, since that is where both
+     of these last went wrong. Kotlin nests block comments, so a stray /*
+     inside a KDoc -- a path like build/screenshots/*.png will do it --
+     swallows the rest of the file.
 
 Usage:
     python verify.py <project-dir>
@@ -623,6 +626,92 @@ def check_kotlin_strings(project, problems):
                          f"this line -- {line.strip()[:60]}")
 
 
+def check_kotlin_comments(project, problems):
+    """Every block comment closes.
+
+    Kotlin nests block comments, unlike Java. So a /* appearing inside a
+    KDoc opens a second level, and the */ that was meant to end the doc
+    ends only the nested one -- swallowing every declaration after it. The
+    compiler says "Unclosed comment" and points at the last line of the
+    file, which is nowhere near the cause.
+
+    A path is the usual way in: build/screenshots/*.png contains /* and
+    reads as prose right up until it costs a build.
+    """
+    for path in all_kotlin(project):
+        rel = os.path.relpath(path, project)
+        with open(path, encoding="utf-8") as handle:
+            body = handle.read()
+
+        depth = 0
+        opened_at = None
+        line = 1
+        index = 0
+        in_string = False
+        in_raw = False
+        in_line_comment = False
+
+        while index < len(body):
+            char = body[index]
+            pair = body[index:index + 2]
+            triple = body[index:index + 3]
+
+            if char == "\n":
+                line += 1
+                in_line_comment = False
+                in_string = False        # a plain literal cannot span lines
+                index += 1
+                continue
+
+            if in_line_comment:
+                index += 1
+            elif in_raw:
+                if triple == '\"\"\"':
+                    in_raw = False
+                    index += 3
+                else:
+                    index += 1
+            elif in_string:
+                if char == "\\":
+                    index += 2
+                elif char == '"':
+                    in_string = False
+                    index += 1
+                else:
+                    index += 1
+            elif depth:
+                if pair == "*/":
+                    depth -= 1
+                    index += 2
+                elif pair == "/*":
+                    depth += 1
+                    index += 2
+                else:
+                    index += 1
+            elif triple == '\"\"\"':
+                in_raw = True
+                index += 3
+            elif char == '"':
+                in_string = True
+                index += 1
+            elif pair == "//":
+                in_line_comment = True
+                index += 2
+            elif pair == "/*":
+                if depth == 0:
+                    opened_at = line
+                depth += 1
+                index += 2
+            else:
+                index += 1
+
+        if depth:
+            fail(problems,
+                 f"{rel}: block comment opened on line {opened_at} is never "
+                 f"closed ({depth} level(s) deep at end of file). Kotlin "
+                 f"nests block comments -- look for a stray /* inside it.")
+
+
 def check_workflow(project, problems):
     path = os.path.join(project, ".github", "workflows", "build.yml")
     if not os.path.isfile(path):
@@ -688,6 +777,7 @@ def main():
     check_shortcut_packages(project, sets, problems)
     check_speech(project, sets, all_sources, problems)
     check_kotlin_strings(project, problems)
+    check_kotlin_comments(project, problems)
     check_workflow(project, problems)
 
     total_sources = sum(len(v) for v in all_sources.values())

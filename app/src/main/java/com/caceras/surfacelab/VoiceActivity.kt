@@ -288,8 +288,8 @@ class VoiceActivity : Activity() {
             input = "",
             instruction = spoken,
             onPartial = { partial ->
-                if (!gone) {
-                    answer.text = Markdown.render(partial)
+                if (!gone && !Prompts.isEcho(partial, Task.ASK)) {
+                    answer.text = Markdown.render(partial, dp(18))
                     if (state == State.THINKING) {
                         state = State.SPEAKING
                         status.text = getString(R.string.answering)
@@ -315,18 +315,29 @@ class VoiceActivity : Activity() {
             return
         }
 
+        val said = Prompts.reply(result.text)
+
+        // The instruction is not an answer, and it is certainly not something
+        // to read out loud to someone who is not looking at the screen.
+        if (Prompts.isEcho(said, Task.ASK)) {
+            answer.text = getString(R.string.echoed)
+            idle()
+            return
+        }
+
         val note = Lang.caveat(Task.ASK, spoken)
+            ?: getString(R.string.truncated).takeIf { Prompts.looksTruncated(said) }
         answer.text = Markdown.render(
-            if (note == null) result.text else result.text + "\n\n" + note
+            if (note == null) said else said + "\n\n" + note, dp(18)
         )
         status.text = getString(R.string.answering)
 
         // What you asked in the kitchen is on the home screen afterwards.
-        ResultStore.save(this, Task.ASK, result.text)
+        ResultStore.save(this, Task.ASK, said)
 
         // The tail that never got a full stop. Without this, "Sure" and every
         // short answer is printed and never spoken.
-        voice.finish(Markdown.strip(result.text))
+        voice.finish(Markdown.strip(said))
         scrollToEnd()
 
         // Nothing was queued -- no engine, muted by a barge-in, or an answer

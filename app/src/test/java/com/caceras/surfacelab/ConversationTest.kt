@@ -175,6 +175,47 @@ class ConversationTest {
     }
 
     @Test
+    fun `the system prompt is never shown as an answer`() {
+        // Exactly what the phone showed: a contentless question, and Nano
+        // reciting its instructions back. The screen printed the lot.
+        val activity = launch().get()
+        composer(activity).setText("??")
+        send(activity)
+        brain.emit(Prompts.system(Task.ASK))
+        brain.complete(Prompts.system(Task.ASK))
+
+        val shown = bubbles(activity).last()
+        assertFalse("the instruction reached the screen: $shown",
+            shown.contains("concise assistant running on the user"))
+        assertEquals(activity.getString(R.string.echoed), shown)
+    }
+
+    @Test
+    fun `an echoed instruction is not remembered as a real turn`() {
+        val activity = launch().get()
+        composer(activity).setText("??")
+        send(activity)
+        brain.complete(Prompts.system(Task.ASK))
+
+        composer(activity).setText("hello")
+        send(activity)
+        assertEquals("the echo was sent back as context", "hello", brain.instruction)
+    }
+
+    @Test
+    fun `an answer that ran out of room says so`() {
+        val activity = launch().get()
+        composer(activity).setText("write me 2000 words")
+        send(activity)
+        brain.complete("The tapestry of football is woven with legends. ".repeat(8) +
+            "His influence wasn")
+
+        val shown = bubbles(activity).last()
+        assertTrue("nothing told the reader it was cut off: $shown",
+            shown.contains("stopped here"))
+    }
+
+    @Test
     fun `a failed answer is not remembered as if it had worked`() {
         val activity = launch().get()
         composer(activity).setText("something")

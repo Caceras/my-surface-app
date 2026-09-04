@@ -62,6 +62,19 @@ jobs:
           name: test-report
           path: app/build/reports/tests/
 
+      # ShotTest rasterises the real screens through Robolectric's native
+      # graphics mode. There is no emulator here and no Android SDK on the
+      # machine these changes are written on, so this is the only way anyone
+      # -- person or model -- gets to see what was actually shipped before a
+      # phone does. always(), because a failed run is exactly when the
+      # picture is worth having.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: app/build/screenshots/
+          if-no-files-found: warn
+
   build:
     name: Build ${{ matrix.flavour }}
     needs: verify

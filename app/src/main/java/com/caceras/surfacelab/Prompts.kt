@@ -23,11 +23,7 @@ object Prompts {
                 "text only. Keep the original language, meaning and approximate length."
         Task.ASK ->
             "You are a concise assistant running on the user's phone. Answer directly. " +
-                "Reply in the same language the user writes in. " +
-                "Earlier turns of the conversation may appear above the latest one. " +
-                "Use them to work out what words like \"more\", \"it\" and \"again\" " +
-                "refer to. Reply with your next answer only: do not repeat the " +
-                "conversation back, and do not prefix your reply with a name."
+                "Reply in the same language the user writes in."
         Task.UPPERCASE -> ""
     }
 
@@ -54,10 +50,45 @@ object Prompts {
     fun conversation(history: List<Turn>, question: String): String {
         val kept = fit(history, BUDGET - question.length)
         if (kept.isEmpty()) return question
-        val out = StringBuilder()
+        val out = StringBuilder(CONTEXT_OPEN)
         kept.forEach { out.append(YOU).append(it.you).append("\n")
                           .append(THEM).append(it.reply).append("\n\n") }
-        return out.append(YOU).append(question).toString()
+        return out.append(CONTEXT_CLOSE).append(question).toString()
+    }
+
+    /**
+     * Did the model hand back its own instructions instead of an answer?
+     *
+     * On a device where isSystemPromptAvailable() is false the instruction is
+     * pasted in as ordinary text above the prompt, and a small model asked a
+     * contentless question -- "??" -- will happily continue by reciting it.
+     * That reached a phone: the whole system prompt, rendered as the reply.
+     *
+     * Any long run shared with the instruction is the tell. Nothing a person
+     * asks for legitimately comes back as fifty unbroken characters of it.
+     */
+    fun isEcho(answer: String, task: Task): Boolean {
+        val instruction = system(task).lowercase()
+        if (instruction.length < ECHO_RUN) return false
+        val text = answer.lowercase()
+        for (start in 0..instruction.length - ECHO_RUN) {
+            if (text.contains(instruction.substring(start, start + ECHO_RUN))) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * An answer that stopped because it ran out of tokens rather than because
+     * it had finished. Nano's cap is a few hundred words, so "write me 2000
+     * words" ends mid-sentence -- and the app used to present that as the
+     * finished article. It is the reader who has to be told, not the model.
+     */
+    fun looksTruncated(answer: String): Boolean {
+        val end = answer.trimEnd()
+        if (end.length < 200) return false
+        return end.last() !in FINISHED
     }
 
     /**
@@ -108,8 +139,18 @@ object Prompts {
         return raw
     }
 
-    private const val YOU = "You: "
-    private const val THEM = "Assistant: "
+    private const val YOU = "I asked: "
+    private const val THEM = "You answered: "
+
+    private const val CONTEXT_OPEN = "Earlier in this conversation:\n\n"
+    private const val CONTEXT_CLOSE = "\nAnswer this, using the above only " +
+        "to resolve what I am referring to:\n"
+
+    /** Characters shared with the instruction before it counts as an echo. */
+    private const val ECHO_RUN = 50
+
+    /** A sentence that ended on purpose ends with one of these. */
+    private val FINISHED = charArrayOf('.', '!', '?', ':', '"', ')', ']', '\u2019', '\u201d')
     private const val ELLIPSIS = "\u2026"
 
     /** Characters of history, at most. Nano has to fit the answer in too. */
@@ -124,7 +165,7 @@ object Prompts {
     /** Below this a truncated reply says nothing, so the turn is dropped. */
     private const val MIN_REPLY = 40
 
-    private val LABELS = listOf(THEM, "AI: ", "Bot: ")
+    private val LABELS = listOf("Assistant: ", "AI: ", "Bot: ", THEM)
 
     /**
      * Two sets, because the two places that offer them are not the same

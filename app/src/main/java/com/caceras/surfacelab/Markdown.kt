@@ -3,6 +3,7 @@ package com.caceras.surfacelab
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.style.LeadingMarginSpan
 import android.text.style.StyleSpan
 
 /**
@@ -24,7 +25,14 @@ object Markdown {
     private val BULLET = Regex("""^\s*[*\-+]\s+""")
     private val HEADING = Regex("""^\s*#{1,6}\s+""")
 
-    fun render(source: String): CharSequence {
+    /**
+     * [bulletIndent] is the hanging indent for a wrapped bullet, in pixels.
+     * A wrapped bullet whose second line starts back at the margin stops
+     * looking like a list at all, which is what the screen was showing.
+     * Zero by default because this object has no Context to convert dp with;
+     * the screens that draw it pass their own.
+     */
+    fun render(source: String, bulletIndent: Int = 0): CharSequence {
         val out = SpannableStringBuilder()
 
         source.split("\n").forEachIndexed { index, raw ->
@@ -42,6 +50,15 @@ object Markdown {
 
             val start = out.length
             appendWithBold(out, line)
+
+            // The wrapped part of a bullet lines up under its text, not back
+            // at the margin.
+            if (bullet != null && bulletIndent > 0 && out.length > start) {
+                out.setSpan(
+                    LeadingMarginSpan.Standard(0, bulletIndent), start, out.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
 
             // A heading is the whole line in bold, after its hashes are gone.
             if (heading != null && out.length > start) {

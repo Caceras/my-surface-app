@@ -191,6 +191,45 @@ class LogicTest {
             Prompts.reply("Assistants are useful"))
     }
 
+    @Test
+    fun `the model reciting its instructions is not an answer`() {
+        // This reached a phone. Asked "??" with a conversation above it, Nano
+        // replied with the entire system prompt, and the app printed it.
+        assertTrue(Prompts.isEcho(Prompts.system(Task.ASK), Task.ASK))
+        assertTrue("a partial recital is still a recital",
+            Prompts.isEcho(
+                "You are a concise assistant running on the user's phone. " +
+                    "Answer directly.", Task.ASK))
+        assertTrue("it is an echo wherever in the reply it appears",
+            Prompts.isEcho(
+                "Sure! You are a concise assistant running on the user's " +
+                    "phone. Answer directly.", Task.ASK))
+    }
+
+    @Test
+    fun `an ordinary answer is not mistaken for an echo`() {
+        // The guard fires on a fifty-character run, so an answer that merely
+        // talks about assistants or phones has to survive it.
+        assertFalse(Prompts.isEcho(
+            "You could ask your phone's assistant to answer that directly, " +
+                "in whichever language you prefer.", Task.ASK))
+        assertFalse(Prompts.isEcho("Maradona was born in Villa Fiorito.", Task.ASK))
+        assertFalse(Prompts.isEcho("", Task.ASK))
+    }
+
+    @Test
+    fun `an answer cut off mid sentence is spotted`() {
+        // Nano stops at its token cap, so "write 2000 words" ends mid-word --
+        // and the app used to present that as the finished article.
+        val cut = "His influence was not confined to the pitch. " .repeat(6) +
+            "His influence wasn"
+        assertTrue(Prompts.looksTruncated(cut))
+        assertFalse("a finished answer must not be flagged",
+            Prompts.looksTruncated(cut.dropLast(18) + "It ended properly."))
+        assertFalse("a short reply is not a truncated one",
+            Prompts.looksTruncated("Yes"))
+    }
+
     private fun assertNotNull(value: Any?) = assertTrue(value != null)
     private fun assertNull(value: Any?) = assertTrue("expected null, got $value", value == null)
 }
