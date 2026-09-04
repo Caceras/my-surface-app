@@ -32,7 +32,8 @@ import java.io.File
  * drawn; the point is the file, which a person (or a model that cannot open
  * an emulator) can then actually look at.
  *
- *     gradle testCoreDebugUnitTest     # writes app/build/screenshots/*.png
+ *     gradle testCoreDebugUnitTest
+ *
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
