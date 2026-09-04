@@ -353,6 +353,10 @@ class MainActivity : Activity() {
             instruction = Prompts.conversation(history, text),
             onPartial = { partial ->
                 if (gone) return@run
+                // Never paint the instruction. On a device that cannot take a
+                // separate system prompt it is pasted above the question as
+                // ordinary text, and a small model asked "??" recites it back.
+                if (Prompts.isEcho(partial, Task.ASK)) return@run
                 answer.text = Markdown.render(partial)
                 if (aloud) mouth?.follow(Markdown.strip(partial))
                 scrollToEnd()
@@ -360,19 +364,25 @@ class MainActivity : Activity() {
         ) { result ->
             if (gone) return@run
             busy = false
-            val note = if (result.ok) Lang.caveat(Task.ASK, text) else null
             val said = Prompts.reply(result.text)
+            val echoed = result.ok && Prompts.isEcho(said, Task.ASK)
+            val note = when {
+                !result.ok || echoed -> null
+                else -> Lang.caveat(Task.ASK, text)
+                    ?: getString(R.string.truncated).takeIf { Prompts.looksTruncated(said) }
+            }
 
             // Rendered, not raw. The streaming path above already rendered
             // each partial, and this line used to hand back the unrendered
             // string at the end -- so every finished answer on the phone
             // showed its own asterisks no matter what the partials did.
             answer.text = when {
+                echoed -> Markdown.render(getString(R.string.echoed))
                 result.ok && note == null -> Markdown.render(said)
                 result.ok -> Markdown.render(said + "\n\n" + note)
                 else -> Markdown.render(result.note ?: getString(R.string.failed))
             }
-            if (result.ok) {
+            if (result.ok && !echoed) {
                 remember(Turn(text, said))
                 ResultStore.save(this, Task.ASK, said)
                 if (aloud) mouth?.finish(Markdown.strip(said))

@@ -29,6 +29,8 @@
     <string name="mic_denied">Microphone permission was declined.</string>
     <string name="more">More</string>
     <string name="new_chat">New</string>
+    <string name="echoed">Nano recited its own instructions instead of answering. That happens on a short or empty question -- try asking it in a sentence, or tap New to start over.</string>
+    <string name="truncated">Nano stopped here: it has a hard output limit of a few hundred words, so a long piece gets cut off rather than finished.</string>
     <string name="prepare_model">Check / prepare on-device model</string>
     <string name="add_tile">Add tile to Quick Settings</string>
     <string name="failed">That did not work.</string>
