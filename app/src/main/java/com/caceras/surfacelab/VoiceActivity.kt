@@ -289,7 +289,7 @@ class VoiceActivity : Activity() {
             instruction = spoken,
             onPartial = { partial ->
                 if (!gone && !Prompts.isEcho(partial, Task.ASK)) {
-                    answer.text = Markdown.render(partial)
+                    answer.text = Markdown.render(partial, dp(18))
                     if (state == State.THINKING) {
                         state = State.SPEAKING
                         status.text = getString(R.string.answering)
@@ -328,7 +328,7 @@ class VoiceActivity : Activity() {
         val note = Lang.caveat(Task.ASK, spoken)
             ?: getString(R.string.truncated).takeIf { Prompts.looksTruncated(said) }
         answer.text = Markdown.render(
-            if (note == null) said else said + "\n\n" + note
+            if (note == null) said else said + "\n\n" + note, dp(18)
         )
         status.text = getString(R.string.answering)
 

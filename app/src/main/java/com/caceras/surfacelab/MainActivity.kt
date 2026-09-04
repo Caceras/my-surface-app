@@ -34,6 +34,7 @@ import android.widget.TextView
 class MainActivity : Activity() {
 
     private lateinit var messages: LinearLayout
+    private lateinit var blank: View
     private lateinit var transcript: ScrollView
     private lateinit var input: EditText
     private lateinit var openers: HorizontalScrollView
@@ -92,7 +93,7 @@ class MainActivity : Activity() {
         history.addAll(Chat.load(this))
         history.forEach { turn ->
             addBubble(turn.you, fromUser = true)
-            addBubble(turn.reply, fromUser = false).text = Markdown.render(turn.reply)
+            addBubble(turn.reply, fromUser = false).text = Markdown.render(turn.reply, dp(18))
         }
         if (history.isNotEmpty()) {
             openers.visibility = View.GONE
@@ -235,6 +236,11 @@ class MainActivity : Activity() {
         messages = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             padDp(14, 6, 14, 6)
+            // Messages sit at the bottom, against the composer, the way every
+            // chat does. Top-aligned they floated above a screenful of empty
+            // grey -- the single thing that made this look unfinished.
+            gravity = Gravity.BOTTOM
+            addView(emptyState(), wide())
         }
         transcript = ScrollView(this).apply {
             isFillViewport = true
@@ -247,6 +253,44 @@ class MainActivity : Activity() {
             setOnClickListener { mouth?.hush() }
         }
         return transcript
+    }
+
+    /**
+     * What the screen says before anyone has said anything.
+     *
+     * It used to say nothing: header, then eight hundred pixels of grey, then
+     * the composer. An empty chat is the first thing anyone sees and it was
+     * the least finished screen in the app.
+     */
+    private fun emptyState(): View {
+        val hello = TextView(this).apply {
+            text = getString(R.string.empty_title)
+            textSize = 22f
+            gravity = Gravity.CENTER_HORIZONTAL
+            setTextColor(color(R.color.text_primary))
+        }
+        val why = TextView(this).apply {
+            text = getString(R.string.empty_body)
+            textSize = 15f
+            gravity = Gravity.CENTER_HORIZONTAL
+            setLineSpacing(0f, 1.2f)
+            setTextColor(color(R.color.text_dim))
+            padDp(24, 8, 24, 0)
+        }
+        blank = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            padDp(0, 0, 0, 40)
+            addView(hello, wide())
+            addView(why, wide())
+        }
+        return blank
+    }
+
+    /** Centre the greeting when there is nothing else; otherwise sit low. */
+    private fun showBlank(empty: Boolean) {
+        blank.visibility = if (empty) View.VISIBLE else View.GONE
+        messages.gravity = if (empty) Gravity.CENTER else Gravity.BOTTOM
     }
 
     private fun buildOpeners(): View {
@@ -357,7 +401,7 @@ class MainActivity : Activity() {
                 // separate system prompt it is pasted above the question as
                 // ordinary text, and a small model asked "??" recites it back.
                 if (Prompts.isEcho(partial, Task.ASK)) return@run
-                answer.text = Markdown.render(partial)
+                answer.text = Markdown.render(partial, dp(18))
                 if (aloud) mouth?.follow(Markdown.strip(partial))
                 scrollToEnd()
             }
@@ -378,8 +422,8 @@ class MainActivity : Activity() {
             // showed its own asterisks no matter what the partials did.
             answer.text = when {
                 echoed -> Markdown.render(getString(R.string.echoed))
-                result.ok && note == null -> Markdown.render(said)
-                result.ok -> Markdown.render(said + "\n\n" + note)
+                result.ok && note == null -> Markdown.render(said, dp(18))
+                result.ok -> Markdown.render(said + "\n\n" + note, dp(18))
                 else -> Markdown.render(result.note ?: getString(R.string.failed))
             }
             if (result.ok && !echoed) {
@@ -402,11 +446,14 @@ class MainActivity : Activity() {
         history.clear()
         Chat.clear(this)
         messages.removeAllViews()
+        messages.addView(emptyState(), wide())
+        showBlank(true)
         openers.visibility = View.VISIBLE
         input.setText("")
     }
 
     private fun addBubble(text: String, fromUser: Boolean): TextView {
+        showBlank(false)
         val bubble = TextView(this).apply {
             this.text = text
             textSize = 16f

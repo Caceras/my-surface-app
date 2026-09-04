@@ -43,7 +43,13 @@ class ShotTest {
     private val width = 1233   // 411dp at xxhdpi, a Pixel in portrait
     private val height = 2742
 
-    private fun shoot(name: String, decor: View) {
+    /**
+     * [minPainted] is the fraction of the screen that must not still be the
+     * erase colour. The first version of this only asked for two distinct
+     * colours, and passed on a screen that was ninety per cent unpainted --
+     * an assertion weak enough to be worthless.
+     */
+    private fun shoot(name: String, decor: View, minPainted: Double = 0.9) {
         decor.measure(
             View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
@@ -62,10 +68,12 @@ class ShotTest {
         // A screen that drew nothing is a screenshot of the erase colour.
         val pixels = IntArray(width * height)
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        val distinct = pixels.toHashSet()
-        assertTrue("$name drew nothing at all", distinct.size > 1)
-        assertTrue("$name is still the erase colour -- nothing was painted",
-            distinct.size > 2 || !distinct.contains(Color.MAGENTA))
+        val painted = pixels.count { it != Color.MAGENTA }.toDouble() / pixels.size
+        assertTrue(
+            "$name painted only ${"%.1f".format(painted * 100)}% of the screen, " +
+                "expected at least ${"%.0f".format(minPainted * 100)}%",
+            painted >= minPainted
+        )
     }
 
     @Test
@@ -92,7 +100,10 @@ class ShotTest {
 
     @Test
     fun `the hands-free screen`() {
+        // Deliberately translucent -- Theme.Translucent.NoTitleBar, so it
+        // floats a card over whatever you opened it from. Most of this frame
+        // is meant to be unpainted, which is why the bar is so much lower.
         val activity = Robolectric.buildActivity(VoiceActivity::class.java).setup().get()
-        shoot("voice", activity.window.decorView)
+        shoot("voice", activity.window.decorView, minPainted = 0.05)
     }
 }
