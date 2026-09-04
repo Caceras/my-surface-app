@@ -95,6 +95,7 @@ class MainActivity : Activity() {
             addBubble(turn.you, fromUser = true)
             addBubble(turn.reply, fromUser = false).text = Markdown.render(turn.reply, dp(18))
         }
+        showBlank(history.isEmpty())
         if (history.isNotEmpty()) {
             openers.visibility = View.GONE
             scrollToEnd()
