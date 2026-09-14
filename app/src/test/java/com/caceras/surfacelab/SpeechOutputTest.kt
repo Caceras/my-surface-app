@@ -100,7 +100,8 @@ class SpeechOutputTest {
         mouth.onIdle = { idle = true }
         mouth.finish("First answer.")
         val focus = org.robolectric.util.ReflectionHelpers.getField<android.media.AudioFocusRequest>(mouth, "focus")
-        focus.onAudioFocusChangeListener!!.onAudioFocusChange(android.media.AudioManager.AUDIOFOCUS_LOSS)
+        val listener = org.robolectric.util.ReflectionHelpers.callInstanceMethod<android.media.AudioManager.OnAudioFocusChangeListener>(focus, "getOnAudioFocusChangeListener")
+        listener.onAudioFocusChange(android.media.AudioManager.AUDIOFOCUS_LOSS)
         assertNotNull(reason)
         assertTrue(idle)
         assertFalse(mouth.speaking())

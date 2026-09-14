@@ -82,26 +82,26 @@ internal class KeyboardMotion(private val view: View) : android.view.WindowInset
     private var start = 0
     private var offset = 0f
 
-        override fun onPrepare(animation: android.view.WindowInsetsAnimation) {
-            if (animation.typeMask and WindowInsets.Type.ime() == 0) return
+    override fun onPrepare(animation: android.view.WindowInsetsAnimation) {
+        if (animation.typeMask and WindowInsets.Type.ime() == 0) return
+        view.getLocationOnScreen(location)
+        start = location[1]
+    }
+    override fun onStart(animation: android.view.WindowInsetsAnimation, bounds: android.view.WindowInsetsAnimation.Bounds): android.view.WindowInsetsAnimation.Bounds {
+        if (animation.typeMask and WindowInsets.Type.ime() != 0) {
+            view.translationY = 0f
             view.getLocationOnScreen(location)
-            start = location[1]
+            offset = (start - location[1]).toFloat()
+            if (android.animation.ValueAnimator.areAnimatorsEnabled()) view.translationY = offset
         }
-        override fun onStart(animation: android.view.WindowInsetsAnimation, bounds: android.view.WindowInsetsAnimation.Bounds): android.view.WindowInsetsAnimation.Bounds {
-            if (animation.typeMask and WindowInsets.Type.ime() != 0) {
-                view.translationY = 0f
-                view.getLocationOnScreen(location)
-                offset = (start - location[1]).toFloat()
-                if (android.animation.ValueAnimator.areAnimatorsEnabled()) view.translationY = offset
-            }
-            return bounds
-        }
-        override fun onProgress(insets: WindowInsets, runningAnimations: MutableList<android.view.WindowInsetsAnimation>): WindowInsets {
-            val ime = runningAnimations.firstOrNull { it.typeMask and WindowInsets.Type.ime() != 0 }
-            if (ime != null) view.translationY = if (android.animation.ValueAnimator.areAnimatorsEnabled()) offset * (1f - ime.interpolatedFraction) else 0f
-            return insets
-        }
-        override fun onEnd(animation: android.view.WindowInsetsAnimation) {
-            if (animation.typeMask and WindowInsets.Type.ime() != 0) { view.translationY = 0f; offset = 0f }
-        }
+        return bounds
+    }
+    override fun onProgress(insets: WindowInsets, runningAnimations: MutableList<android.view.WindowInsetsAnimation>): WindowInsets {
+        val ime = runningAnimations.firstOrNull { it.typeMask and WindowInsets.Type.ime() != 0 }
+        if (ime != null) view.translationY = if (android.animation.ValueAnimator.areAnimatorsEnabled()) offset * (1f - ime.interpolatedFraction) else 0f
+        return insets
+    }
+    override fun onEnd(animation: android.view.WindowInsetsAnimation) {
+        if (animation.typeMask and WindowInsets.Type.ime() != 0) { view.translationY = 0f; offset = 0f }
+    }
 }

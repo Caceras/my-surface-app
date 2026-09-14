@@ -460,6 +460,33 @@ class VoiceTest {
     }
 
     @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun `voice streaming preserves the reading position until latest is requested`() {
+        val activity = open().get()
+        say("Tell me a long story")
+        brain.emit("An earlier paragraph. ".repeat(400))
+        val decor = activity.window.decorView
+        fun layout() {
+            decor.measure(View.MeasureSpec.makeMeasureSpec(activity.dp(411), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(activity.dp(914), View.MeasureSpec.EXACTLY))
+            decor.layout(0, 0, activity.dp(411), activity.dp(914))
+            drain()
+        }
+        layout()
+        val scroll = decor.findViewWithTag<ReadingScrollView>("voice-transcript")
+        assertTrue(scroll.getChildAt(0).height > scroll.height + 30)
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        scroll.scrollTo(0, 30)
+        brain.complete("An earlier paragraph. ".repeat(400) + "The end.")
+        layout()
+        assertEquals(30, scroll.scrollY)
+        val latest = decor.findViewWithTag<View>("voice-latest")
+        assertEquals(View.VISIBLE, latest.visibility)
+        latest.performClick()
+        assertEquals(View.GONE, latest.visibility)
+    }
+
+    @Test
     fun `regional speech selection prefers exact then same language only`() {
         assertEquals("en-US", Ears.bestLanguage(java.util.Locale.forLanguageTag("en-SE"), listOf("sv-SE", "en-US")))
         assertEquals("en-GB", Ears.bestLanguage(java.util.Locale.UK, listOf("en-US", "en-GB")))

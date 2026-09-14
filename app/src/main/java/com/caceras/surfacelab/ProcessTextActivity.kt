@@ -184,7 +184,7 @@ class ProcessTextActivity : Activity() {
             // Barge-in: touching the answer stops it being read aloud.
             setOnClickListener { mouth?.hush() }
         }
-        val scroll = ScrollView(this).apply {
+        val scroll = ReadingScrollView(this).apply {
             addView(
                 stream,
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -202,7 +202,7 @@ class ProcessTextActivity : Activity() {
 
         streamed = StreamUpdates { text ->
             stream.text = Markdown.render(text, dp(18))
-            scroll.post { scroll.scrollTo(0, stream.height) }
+            scroll.contentChanged()
         }
         if (aloud) speaker().begin(ears.locale())
 

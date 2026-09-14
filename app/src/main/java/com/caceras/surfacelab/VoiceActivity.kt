@@ -43,7 +43,7 @@ class VoiceActivity : Activity() {
     private lateinit var heard: TextView
     private lateinit var answer: TextView
     private lateinit var action: TextView
-    private lateinit var scroller: ScrollView
+    private lateinit var scroller: ReadingScrollView
     private lateinit var language: TextView
     private var setupMode = false
     private val streamed = StreamUpdates { text ->
@@ -147,7 +147,8 @@ class VoiceActivity : Activity() {
         dot = presence(96).apply { visibility = View.INVISIBLE }
         heard = label("", 23f).apply { padDp(4, 20, 4, 4) }
         answer = label("", 17f, true).apply { padDp(4, 12, 4, 20); setLineSpacing(dp(3).toFloat(), 1.15f) }
-        scroller = ScrollView(this).apply {
+        scroller = ReadingScrollView(this).apply {
+            tag = "voice-transcript"
             addView(LinearLayout(this@VoiceActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(heard, wide())
@@ -201,7 +202,16 @@ class VoiceActivity : Activity() {
                 padDp(0, 10, 0, 10)
             }
             addView(guidance, wide())
-            addView(scroller, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(android.widget.FrameLayout(this@VoiceActivity).apply {
+                addView(scroller, android.widget.FrameLayout.LayoutParams(-1, -1))
+                val latest = pill("Latest reply") { scroller.latest() }.apply {
+                    tag = "voice-latest"
+                    visibility = View.GONE
+                    elevation = dp(4).toFloat()
+                }
+                addView(latest, android.widget.FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
+                scroller.onFollowingChanged = { latest.visibility = if (it) View.GONE else View.VISIBLE }
+            }, LinearLayout.LayoutParams(-1, 0, 1f))
             addView(continuousSwitch, wide())
             addView(action, wide().apply { bottomMargin = dp(10) })
             addView(LinearLayout(this@VoiceActivity).apply {
@@ -426,6 +436,7 @@ class VoiceActivity : Activity() {
         lastQuestion = spoken
         speechProblem = null
 
+        scroller.latest()
         heard.text = spoken
         state = State.THINKING
         status.text = getString(R.string.working)
@@ -538,8 +549,7 @@ class VoiceActivity : Activity() {
 
     private fun speaker(): Mouth = mouth ?: Mouth(this).also { mouth = it }
 
-    private fun scrollToEnd() =
-        scroller.post { scroller.fullScroll(ScrollView.FOCUS_DOWN) }
+    private fun scrollToEnd() = scroller.contentChanged()
 
     // ------------------------------------------------------------ plumbing
 
@@ -550,6 +560,10 @@ class VoiceActivity : Activity() {
         mouth?.hush()
         if (generating) {
             guidance.text = "Continuing in text…"
+            guidance.isClickable = false
+            guidance.isFocusable = false
+            guidance.background = null
+            guidance.setTextColor(color(R.color.text_dim))
             dot.show(PresenceView.Mode.THINKING)
         } else idle()
     }
