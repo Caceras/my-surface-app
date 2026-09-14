@@ -188,7 +188,7 @@ class ShotTest {
         children(activity.window.decorView).filterIsInstance<android.widget.TextView>()
             .first { it.text == "Listen" }.performClick()
         shoot("chat-compact", activity.window.decorView, shotWidth = 960, shotHeight = 1920)
-        listOf("Voice", "Conversations", activity.getString(R.string.stop_speaking)).forEach { label ->
+        listOf("Voice", "History", activity.getString(R.string.stop_speaking)).forEach { label ->
             val control = children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == label }
             val rect = android.graphics.Rect()
             assertTrue("$label is not visible", control.getGlobalVisibleRect(rect))
@@ -234,7 +234,7 @@ class ShotTest {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         shoot("aegentica-large-font", activity.window.decorView)
         fun children(v: View): List<View> = listOf(v) + if (v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
-        listOf("Voice", "Conversations", "Actions").forEach { name ->
+        listOf("Voice", "History", "Actions").forEach { name ->
             val button = children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == name }
             val rect = android.graphics.Rect()
             assertTrue("$name missing at large text", button.getGlobalVisibleRect(rect))
@@ -246,7 +246,12 @@ class ShotTest {
     fun `compact widget draws both touch targets without answer exposure`() {
         val context = RuntimeEnvironment.getApplication()
         val view = SurfaceWidgetProvider().views(context, true).apply(context, android.widget.FrameLayout(context))
-        shoot("aegentica-widget", view, shotWidth = context.dp(240), shotHeight = context.dp(110))
+        val host = android.widget.FrameLayout(context).apply {
+            setBackgroundColor(context.getColor(R.color.chat_bg))
+            padDp(4, 4, 4, 4)
+            addView(view, android.widget.FrameLayout.LayoutParams(-1, -1))
+        }
+        shoot("aegentica-widget", host, shotWidth = context.dp(240), shotHeight = context.dp(110))
         listOf(R.id.widget_type, R.id.widget_talk).forEach { id ->
             val button = view.findViewById<View>(id)
             assertTrue("widget target clipped", button.height >= context.dp(48))

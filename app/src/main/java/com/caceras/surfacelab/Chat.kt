@@ -147,7 +147,7 @@ object Chat {
     fun readBackup(raw: String): Pair<List<Turn>, String> {
         require(raw.toByteArray(Charsets.UTF_8).size <= MAX_BACKUP_BYTES) { "This backup is too large." }
         val objectValue = JSONObject(raw)
-        require(objectValue.getString("format") == "surface-chat-v1") { "Choose a Surface conversation backup." }
+        require(objectValue.getString("format") == "surface-chat-v1") { "Choose an Ægentica AI or Surface conversation backup." }
         val array = objectValue.getJSONArray("turns")
         require(array.length() <= KEEP) { "This backup contains too many turns." }
         val turns = (0 until array.length()).map { i ->

@@ -103,7 +103,7 @@ class ScreenTest {
     @Test
     fun `spacing is density-scaled, not raw pixels`() {
         val activity = launchMain().get()
-        val header = (root(activity) as ViewGroup).getChildAt(0)
+        val header = activity.window.decorView.findViewWithTag<View>("chat-header")
 
         val density = activity.resources.displayMetrics.density
         val expected = (20 * density).toInt()

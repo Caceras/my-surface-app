@@ -30,7 +30,7 @@ Status legend: **This pass** = implement and verify in this delivery; **Existing
 | Windows | Edge-to-edge, keyboard, cutouts | Existing keyboard animation; this pass includes display-cutout insets | Gesture/three-button navigation and IME on phone |
 | Windows | Tablets, foldables, desktop, split screen | This pass: maximum reading width and compact vertical layout; no orientation lock | Landscape/wide/large-font tests; physical resize gate |
 | Navigation | Predictive system back | This pass: explicit opt-in; preserve platform navigation without an always-consuming callback | Android system transition/device gate |
-| Input | Hardware keyboard | This pass: Ctrl+Enter send, Ctrl+N new, Ctrl+L focus, Ctrl+Shift+V voice; system shortcut help | Key routing and no unintended plain-Enter send |
+| Input | Hardware keyboard | This pass: Ctrl+Enter send, Ctrl+N new, Ctrl+L focus, Ctrl+Shift+M voice; system shortcut help | Key routing and no unintended plain-Enter send |
 | Input | Stylus handwriting / rich content | Existing standard EditText may benefit from system support; Later: attachment pipeline before rich content | IME/handwriting hardware; photo privacy |
 | Accessibility | Headings, action roles, target sizes, reduced motion | This pass: native button semantics for custom controls and headings; existing 48 dp targets and motion preference | Native layout plus TalkBack/device gate |
 | Accessibility | Full TalkBack, Switch Access, contrast, 200% text | Device gate: automated layout and color checks are partial evidence | Manual traversal/announcements; no certification claim |

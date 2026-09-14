@@ -88,6 +88,16 @@ class NativeFeaturesTest {
         assertEquals(1, brain.runs)
     }
 
+    @Test fun `voice keyboard shortcut routes through activity dispatch without stealing paste`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val field = children(activity.window.decorView).filterIsInstance<EditText>().first()
+        field.requestFocus()
+        val event = KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_M, 0, KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON)
+        assertTrue(activity.dispatchKeyShortcutEvent(event))
+        assertEquals(VoiceActivity::class.java.name, shadowOf(activity).nextStartedActivity.component!!.className)
+        assertFalse(activity.onKeyShortcut(KeyEvent.KEYCODE_V, KeyEvent(0, 0, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_V, 0, KeyEvent.META_CTRL_ON)))
+    }
+
     @Test fun `widget answers are opt in and compact controls stay available`() {
         ResultStore.save(context, Task.ASK, "Private answer")
         val provider = SurfaceWidgetProvider()

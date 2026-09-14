@@ -147,7 +147,7 @@ class ConversationTest {
         Chat.archiveCurrent(activity, "")
         Chat.clear(activity)
         composer(activity).setText("Keep my current thought")
-        descendants(content(activity)).filterIsInstance<TextView>().first { it.text == "Conversations" }.performClick()
+        descendants(content(activity)).filterIsInstance<TextView>().first { it.text == "History" }.performClick()
         val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog()
         val root = dialog.window!!.decorView
         root.findViewWithTag<EditText>("conversation-search").setText("lake")

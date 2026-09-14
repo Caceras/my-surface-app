@@ -190,6 +190,7 @@ class MainActivity : Activity() {
             addView(flatButton(getString(R.string.more)) { showSettings(brain) }.apply { padDp(12, 14, 0, 14) })
         }
         return LinearLayout(this).apply {
+            tag = "chat-header"
             orientation = if (compact) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             padDp(20, 12, 20, 8)
@@ -403,7 +404,7 @@ class MainActivity : Activity() {
                     val (turns, draft) = Chat.readBackup(backup)
                     runOnUiThread {
                         if (!gone) AlertDialog.Builder(this).setTitle("Restore conversation?")
-                            .setMessage("Restore " + turns.size + " exchanges and any saved conversations in this backup? Your current chat will be saved in Conversations.")
+                            .setMessage("Restore " + turns.size + " exchanges and any saved conversations in this backup? Your current chat will be saved in History.")
                             .setPositiveButton("Restore") { _, _ ->
                                 newChat()
                                 Chat.restoreArchives(this, backup)
@@ -646,7 +647,7 @@ class MainActivity : Activity() {
                 addView(flatButton("Voice") {
                     startActivity(Intent(this@MainActivity, VoiceActivity::class.java))
                 }.apply { tag = "voice-entry"; gravity = Gravity.CENTER; padDp(4, 12, 4, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(flatButton("Conversations") { showConversations() }.apply { textSize = 13f; gravity = Gravity.CENTER; padDp(2, 12, 2, 12) }, LinearLayout.LayoutParams(0, -2, 1.45f))
+                addView(flatButton("History") { showConversations() }.apply { tag = "history-entry"; contentDescription = "Saved conversations"; textSize = 15f; gravity = Gravity.CENTER; padDp(2, 12, 2, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(flatButton("Actions") { showActions() }.apply { gravity = Gravity.CENTER; padDp(4, 12, 4, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
             }, wide())
             addView(playback, wide())
@@ -670,7 +671,7 @@ class MainActivity : Activity() {
             android.view.KeyEvent.KEYCODE_ENTER -> { submitDraft(); return true }
             android.view.KeyEvent.KEYCODE_N -> { newChat(); return true }
             android.view.KeyEvent.KEYCODE_L -> { input.requestFocus(); getSystemService(android.view.inputmethod.InputMethodManager::class.java).showSoftInput(input, 0); return true }
-            android.view.KeyEvent.KEYCODE_V -> if (event.isShiftPressed) { startActivity(Intent(this, VoiceActivity::class.java)); return true }
+            android.view.KeyEvent.KEYCODE_M -> if (event.isShiftPressed) { startActivity(Intent(this, VoiceActivity::class.java)); return true }
         }
         return super.onKeyShortcut(keyCode, event)
     }
@@ -682,7 +683,7 @@ class MainActivity : Activity() {
             android.view.KeyboardShortcutInfo("Send draft", android.view.KeyEvent.KEYCODE_ENTER, ctrl),
             android.view.KeyboardShortcutInfo("New conversation", android.view.KeyEvent.KEYCODE_N, ctrl),
             android.view.KeyboardShortcutInfo("Focus composer", android.view.KeyEvent.KEYCODE_L, ctrl),
-            android.view.KeyboardShortcutInfo("Open voice", android.view.KeyEvent.KEYCODE_V, ctrl or android.view.KeyEvent.META_SHIFT_ON)
+            android.view.KeyboardShortcutInfo("Open voice", android.view.KeyEvent.KEYCODE_M, ctrl or android.view.KeyEvent.META_SHIFT_ON)
         )))
     }
 
@@ -861,7 +862,7 @@ class MainActivity : Activity() {
         messages.addView(emptyState(), wide())
         showBlank(true)
         input.setText("")
-        if (saved) Toast.makeText(this, "Saved in Conversations", Toast.LENGTH_SHORT).show()
+        if (saved) Toast.makeText(this, "Saved in History", Toast.LENGTH_SHORT).show()
     }
 
     private fun addBubble(text: String, fromUser: Boolean): TextView {

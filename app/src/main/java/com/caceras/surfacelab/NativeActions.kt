@@ -49,13 +49,13 @@ object NativeActions {
     fun show(activity: Activity, draft: String = ""): Dialog {
         val dialog = Dialog(activity)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        fun form(title: String, hint: String, type: Int, initial: String = "", make: (String) -> Intent) {
+        fun form(title: String, hint: String, type: Int, initial: String = "", confirm: String = "Open", make: (String) -> Intent) {
             val field = EditText(activity).apply {
                 this.hint = hint; inputType = type; setText(initial); maxLines = 3
                 padDp(20, 14, 20, 14)
             }
             val form = AlertDialog.Builder(activity).setTitle(title).setView(field)
-                .setNegativeButton("Cancel", null).setPositiveButton("Open", null).create()
+                .setNegativeButton("Cancel", null).setPositiveButton(confirm, null).create()
             form.show()
             NativePrivacy.apply(activity, form.window)
             form.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -76,7 +76,7 @@ object NativeActions {
                 addView(activity.label(hint, 13f, true).apply { padDp(12, 8, 12, 20) })
             }
             action("Set a timer", "Choose minutes, then open your Clock app.") {
-                form("Set a timer", "Minutes", InputType.TYPE_CLASS_NUMBER) { timer(it.toIntOrNull() ?: 0) }
+                form("Set a timer", "Minutes", InputType.TYPE_CLASS_NUMBER, confirm = "Set timer") { timer(it.toIntOrNull() ?: 0) }
             }
             action("Set an alarm", "Choose a time in your phone’s local time zone.") {
                 val now = Calendar.getInstance()
@@ -86,16 +86,17 @@ object NativeActions {
                 picker.show(); NativePrivacy.apply(activity, picker.window)
             }
             action("Draft a calendar event", "Review the date and details in Calendar before saving.") {
-                form("Calendar event", "Event title", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, draft.take(200)) { calendar(it) }
+                form("Calendar event", "Event title", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, draft.take(200), confirm = "Review in Calendar") { calendar(it) }
             }
             action("Find a place", "Search in Maps. Your search is shared with that app.") {
-                form("Find a place", "Place or address", InputType.TYPE_CLASS_TEXT) { maps(it) }
+                form("Find a place", "Place or address", InputType.TYPE_CLASS_TEXT, confirm = "Search") { maps(it) }
             }
             action("Open the dialer", "Review a number before choosing to call.") {
-                form("Open the dialer", "Phone number", InputType.TYPE_CLASS_PHONE) { dial(it) }
+                form("Open the dialer", "Phone number", InputType.TYPE_CLASS_PHONE, confirm = "Open dialer") { dial(it) }
             }
         }
         dialog.setContentView(AdaptiveFrame(activity, ScrollView(activity).apply { addView(content) }).apply { padForSystemBars() })
+        dialog.window?.setBackgroundDrawableResource(R.color.chat_bg)
         dialog.show(); dialog.window?.setLayout(-1, -1); dialog.window?.let { activity.readableSystemBars(it) }
         return dialog
     }

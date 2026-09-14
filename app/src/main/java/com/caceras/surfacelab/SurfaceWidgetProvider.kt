@@ -7,6 +7,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Build
+import android.util.SizeF
 import android.widget.RemoteViews
 
 /** Last answer with explicit Type and Talk entry points into the shared conversation. */
@@ -37,7 +39,11 @@ class SurfaceWidgetProvider : AppWidgetProvider() {
 
     private fun push(context: Context, manager: AppWidgetManager, id: Int) {
         val options = manager.getAppWidgetOptions(id)
-        manager.updateAppWidget(id, views(context, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) < 150))
+        val layout = if (Build.VERSION.SDK_INT >= 31) RemoteViews(mapOf(
+            SizeF(180f, 100f) to views(context, true),
+            SizeF(180f, 160f) to views(context, false)
+        )) else views(context, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 160) < 150)
+        manager.updateAppWidget(id, layout)
     }
 
     internal fun views(context: Context, compact: Boolean): RemoteViews {
