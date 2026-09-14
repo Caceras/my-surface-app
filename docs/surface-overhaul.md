@@ -27,3 +27,23 @@ The initial audit used the two supplied phone screenshots (8110.png and 8109.png
 CI builds both core and Nano APKs and runs Robolectric tests against the deterministic core flavor. Native screenshots cover empty chat, conversation, settings, voice setup and dark mode; these are real activity layouts, not proof of Pixel hardware behavior. Regression tests cover visible greeting/voice entry, compact settings, keyboard send, visible answer actions, shared history, cancellation, offline-only TTS, language selection, mic release and backup validation.
 
 This is a private conversational assistant, not a phone automation agent. It cannot silently read other apps, send messages, browse live information, control alarms, or listen for an always-on wake word. Text explicitly shared or selected is the cross-app context. Android Auto, Wear OS, notification replies and privileged lock-screen/hotword integration are not implemented.
+
+## Interaction refinement
+
+The chat composer now separates writing from dictation and uses one quiet status
+line. Voice and Conversations remain available after the welcome screen leaves.
+Two complete starter prompts replace the duplicate horizontal suggestion strip.
+Replies animate in briefly, and the presence mark reflects thinking/listening/
+speaking; Android's disabled-animation preference is respected.
+
+Streaming preserves the reader's position. Latest reply returns to the bottom.
+New saves the conversation being left; Conversations resumes it and preserves
+any current draft. Up to 12 recent conversations are retained, with a soft
+512 KB archive budget (the newest conversation is retained in full). Exports
+include these conversations and still read older single-conversation backups.
+
+Voice uses explicit quiet/stop controls. Scrolling and toggling Keep talking no
+longer hush playback or change a button's action midway through a touch.
+Validation uses framework layout and speech lifecycle tests plus native Skia
+screenshots. Real Gemini Nano, speech language downloads, and perceived latency
+still require a physical supported Pixel.

@@ -120,9 +120,8 @@ class VoiceTest {
     private fun drain() = shadowOf(Looper.getMainLooper()).idle()
 
     private fun tap(activity: VoiceActivity) {
-        val down = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 1f, 1f, 0)
-        activity.dispatchTouchEvent(down)
-        down.recycle()
+        descendants(activity.findViewById(android.R.id.content)).filterIsInstance<TextView>()
+            .first { it.text == "Quiet voice · Keep reading" }.performClick()
         drain()
     }
 

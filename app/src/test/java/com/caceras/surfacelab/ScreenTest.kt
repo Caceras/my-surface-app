@@ -190,22 +190,19 @@ class ScreenTest {
     }
 
     @Test
-    fun `openers fill the composer and step aside once talking has started`() {
+    fun `starter cards stage complete requests and voice stays reachable in a chat`() {
         val activity = launchMain().get()
-        val opener = descendants(content(activity))
-            .filterIsInstance<TextView>()
-            .first { it.text.toString() == Prompts.OPENERS.first() }
-
-        opener.performClick()
-        assertTrue("opener did not reach the composer",
-            composer(activity).text.toString().startsWith(Prompts.OPENERS.first()))
-
-        composer(activity).setText("something")
+        val starter = descendants(content(activity)).first {
+            it.contentDescription?.toString()?.startsWith("Find the words") == true
+        }
+        starter.performClick()
+        assertTrue(composer(activity).text.toString().startsWith("Help me write a thoughtful message."))
         button(activity, activity.getString(R.string.send)).performClick()
-
-        val row = descendants(content(activity))
-            .filterIsInstance<android.widget.HorizontalScrollView>().first()
-        assertEquals("openers still showing mid-conversation", View.GONE, row.visibility)
+        assertTrue("starter is still visible", !showing(starter))
+        val voice = descendants(content(activity)).first { it.tag == "voice-entry" }
+        assertTrue("voice disappeared in a conversation", showing(voice))
+        voice.performClick()
+        assertEquals(VoiceActivity::class.java.name, shadowOf(activity).nextStartedActivity.component!!.className)
     }
 
     private fun mics(activity: android.app.Activity) =
@@ -417,7 +414,7 @@ class ScreenTest {
         val bounds = android.graphics.Rect()
         assertTrue("greeting is clipped or missing", greeting.getGlobalVisibleRect(bounds))
         assertTrue("greeting has no measurable height", bounds.height() >= activity.dp(40))
-        descendants(decor).filterIsInstance<TextView>().first { it.text == "Let’s talk" }.performClick()
+        descendants(decor).filterIsInstance<TextView>().first { it.text == "Voice" }.performClick()
         assertEquals(VoiceActivity::class.java.name, shadowOf(activity).nextStartedActivity.component!!.className)
     }
 

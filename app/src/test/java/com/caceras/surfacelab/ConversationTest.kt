@@ -49,6 +49,63 @@ class ConversationTest {
         Chat.clear(app)
     }
 
+    @Test
+    fun `new saves a recoverable conversation and switching preserves the next draft`() {
+        val activity = launch().get()
+        exchange(activity, "Plan a weekend", "Take a walk.")
+        descendants(content(activity)).filterIsInstance<TextView>().first { it.text == "New" }.performClick()
+        val saved = Chat.archives(activity).single()
+        assertTrue(Chat.load(activity).isEmpty())
+        Chat.saveDraft(activity, "A different thought")
+        assertTrue(Chat.openArchive(activity, saved.id))
+        assertEquals(listOf(Turn("Plan a weekend", "Take a walk.")), Chat.load(activity))
+        assertEquals("A different thought", Chat.archives(activity).single().draft)
+    }
+
+    @Test
+    fun `backup includes archived conversations and remains compatible with older backups`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        Chat.save(context, listOf(Turn("Earlier", "Answer")))
+        Chat.archiveCurrent(context, "Follow up")
+        Chat.clear(context)
+        Chat.saveDraft(context, "Current draft")
+        val backup = Chat.backup(context)
+        assertEquals("Current draft", Chat.readBackup(backup).second)
+        context.getSharedPreferences("surfacelab", 0).edit().remove("conversations").apply()
+        Chat.restoreArchives(context, backup)
+        assertEquals("Follow up", Chat.archives(context).single().draft)
+        assertEquals(emptyList<Turn>(), Chat.readBackup("""{"format":"surface-chat-v1","turns":[],"draft":""}""").first)
+    }
+
+    @Test
+    fun `streaming leaves the reading position alone until latest reply is requested`() {
+        val activity = launch().get()
+        exchange(activity, "Earlier question", "Earlier answer. ".repeat(400))
+        val decor = activity.window.decorView
+        fun layout() {
+            decor.measure(View.MeasureSpec.makeMeasureSpec(activity.dp(411), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(activity.dp(914), View.MeasureSpec.EXACTLY))
+            decor.layout(0, 0, activity.dp(411), activity.dp(914))
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        }
+        layout()
+        composer(activity).setText("Continue")
+        send(activity)
+        layout()
+        val scroll = descendants(content(activity)).filterIsInstance<ScrollView>().first { it.tag == "conversation" }
+        scroll.scrollTo(0, 30)
+        val before = scroll.scrollY
+        brain.emit("A new paragraph. ".repeat(100))
+        layout()
+        brain.complete("A new paragraph. ".repeat(100))
+        layout()
+        assertEquals("streaming moved the reader", before, scroll.scrollY)
+        val latest = descendants(content(activity)).first { it.tag == "latest-reply" }
+        assertEquals(View.VISIBLE, latest.visibility)
+        latest.performClick()
+        assertEquals(View.GONE, latest.visibility)
+    }
+
     // --------------------------------------------------------------- rig
 
     private fun launch(): ActivityController<MainActivity> =

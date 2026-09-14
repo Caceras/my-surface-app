@@ -26,7 +26,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import android.widget.HorizontalScrollView
+import android.widget.FrameLayout
+import android.view.MotionEvent
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -49,7 +50,12 @@ class MainActivity : Activity() {
     private lateinit var blank: View
     private lateinit var transcript: ScrollView
     private lateinit var input: EditText
-    private lateinit var openers: HorizontalScrollView
+    private lateinit var latest: TextView
+    private var followReply = true
+    private var scrollPosted = false
+    private var restoring = false
+    private lateinit var composeState: TextView
+    private var thinkingMark: PresenceView? = null
     private lateinit var send: ImageButton
     private lateinit var status: TextView
     private var mic: ImageButton? = null
@@ -102,7 +108,6 @@ class MainActivity : Activity() {
         root.addView(buildTranscript(), LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))
-        root.addView(buildOpeners(), wide())
         root.addView(composer(), wide())
 
         setContentView(root)
@@ -120,6 +125,8 @@ class MainActivity : Activity() {
     }
 
     private fun restoreHistory() {
+        restoring = true
+        followReply = true
         history.clear()
         history.addAll(Chat.load(this))
         messages.removeAllViews()
@@ -132,7 +139,8 @@ class MainActivity : Activity() {
             }
         }
         showBlank(history.isEmpty())
-        openers.visibility = if (history.isEmpty()) View.VISIBLE else View.GONE
+        restoring = false
+        latest.visibility = View.GONE
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -169,7 +177,9 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER_VERTICAL
             padDp(20, 12, 20, 12)
             addView(titles, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(pill(getString(R.string.new_chat)) { newChat() })
+            addView(pill(getString(R.string.new_chat)) { newChat() }.apply {
+                tooltipText = "Save this conversation and start a new one"
+            })
             addView(flatButton(getString(R.string.more)) { showSettings(brain) }.apply { padDp(12, 14, 0, 14) })
         }
     }
@@ -347,25 +357,27 @@ class MainActivity : Activity() {
                     val bytes = stream.use { source ->
                         val out = java.io.ByteArrayOutputStream()
                         val buffer = ByteArray(8192)
-                        while (out.size() <= 512_000) {
-                            val count = source.read(buffer, 0, minOf(buffer.size, 512_001 - out.size()))
+                        while (out.size() <= 4_000_000) {
+                            val count = source.read(buffer, 0, minOf(buffer.size, 4_000_001 - out.size()))
                             if (count < 0) break
                             out.write(buffer, 0, count)
                         }
                         out.toByteArray()
                     }
-                    require(bytes.size <= 512_000) { "This backup is too large." }
-                    val (turns, draft) = Chat.readBackup(bytes.toString(Charsets.UTF_8))
+                    require(bytes.size <= 4_000_000) { "This backup is too large." }
+                    val backup = bytes.toString(Charsets.UTF_8)
+                    val (turns, draft) = Chat.readBackup(backup)
                     runOnUiThread {
                         if (!gone) AlertDialog.Builder(this).setTitle("Restore conversation?")
-                            .setMessage("Replace this conversation with " + turns.size + " saved exchanges? Export your current conversation first if you want to keep it.")
+                            .setMessage("Restore " + turns.size + " exchanges and any saved conversations in this backup? Your current chat will be saved in Conversations.")
                             .setPositiveButton("Restore") { _, _ ->
                                 newChat()
+                                Chat.restoreArchives(this, backup)
                                 Chat.save(this, turns)
                                 Chat.saveDraft(this, draft)
                                 restoreHistory()
                                 input.setText(draft)
-                                playback.visibility = if (turns.isEmpty()) View.GONE else View.VISIBLE
+                                playback.visibility = View.GONE
                                 turns.lastOrNull()?.let { ResultStore.save(this, Task.ASK, it.reply) }
                                 settingsDialog?.dismiss()
                             }.setNegativeButton("Cancel", null).show()
@@ -398,9 +410,34 @@ class MainActivity : Activity() {
             // Tapping the conversation stops the answer being read aloud.
             // Not being able to shut it up is what makes a talking app feel
             // like an appliance.
-            setOnClickListener { mouth?.hush() }
+            setOnClickListener { hushPlayback() }
         }
-        return transcript
+        latest = pill("Latest reply") {
+            followReply = true
+            latest.visibility = View.GONE
+            scrollToEnd(animated = true)
+        }.apply {
+            tag = "latest-reply"
+            visibility = View.GONE
+            elevation = dp(4).toFloat()
+        }
+        transcript.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_MOVE) {
+                followReply = false
+                latest.visibility = if (history.isNotEmpty() || busy) View.VISIBLE else View.GONE
+            }
+            false
+        }
+        transcript.setOnScrollChangeListener { _, _, y, _, oldY ->
+            if (y < oldY) followReply = false
+            if (!transcript.canScrollVertically(1)) followReply = true
+            latest.visibility = if (followReply || (history.isEmpty() && !busy)) View.GONE else View.VISIBLE
+        }
+        return FrameLayout(this).apply {
+            addView(transcript, FrameLayout.LayoutParams(-1, -1))
+            addView(latest, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
+                .apply { bottomMargin = dp(12) })
+        }
     }
 
     /**
@@ -415,30 +452,37 @@ class MainActivity : Activity() {
             tag = "welcome"
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            padDp(10, 24, 10, 24)
-            addView(presence(), LinearLayout.LayoutParams(dp(88), dp(88)).apply { bottomMargin = dp(24) })
-            addView(label(getString(R.string.empty_title), 34f).apply {
+            padDp(4, 24, 4, 24)
+            addView(presence(64), LinearLayout.LayoutParams(dp(64), dp(64)).apply { bottomMargin = dp(24) })
+            addView(label(getString(R.string.empty_title), 32f).apply {
                 gravity = Gravity.CENTER
                 letterSpacing = -0.04f
                 setLineSpacing(0f, 1.02f)
             }, wide())
-            addView(label(getString(R.string.empty_body), 15f, true).apply {
+            addView(label("Space to think. A hand with the words.", 15f, true).apply {
                 gravity = Gravity.CENTER
-                padDp(4, 16, 4, 24)
+                padDp(4, 16, 4, 28)
             }, wide())
-            addView(pill("Let’s talk", primary = true) {
-                startActivity(Intent(this@MainActivity, VoiceActivity::class.java))
-            }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(24) })
-            val starters = listOf(
-                "Find the right words" to "Help me write a thoughtful message. Ask me who it is for and what I want to say.",
-                "Untangle a thought" to "Help me think through a decision. Ask me one question at a time."
-            )
-            starters.forEach { (title, prompt) ->
-                addView(pill(title) {}.apply {
-                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                    setOnClickListener { stagePrompt(prompt) }
-                }, wide().apply { bottomMargin = dp(8) })
-            }
+            addView(LinearLayout(this@MainActivity).apply {
+                val options = listOf(
+                    Triple("Find the words", "Messages & ideas", "Help me write a thoughtful message. Ask me who it is for and what I want to say."),
+                    Triple("Think it through", "Clarity & next steps", "Help me think through a decision. Ask me one question at a time.")
+                )
+                options.forEachIndexed { index, (title, hint, prompt) ->
+                    addView(LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        minimumHeight = dp(96)
+                        padDp(16, 16, 12, 16)
+                        background = surface(if (index == 0) R.color.presence_bg else R.color.chip_bg, 22)
+                        addView(label(title, 16f).apply { medium() })
+                        addView(label(hint, 12f, true).apply { padDp(0, 6, 0, 0) })
+                        isFocusable = true
+                        contentDescription = "$title. $hint"
+                        setOnClickListener { stagePrompt(prompt) }
+                    }, LinearLayout.LayoutParams(0, -2, 1f).apply { if (index == 0) rightMargin = dp(10) })
+                }
+            }, wide())
         }
         return blank
     }
@@ -455,23 +499,6 @@ class MainActivity : Activity() {
     private fun showBlank(empty: Boolean) {
         blank.visibility = if (empty) View.VISIBLE else View.GONE
         messages.gravity = if (empty) Gravity.CENTER else Gravity.BOTTOM
-    }
-
-    private fun buildOpeners(): View {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            padDp(20, 0, 20, 12)
-        }
-        Prompts.OPENERS.forEach { opener ->
-            row.addView(chip(opener) {
-                stagePrompt("$opener ")
-            })
-        }
-        openers = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            addView(row)
-        }
-        return openers
     }
 
     private fun composer(): View {
@@ -515,16 +542,18 @@ class MainActivity : Activity() {
         }
 
         val bar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            padDp(4, 4, 6, 4)
+            orientation = LinearLayout.VERTICAL
+            padDp(4, 2, 6, 6)
             background = getDrawable(R.drawable.composer_bg)
-            addView(input, LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(input, wide())
         }
 
-        // No on-device recogniser means no microphone at all, rather than a
-        // button that quietly sends audio somewhere. See docs/voice.md.
+        val tools = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        composeState = label("On device", 12f, true).apply {
+            tag = "compose-state"
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            padDp(8, 0, 8, 0)
+        }
         if (ears.available()) {
             val button = ImageButton(this).apply {
                 setImageResource(R.drawable.ic_mic)
@@ -532,35 +561,65 @@ class MainActivity : Activity() {
                 minimumWidth = dp(48)
                 minimumHeight = dp(48)
                 contentDescription = getString(R.string.mic)
+                tooltipText = "Dictate into your draft, then review and send"
                 val pad = dp(10)
                 setPadding(pad, pad, pad, pad)
                 setOnClickListener { toggleListening() }
             }
             mic = button
-            bar.addView(button)
+            tools.addView(button)
+            composeState.text = "Dictate a message"
         }
-        bar.addView(send)
-        playback = flatButton(getString(R.string.read_last)) {
-            if (busy || mouth?.speaking() == true) {
-                mouth?.hush()
-                playback.text = getString(R.string.read_last)
-            } else history.lastOrNull()?.let { readAloud(it.reply) }
+        tools.addView(composeState, LinearLayout.LayoutParams(0, -2, 1f))
+        tools.addView(send)
+        bar.addView(tools, wide())
+        playback = flatButton(getString(R.string.stop_speaking)) { hushPlayback() }.apply {
+            gravity = Gravity.CENTER
+            minHeight = dp(48)
+            visibility = View.GONE
         }
-        playback.gravity = Gravity.CENTER
-        playback.minHeight = dp(48)
-        playback.visibility = if (Chat.load(this).isEmpty()) View.GONE else View.VISIBLE
         updateSend()
-
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             padDp(16, 0, 16, 8)
             addView(bar, wide())
-            addView(playback, wide())
-            addView(label("Private by design · Answers can be imperfect", 11f, true).apply {
-                gravity = Gravity.CENTER
-                padDp(0, 10, 0, 6)
+            addView(LinearLayout(this@MainActivity).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(flatButton("Voice") {
+                    startActivity(Intent(this@MainActivity, VoiceActivity::class.java))
+                }.apply { tag = "voice-entry"; padDp(16, 12, 16, 12) })
+                addView(flatButton("Conversations") { showConversations() }.apply { padDp(12, 12, 12, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(playback)
             }, wide())
         }
+    }
+
+    private fun hushPlayback() {
+        mouth?.hush()
+        playback.visibility = View.GONE
+    }
+
+    private fun showConversations() {
+        val saved = Chat.archives(this)
+        val dialog = AlertDialog.Builder(this).setTitle("Your conversations")
+        if (saved.isEmpty()) dialog.setMessage("Your previous conversations will appear here when you tap New. This conversation is saved on your phone automatically.")
+        else dialog.setItems(saved.map { it.title }.toTypedArray()) { _, position ->
+            stopAnswer()
+            ears.cancel()
+            listening = false
+            setMicActive(false)
+            hushPlayback()
+            askedAloud = false
+            input.hint = getString(R.string.chat_hint)
+            Chat.saveDraft(this, input.text.toString())
+            if (Chat.openArchive(this, saved[position].id)) {
+                restoreHistory()
+                input.setText(Chat.draft(this))
+                history.lastOrNull()?.let { ResultStore.save(this, Task.ASK, it.reply) }
+                    ?: ResultStore.clear(this)
+            }
+        }
+        dialog.setNegativeButton("Done", null).show()
     }
 
     // ------------------------------------------------------------ asking
@@ -577,6 +636,9 @@ class MainActivity : Activity() {
         send.contentDescription = getString(if (busy) R.string.stop_response else R.string.send)
         send.isEnabled = busy || (!listening && input.text.toString().isNotBlank())
         send.alpha = if (send.isEnabled) 1f else 0.4f
+        if (::composeState.isInitialized && !listening) {
+            composeState.text = if (busy) "Thinking on your phone…" else if (askedAloud) "Review your words, then send" else "On device · Private"
+        }
     }
 
     private fun stopAnswer() {
@@ -584,7 +646,8 @@ class MainActivity : Activity() {
         requestId++
         Brains.get().cancel()
         busy = false
-        mouth?.hush()
+        thinkingMark?.let { it.show(PresenceView.Mode.REST); it.visibility = View.GONE }
+        hushPlayback()
         pendingAnswer?.append("\n\n" + getString(R.string.response_stopped))
         pendingAnswer = null
         if (input.text.isBlank()) input.setText(pendingQuestion)
@@ -598,20 +661,28 @@ class MainActivity : Activity() {
 
         val token = ++requestId
         busy = true
-        playback.visibility = View.VISIBLE
+        playback.visibility = View.GONE
+        followReply = true
         pendingQuestion = text
         input.setText("")
         Chat.saveDraft(this, "")
         updateSend()
-        openers.visibility = View.GONE
         mouth?.hush()
 
+        getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            .hideSoftInputFromWindow(input.windowToken, 0)
+        input.clearFocus()
         addBubble(text, fromUser = true)
+        thinkingMark = presence(28).also {
+            it.show(PresenceView.Mode.THINKING)
+            messages.addView(it, LinearLayout.LayoutParams(dp(28), dp(28)).apply { topMargin = dp(14) })
+        }
         val answer = addBubble(getString(R.string.working), fromUser = false)
         pendingAnswer = answer
 
         if (aloud) {
             playback.text = getString(R.string.stop_speaking)
+            playback.visibility = View.VISIBLE
             speaker().begin(ears.locale())
         }
 
@@ -627,14 +698,15 @@ class MainActivity : Activity() {
                 // separate system prompt it is pasted above the question as
                 // ordinary text, and a small model asked "??" recites it back.
                 if (Prompts.isEcho(partial, Task.ASK)) return@run
-                val atBottom = !transcript.canScrollVertically(1)
+                thinkingMark?.let { mark -> mark.show(PresenceView.Mode.REST); mark.visibility = View.GONE }
                 answer.text = Markdown.render(Prompts.reply(partial), dp(18))
                 if (aloud) mouth?.follow(Markdown.strip(Prompts.reply(partial)))
-                if (atBottom) scrollToEnd()
+                scrollToEnd()
             }
         ) { result ->
             if (gone || token != requestId) return@run
             busy = false
+            thinkingMark?.let { it.show(PresenceView.Mode.REST); it.visibility = View.GONE }
             pendingQuestion = ""
             pendingAnswer = null
             updateSend()
@@ -662,7 +734,7 @@ class MainActivity : Activity() {
                 ResultStore.save(this, Task.ASK, said)
                 if (aloud) mouth?.finish(Markdown.strip(said))
             } else {
-                mouth?.hush()
+                hushPlayback()
                 if (input.text.isBlank()) input.setText(text)
                 answer.setOnClickListener {
                     input.setText(text)
@@ -689,6 +761,9 @@ class MainActivity : Activity() {
         setMicActive(false)
         input.hint = getString(R.string.chat_hint)
         mouth?.hush()
+        val saved = Chat.archiveCurrent(this, input.text.toString())
+        followReply = true
+        latest.visibility = View.GONE
         history.clear()
         Chat.clear(this)
         Chat.saveDraft(this, "")
@@ -697,8 +772,8 @@ class MainActivity : Activity() {
         messages.removeAllViews()
         messages.addView(emptyState(), wide())
         showBlank(true)
-        openers.visibility = View.VISIBLE
         input.setText("")
+        if (saved) Toast.makeText(this, "Saved in Conversations", Toast.LENGTH_SHORT).show()
     }
 
     private fun addBubble(text: String, fromUser: Boolean): TextView {
@@ -715,7 +790,7 @@ class MainActivity : Activity() {
             ))
             padDp(if (fromUser) 18 else 4, 14, if (fromUser) 18 else 4, 14)
             // Tapping an answer stops it being spoken.
-            if (!fromUser) setOnClickListener { mouth?.hush() }
+            if (!fromUser) setOnClickListener { hushPlayback() }
         }
 
         val params = LinearLayout.LayoutParams(
@@ -730,19 +805,29 @@ class MainActivity : Activity() {
         }
 
         messages.addView(bubble, params)
+        if (!restoring) bubble.arrive()
         scrollToEnd()
         return bubble
     }
 
-    private fun scrollToEnd() =
-        transcript.post { transcript.fullScroll(ScrollView.FOCUS_DOWN) }
+    private fun scrollToEnd(animated: Boolean = false) {
+        if (!followReply || scrollPosted) return
+        scrollPosted = true
+        transcript.post {
+            scrollPosted = false
+            if (!gone && followReply) {
+                if (animated) transcript.smoothScrollTo(0, messages.height)
+                else transcript.scrollTo(0, messages.height)
+            }
+        }
+    }
 
     // ----------------------------------------------------------- speaking
 
     private fun speaker(): Mouth = mouth ?: Mouth(this).also { voice ->
         mouth = voice
-        voice.onProblem = { if (!gone) { status.text = it; playback.text = getString(R.string.read_last) } }
-        voice.onIdle = { if (!gone) playback.text = getString(R.string.read_last) }
+        voice.onProblem = { if (!gone) { status.text = it; playback.visibility = View.GONE } }
+        voice.onIdle = { if (!gone) playback.visibility = View.GONE }
     }
 
     private fun readAloud(text: String) {
@@ -752,6 +837,7 @@ class MainActivity : Activity() {
         setMicActive(false)
         updateSend()
         playback.text = getString(R.string.stop_speaking)
+        playback.visibility = View.VISIBLE
         speaker().apply { begin(ears.locale()); finish(Markdown.strip(text)) }
     }
 
@@ -830,11 +916,13 @@ class MainActivity : Activity() {
                 // not a redo. Send speaks the answer back, because this
                 // question was asked out loud.
                 askedAloud = true
+                composeState.text = "Review your words, then send"
             },
             onStop = { problem ->
                 listening = false
                 updateSend()
                 setMicActive(false)
+                if (askedAloud) composeState.text = "Review your words, then send"
                 input.hint = getString(R.string.chat_hint)
                 if (problem != null) report(problem)
             }
@@ -861,6 +949,7 @@ class MainActivity : Activity() {
             color(if (active) R.color.listening else R.color.text_dim)
         )
         mic?.contentDescription = getString(if (active) R.string.finish_dictation else R.string.mic)
+        if (::composeState.isInitialized) composeState.text = if (active) "Listening… tap mic to finish" else "Dictate a message"
         if (!active) level(0f)
     }
 
@@ -870,7 +959,7 @@ class MainActivity : Activity() {
      * that the screen is never blank while you are talking.
      */
     private fun level(rms: Float) {
-        val scale = 1f + (rms.coerceIn(0f, 10f) / 20f)
+        val scale = 1f + (rms.coerceIn(0f, 10f) / 70f)
         mic?.scaleX = scale
         mic?.scaleY = scale
     }
@@ -893,7 +982,7 @@ class MainActivity : Activity() {
         super.onResume()
         if (::messages.isInitialized && !busy && Chat.load(this) != history) {
             restoreHistory()
-            playback.visibility = if (history.isEmpty()) View.GONE else View.VISIBLE
+            playback.visibility = View.GONE
         }
         if (::input.isInitialized && input.text.isBlank() && Chat.draft(this).isNotBlank()) {
             input.setText(Chat.draft(this))

@@ -10,7 +10,6 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Switch
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -38,7 +37,7 @@ class VoiceActivity : Activity() {
     private enum class State { IDLE, LISTENING, THINKING, SPEAKING }
 
     private lateinit var card: View
-    private lateinit var dot: View
+    private lateinit var dot: PresenceView
     private lateinit var status: TextView
     private lateinit var guidance: TextView
     private lateinit var heard: TextView
@@ -53,6 +52,15 @@ class VoiceActivity : Activity() {
     private var mouth: Mouth? = null
 
     private var state = State.IDLE
+        set(value) {
+            field = value
+            if (::dot.isInitialized) dot.show(when (value) {
+                State.IDLE -> PresenceView.Mode.REST
+                State.LISTENING -> PresenceView.Mode.LISTENING
+                State.THINKING -> PresenceView.Mode.THINKING
+                State.SPEAKING -> PresenceView.Mode.SPEAKING
+            })
+        }
 
     /**
      * Set on the way out, and checked by every brain callback.
@@ -106,14 +114,12 @@ class VoiceActivity : Activity() {
                 setupTools.visibility = View.VISIBLE
                 continuousSwitch.visibility = View.GONE
                 dot.visibility = View.VISIBLE
-                dot.alpha = 0.45f
                 action.visibility = View.GONE
             }
             granted() -> pendingListen = true
             else -> {
                 status.text = "Your voice, your space"
                 dot.visibility = View.VISIBLE
-                dot.alpha = 0.45f
                 answer.text = "Allow microphone access to speak. Audio is transcribed on your phone. You can also choose Type below."
                 requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
             }
@@ -180,6 +186,8 @@ class VoiceActivity : Activity() {
             addView(status, wide())
             guidance = label("Speak, pause, and hear a reply.", 14f, true).apply {
                 gravity = Gravity.CENTER
+                minHeight = dp(48)
+                setOnClickListener { if (state == State.SPEAKING) quietVoice() }
                 padDp(0, 10, 0, 10)
             }
             addView(guidance, wide())
@@ -221,7 +229,6 @@ class VoiceActivity : Activity() {
     private fun showSetup() {
         setupMode = true
         dot.visibility = View.VISIBLE
-        dot.alpha = 0.45f
         status.text = "Make yourself heard"
         guidance.text = "A one-time setup. A more natural conversation."
         heard.text = "A quick voice check"
@@ -323,7 +330,6 @@ class VoiceActivity : Activity() {
         continuousSwitch.visibility = View.VISIBLE
         heard.textSize = 23f
         guidance.text = "Pause to send. Tap Finish speaking when you’re done."
-        dot.alpha = 1f
         state = State.LISTENING
         status.text = getString(R.string.listening_hint)
         heard.text = ""
@@ -342,11 +348,7 @@ class VoiceActivity : Activity() {
     }
 
     /** rmsdB runs from roughly -2 to 10, and only the loud half is useful. */
-    private fun level(rms: Float) {
-        val scale = 1f + (rms.coerceIn(0f, 10f) / 70f)
-        dot.scaleX = scale
-        dot.scaleY = scale
-    }
+    private fun level(rms: Float) = dot.level(rms)
 
     private fun stopped(problem: VoiceProblem?) {
         dot.scaleX = 1f
@@ -363,7 +365,6 @@ class VoiceActivity : Activity() {
         continuousSwitch.isChecked = false
         state = State.IDLE
         dot.visibility = View.VISIBLE
-        dot.alpha = 0.45f
         setupMode = true
         continuousSwitch.visibility = View.GONE
         setupTools.visibility = View.VISIBLE
@@ -393,7 +394,6 @@ class VoiceActivity : Activity() {
     private fun idleWith(line: String) {
         state = State.IDLE
         dot.visibility = View.VISIBLE
-        dot.alpha = 0.45f
         status.text = line
         guidance.text = "Pick up whenever you’re ready."
         idleAction()
@@ -419,7 +419,6 @@ class VoiceActivity : Activity() {
         status.text = getString(R.string.working)
         guidance.text = "Thinking it through, on your phone."
         dot.visibility = View.VISIBLE
-        dot.alpha = 0.45f
 
         action.text = getString(R.string.stop_response)
         action.visibility = View.VISIBLE
@@ -460,7 +459,7 @@ class VoiceActivity : Activity() {
                     if (state == State.THINKING) {
                         state = State.SPEAKING
                         status.text = speechProblem ?: getString(R.string.answering)
-                        guidance.text = "Tap to quiet the voice. Your reply stays here."
+                        guidance.text = "Quiet voice · Keep reading"
                     }
                     // Speech starts at the first finished sentence, not at
                     // the end of the answer. This is the whole difference
@@ -504,7 +503,7 @@ class VoiceActivity : Activity() {
             if (note == null) said else said + "\n\n" + note, dp(18)
         )
         status.text = speechProblem ?: getString(R.string.answering)
-        guidance.text = "Tap to quiet the voice. Your reply stays here."
+        guidance.text = "Quiet voice · Keep reading"
 
         // What you asked in the kitchen is on the home screen afterwards.
         Chat.append(this, Turn(spoken, said))
@@ -518,6 +517,10 @@ class VoiceActivity : Activity() {
         // Nothing was queued -- no engine, muted by a barge-in, or an answer
         // already spoken in full -- so no onIdle is coming to end the turn.
         if (!voice.speaking()) idleWith(speechProblem ?: getString(R.string.tap_to_talk))
+        else {
+            action.text = getString(R.string.stop_speaking)
+            action.setOnClickListener { quietVoice() }
+        }
     }
 
     private fun speaker(): Mouth = mouth ?: Mouth(this).also { mouth = it }
@@ -527,20 +530,15 @@ class VoiceActivity : Activity() {
 
     // ------------------------------------------------------------ plumbing
 
-    /**
-     * Barge-in. Any touch stops the phone talking, immediately -- not being
-     * able to shut it up is what makes a voice assistant feel like an
-     * appliance. Mouth.hush() also mutes the chunker, because the brain is
-     * very likely still streaming and stop() alone only clears the queue.
-     */
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-            main.removeCallbacks(nextListen)
-            if (state == State.SPEAKING || state == State.THINKING) continuousSwitch.isChecked = false
-            mouth?.hush()
-            if (!generating && state == State.SPEAKING) idle()
-        }
-        return super.dispatchTouchEvent(event)
+    /** An explicit control avoids changing a button's action halfway through a tap. */
+    private fun quietVoice() {
+        main.removeCallbacks(nextListen)
+        continuousSwitch.isChecked = false
+        mouth?.hush()
+        if (generating) {
+            guidance.text = "Continuing in text…"
+            dot.show(PresenceView.Mode.THINKING)
+        } else idle()
     }
 
     override fun onRequestPermissionsResult(

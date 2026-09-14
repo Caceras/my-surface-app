@@ -45,14 +45,16 @@ fun Context.pill(value: String, primary: Boolean = false, onClick: () -> Unit) =
         onClick()
     }
 }
-fun Context.presence(size: Int = 88) = ImageView(this).apply {
-    tag = "presence"
-    setImageResource(R.drawable.ic_surface)
-    setColorFilter(ink(R.color.accent))
-    background = surface(R.color.presence_bg, size / 2)
-    padDp(size / 4, size / 4, size / 4, size / 4)
-    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+fun Context.presence(size: Int = 88) = PresenceView(this, size)
+
+/** Short, interruptible entry motion. Android's remove-animation preference wins. */
+fun View.arrive() {
+    if (!isAttachedToWindow || !android.animation.ValueAnimator.areAnimatorsEnabled()) return
+    translationY = context.dp(6).toFloat()
+    animate().translationY(0f).setDuration(180)
+        .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
 }
+
 fun Activity.readableSystemBars(target: android.view.Window = window) {
     val light = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_YES
     if (Build.VERSION.SDK_INT >= 30) {
