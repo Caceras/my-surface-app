@@ -445,7 +445,10 @@ class MainActivity : Activity() {
         }
         transcript.setOnScrollChangeListener { _, _, y, _, oldY ->
             if (y < oldY) followReply = false
-            if (!transcript.canScrollVertically(1)) followReply = true
+            // Use the position delivered by this callback, not an independently
+            // sampled scrollY (test shadows can update it after the callback).
+            val end = (messages.height - transcript.height + transcript.paddingTop + transcript.paddingBottom).coerceAtLeast(0)
+            if (y >= end) followReply = true
             latest.visibility = if (followReply || (history.isEmpty() && !busy)) View.GONE else View.VISIBLE
         }
         return FrameLayout(this).apply {

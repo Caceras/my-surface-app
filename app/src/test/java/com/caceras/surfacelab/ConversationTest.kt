@@ -97,6 +97,8 @@ class ConversationTest {
         assertTrue("fixture needs a scrollable conversation", scroll.scrollY > 30)
         scroll.scrollTo(0, 30)
         val before = scroll.scrollY
+        assertEquals("scrolling up must detach from the latest reply", View.VISIBLE,
+            descendants(content(activity)).first { it.tag == "latest-reply" }.visibility)
         brain.emit("A new paragraph. ".repeat(100))
         layout()
         brain.complete("A new paragraph. ".repeat(100))
