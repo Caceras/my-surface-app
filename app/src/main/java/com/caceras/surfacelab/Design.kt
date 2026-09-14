@@ -53,13 +53,13 @@ fun Context.presence(size: Int = 88) = ImageView(this).apply {
     padDp(size / 4, size / 4, size / 4, size / 4)
     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
 }
-fun Activity.readableSystemBars() {
+fun Activity.readableSystemBars(target: android.view.Window = window) {
     val light = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_YES
     if (Build.VERSION.SDK_INT >= 30) {
         val mask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
-        window.insetsController?.setSystemBarsAppearance(if (light) mask else 0, mask)
+        target.insetsController?.setSystemBarsAppearance(if (light) mask else 0, mask)
     } else {
         @Suppress("DEPRECATION")
-        window.decorView.systemUiVisibility = if (light) View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
+        target.decorView.systemUiVisibility = if (light) View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
     }
 }

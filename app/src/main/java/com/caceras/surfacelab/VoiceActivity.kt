@@ -40,6 +40,7 @@ class VoiceActivity : Activity() {
     private lateinit var card: View
     private lateinit var dot: View
     private lateinit var status: TextView
+    private lateinit var guidance: TextView
     private lateinit var heard: TextView
     private lateinit var answer: TextView
     private lateinit var action: TextView
@@ -103,13 +104,17 @@ class VoiceActivity : Activity() {
                 status.text = "Voice needs setup"
                 answer.text = getString(R.string.voice_unavailable)
                 setupTools.visibility = View.VISIBLE
+                continuousSwitch.visibility = View.GONE
                 dot.visibility = View.VISIBLE
                 dot.alpha = 0.45f
                 action.visibility = View.GONE
             }
             granted() -> pendingListen = true
             else -> {
-                status.text = getString(R.string.mic_rationale)
+                status.text = "Your voice, your space"
+                dot.visibility = View.VISIBLE
+                dot.alpha = 0.45f
+                answer.text = "Allow microphone access to speak. Audio is transcribed on your phone. You can also choose Type below."
                 requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
             }
         }
@@ -137,7 +142,13 @@ class VoiceActivity : Activity() {
                     language = pill("Choose speaking language") { chooseLanguage() }
                     addView(language, wide().apply { bottomMargin = dp(8) })
                     addView(pill("Download offline speech") { downloadLanguage() }, wide().apply { bottomMargin = dp(8) })
-                    addView(pill("Test speaker & settings") { voiceOptions() }, wide())
+                    addView(pill("Test speaker") { testSpeaker() }, wide().apply { bottomMargin = dp(8) })
+                    addView(label("Android settings", 14f).apply {
+                        minHeight = dp(48)
+                        gravity = Gravity.CENTER
+                        isFocusable = true
+                        setOnClickListener { voiceOptions() }
+                    }, wide())
                 }
                 addView(setupTools, wide())
             }, wide())
@@ -167,10 +178,11 @@ class VoiceActivity : Activity() {
                 bottomMargin = dp(24)
             })
             addView(status, wide())
-            addView(label("Speak, pause, and hear a reply.", 14f, true).apply {
+            guidance = label("Speak, pause, and hear a reply.", 14f, true).apply {
                 gravity = Gravity.CENTER
                 padDp(0, 10, 0, 10)
-            }, wide())
+            }
+            addView(guidance, wide())
             addView(scroller, LinearLayout.LayoutParams(-1, 0, 1f))
             addView(continuousSwitch, wide())
             addView(action, wide().apply { bottomMargin = dp(10) })
@@ -211,12 +223,28 @@ class VoiceActivity : Activity() {
         dot.visibility = View.VISIBLE
         dot.alpha = 0.45f
         status.text = "Make yourself heard"
+        guidance.text = "A one-time setup. A more natural conversation."
         heard.text = "A quick voice check"
-        answer.text = "1. Choose your speaking language.\n2. Download its offline speech pack.\n3. Test the speaker, then tap Talk.\n\nSpeech and Gemini Nano are separate. A ready model does not mean your speech language is installed."
-        action.text = "Voice options"
-        action.visibility = View.VISIBLE
-        action.setOnClickListener { voiceOptions() }
+        heard.textSize = 20f
+        answer.text = "Choose your language, prepare offline speech, then test the speaker. Initial downloads need a connection."
+        continuousSwitch.visibility = View.GONE
+        idleAction()
         setupTools.visibility = View.VISIBLE
+    }
+
+    private fun testSpeaker() {
+        stopForSetup()
+        status.text = "Testing your speaker"
+        val voice = speaker()
+        voice.onProblem = { if (!gone) {
+            status.text = "Speaker needs setup"
+            answer.text = it + " Tap Voice setup, then Android settings to install a playback voice."
+            action.text = "Android speech settings"
+            action.setOnClickListener { voiceOptions() }
+        } }
+        voice.onIdle = { if (!gone && status.text == "Testing your speaker") idle() }
+        voice.begin(ears.locale())
+        voice.finish(if (ears.locale().language == "sv") "Hej! Jag är redo att hjälpa dig." else "Hello. I am ready to help. This voice is running on your phone.")
     }
 
     private fun voiceOptions() {
@@ -225,14 +253,7 @@ class VoiceActivity : Activity() {
                 when (which) {
                     0 -> chooseLanguage()
                     1 -> downloadLanguage()
-                    2 -> {
-                        status.text = "Testing your speaker"
-                        val voice = speaker()
-                        voice.onProblem = { if (!gone) { status.text = "Speaker needs setup"; answer.text = it + " Open Android speech settings to install a voice." } }
-                        voice.onIdle = { if (!gone) idle() }
-                        voice.begin(ears.locale())
-                        voice.finish(if (ears.locale().language == "sv") "Hej! Jag är redo att hjälpa dig." else "Hello. I am ready to help. This voice is running on your phone.")
-                    }
+                    2 -> testSpeaker()
                     3 -> AlertDialog.Builder(this).setTitle("Android speech settings")
                         .setItems(arrayOf("Spoken replies", "Voice input", "Microphone permission")) { _, option ->
                             val target = when (option) {
@@ -299,6 +320,9 @@ class VoiceActivity : Activity() {
 
         setupMode = false
         setupTools.visibility = View.GONE
+        continuousSwitch.visibility = View.VISIBLE
+        heard.textSize = 23f
+        guidance.text = "Pause to send. Tap Finish speaking when you’re done."
         dot.alpha = 1f
         state = State.LISTENING
         status.text = getString(R.string.listening_hint)
@@ -340,9 +364,11 @@ class VoiceActivity : Activity() {
         state = State.IDLE
         dot.visibility = View.VISIBLE
         dot.alpha = 0.45f
+        setupMode = true
+        continuousSwitch.visibility = View.GONE
         setupTools.visibility = View.VISIBLE
         status.text = "Let’s get voice ready"
-        answer.text = problem.message + "\n\nChoose English (United States) if your system uses an English region without an offline pack. Voice setup lets you change language and test the speaker."
+        answer.text = problem.message + "\n\nTry English (United States), or choose your speaking language below."
 
         if (problem.languageMissing && ears.canFetchLanguage()) {
             // The recogniser is here, the language pack is not. That is the

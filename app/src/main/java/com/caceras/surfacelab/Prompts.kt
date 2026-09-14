@@ -190,11 +190,9 @@ object Prompts {
 
     /** Offered on the empty chat screen. Each one stands on its own. */
     val OPENERS = listOf(
-        "Explain a hard idea simply",
-        "Help me word a message",
-        "Give me three ideas for",
-        "What should I ask about",
-        "Translate to English",
-        "Write a short summary of"
+        "Plan a calmer day",
+        "Help me focus",
+        "Teach me something new",
+        "Write a thank-you"
     )
 }

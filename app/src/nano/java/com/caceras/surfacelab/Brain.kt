@@ -216,7 +216,7 @@ private fun describe(code: Int?, error: Throwable?): BrainStatus = when (code) {
     FeatureStatus.AVAILABLE ->
         BrainStatus("Gemini Nano · On device", ready = true)
     FeatureStatus.DOWNLOADABLE ->
-        BrainStatus("Model not downloaded - tap to fetch it", ready = false, preparable = true)
+        BrainStatus("Model setup needed · Open Settings", ready = false, preparable = true)
     FeatureStatus.DOWNLOADING ->
         BrainStatus("Model downloading...", ready = false)
     FeatureStatus.UNAVAILABLE ->

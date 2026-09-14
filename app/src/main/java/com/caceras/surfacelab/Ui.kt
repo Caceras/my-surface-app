@@ -27,22 +27,32 @@ fun View.padDp(left: Int, top: Int, right: Int, bottom: Int) =
  * the system bars on top of it.
  */
 fun View.padForSystemBars(extraTop: Int = 0, extraBottom: Int = 0) {
+    val baseLeft = paddingLeft
+    val baseRight = paddingRight
     val baseTop = paddingTop + context.dp(extraTop)
     val baseBottom = paddingBottom + context.dp(extraBottom)
     setOnApplyWindowInsetsListener { view, insets ->
         val top: Int
         val bottom: Int
+        val left: Int
+        val right: Int
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
             top = bars.top
             bottom = bars.bottom
+            left = bars.left
+            right = bars.right
         } else {
             @Suppress("DEPRECATION")
             top = insets.systemWindowInsetTop
             @Suppress("DEPRECATION")
             bottom = insets.systemWindowInsetBottom
+            @Suppress("DEPRECATION")
+            left = insets.systemWindowInsetLeft
+            @Suppress("DEPRECATION")
+            right = insets.systemWindowInsetRight
         }
-        view.setPadding(view.paddingLeft, baseTop + top, view.paddingRight, baseBottom + bottom)
+        view.setPadding(baseLeft + left, baseTop + top, baseRight + right, baseBottom + bottom)
         insets
     }
     requestApplyInsets()

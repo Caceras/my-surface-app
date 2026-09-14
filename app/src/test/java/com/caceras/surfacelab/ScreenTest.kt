@@ -430,4 +430,27 @@ class ScreenTest {
         assertTrue(body.containsAll(listOf("Listen", "Copy", "Share")))
     }
 
+    @Test
+    fun `side system insets protect controls and do not accumulate`() {
+        val view = root(launchMain().get())
+        val insets = WindowInsets.Builder().setInsets(WindowInsets.Type.systemBars(), Insets.of(60, 20, 40, 30)).build()
+        view.dispatchApplyWindowInsets(insets)
+        view.dispatchApplyWindowInsets(insets)
+        assertEquals(60, view.paddingLeft)
+        assertEquals(40, view.paddingRight)
+    }
+
+    @Test
+    fun `model preparation result is visible inside Settings`() {
+        val activity = launchMain().get()
+        descendants(content(activity)).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.more) }.performClick()
+        val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+        descendants(dialog).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.prepare_model) }.performClick()
+        val state = dialog.findViewWithTag<TextView>("model-state")
+        assertTrue(state.text.isNotBlank())
+        assertTrue(state.text != activity.getString(R.string.working))
+    }
+
 }

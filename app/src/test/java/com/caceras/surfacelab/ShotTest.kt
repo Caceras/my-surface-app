@@ -100,9 +100,9 @@ class ShotTest {
 
     @Test
     fun `the hands-free screen`() {
-        // Deliberately translucent -- Theme.Translucent.NoTitleBar, so it
-        // floats a card over whatever you opened it from. Most of this frame
-        // is meant to be unpainted, which is why the bar is so much lower.
+        val application = RuntimeEnvironment.getApplication()
+        org.robolectric.Shadows.shadowOf(application).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        org.robolectric.shadows.ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
         val activity = Robolectric.buildActivity(VoiceActivity::class.java).setup().get()
         shoot("voice", activity.window.decorView, minPainted = 0.05)
     }
@@ -124,11 +124,43 @@ class ShotTest {
     }
 
     @Test
-    @Config(qualifiers = "w411dp-h914dp-xxhdpi-night")
+    @Config(qualifiers = "w411dp-h914dp-night-xxhdpi")
     fun `chat in dark mode`() {
         Chat.clear(RuntimeEnvironment.getApplication())
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         shoot("chat-night", activity.window.decorView)
+    }
+
+    @Test
+    fun `missing speech language keeps setup and typing reachable`() {
+        val application = RuntimeEnvironment.getApplication()
+        org.robolectric.Shadows.shadowOf(application).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        org.robolectric.shadows.ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+        val activity = Robolectric.buildActivity(VoiceActivity::class.java).setup().get()
+        org.robolectric.Shadows.shadowOf(org.robolectric.shadows.ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+            .triggerOnError(android.speech.SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE)
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        shoot("voice-error", activity.window.decorView)
+    }
+
+    @Test
+    fun `voice answer streams into the native screen`() {
+        val application = RuntimeEnvironment.getApplication()
+        org.robolectric.Shadows.shadowOf(application).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        org.robolectric.shadows.ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+        val brain = StreamingBrain()
+        Brains.useForTest(brain)
+        try {
+            val activity = Robolectric.buildActivity(VoiceActivity::class.java).setup().get()
+            org.robolectric.Shadows.shadowOf(org.robolectric.shadows.ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+                .triggerOnResults(android.os.Bundle().apply {
+                    putStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION,
+                        arrayListOf("Help me slow down for a minute."))
+                })
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            brain.emit("Let’s make a little space.\n\nPut down what you’re carrying. Take one slow breath.\n\nWhat is the one thing that needs your attention next?")
+            shoot("voice-answer", activity.window.decorView)
+        } finally { Brains.useForTest(null) }
     }
 
 }

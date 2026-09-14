@@ -179,6 +179,7 @@ class MainActivity : Activity() {
             .hideSoftInputFromWindow(input.windowToken, 0)
         input.clearFocus()
         val dialog = Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         settingsDialog = dialog
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -198,6 +199,7 @@ class MainActivity : Activity() {
         dialog.window?.setBackgroundDrawableResource(R.color.chat_bg)
         dialog.show()
         dialog.window?.setLayout(-1, -1)
+        dialog.window?.let { readableSystemBars(it) }
         body.padForSystemBars()
     }
 
@@ -234,9 +236,15 @@ class MainActivity : Activity() {
         })
 
         panel.addView(label("YOUR ASSISTANT", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 22, 0, 8) })
+        val modelState = label(status.text.toString(), 14f, true).apply {
+            tag = "model-state"
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        panel.addView(modelState, wide())
         panel.addView(flatButton(getString(R.string.prepare_model)) {
             status.text = getString(R.string.working)
-            brain.prepare(this) { if (!gone) status.text = it.label }
+            modelState.text = status.text
+            brain.prepare(this) { if (!gone) { status.text = it.label; modelState.text = it.label } }
         })
 
         speakReplies = Chat.speakReplies(this)
