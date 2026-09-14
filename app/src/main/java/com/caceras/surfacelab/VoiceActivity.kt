@@ -368,7 +368,11 @@ class VoiceActivity : Activity() {
         continuousSwitch.visibility = View.GONE
         setupTools.visibility = View.VISIBLE
         status.text = "Let’s get voice ready"
-        answer.text = problem.message + "\n\nTry English (United States), or choose your speaking language below."
+        guidance.text = "You can keep typing while voice gets ready."
+        val nextStep = if (ears.locale().language == "en" && ears.locale().toLanguageTag() != "en-US")
+            "Try English (United States), or choose your speaking language below."
+            else "Download the language below, or choose another supported speaking language."
+        answer.text = problem.message + "\n\n" + nextStep
 
         if (problem.languageMissing && ears.canFetchLanguage()) {
             // The recogniser is here, the language pack is not. That is the
@@ -391,6 +395,7 @@ class VoiceActivity : Activity() {
         dot.visibility = View.VISIBLE
         dot.alpha = 0.45f
         status.text = line
+        guidance.text = "Pick up whenever you’re ready."
         idleAction()
     }
 
@@ -412,6 +417,7 @@ class VoiceActivity : Activity() {
         heard.text = spoken
         state = State.THINKING
         status.text = getString(R.string.working)
+        guidance.text = "Thinking it through, on your phone."
         dot.visibility = View.VISIBLE
         dot.alpha = 0.45f
 
@@ -454,6 +460,7 @@ class VoiceActivity : Activity() {
                     if (state == State.THINKING) {
                         state = State.SPEAKING
                         status.text = speechProblem ?: getString(R.string.answering)
+                        guidance.text = "Tap to quiet the voice. Your reply stays here."
                     }
                     // Speech starts at the first finished sentence, not at
                     // the end of the answer. This is the whole difference
@@ -497,6 +504,7 @@ class VoiceActivity : Activity() {
             if (note == null) said else said + "\n\n" + note, dp(18)
         )
         status.text = speechProblem ?: getString(R.string.answering)
+        guidance.text = "Tap to quiet the voice. Your reply stays here."
 
         // What you asked in the kitchen is on the home screen afterwards.
         Chat.append(this, Turn(spoken, said))
