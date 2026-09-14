@@ -39,11 +39,15 @@ The branded assets are `aegentica-ai-nano.apk` and `aegentica-ai-core.apk`. Lega
 
 ## CI
 
-`.github/workflows/build.yml` runs the static pre-flight, then JVM tests and both flavor builds. Preview publication requires the test and build jobs to pass. Pull-request runs validate but do not publish branch releases. Pushes publish a rolling prerelease for their branch; main publishes the rolling main release.
+The [iteration workflow](iteration-workflow.md) is the operational reference. Preflight runs source/resource, documentation and tool regressions. One Android job performs JVM tests, lint and both flavor builds. Errors block publication; diagnostics are kept even on failure. PR runs validate merge results without signing secrets and never publish. Manual dispatch validates without publishing. Pushes publish previews after all gates pass.
 
-Preview publication replaces a rolling tag/release. There can be a brief unavailable interval while assets are replaced. For reproducibility, record the release commit and CI run instead of relying only on the bookmark. A rerun may reuse the same version code; it is not a new installed-version guarantee.
+Successful builds carry `release-evidence.json`, `SHA256SUMS`, reports, native screenshots and `review.html` in **aegentica-evidence.zip**. CI validates package IDs/version codes, checks source/run provenance, downloads release assets and compares hashes. Screenshot generation is not visual approval or physical Pixel certification.
 
-Use `.apk` release assets on Android. GitHub workflow artifact downloads are ZIP archives intended for development and inspection.
+A build-specific release such as `preview-improve-pixel-assistant-build-102` is published and verified before compatibility aliases are refreshed. These unique links are the preferred handoff and rollback reference. A rerun adds `-r<attempt>` to its release tag, but can reuse the Android version code. Existing published build assets are not silently replaced. Retrying a partially uploaded draft is supported.
+
+The rolling preview tag is updated without deleting the previous release first. Its multiple asset/tag updates are not atomic; use the unique build URL when exact identity matters. If alias refresh fails, the verified unique build remains available. Branches that have advanced are skipped before publication. Main's existing distribution identity remains distinct from preview links.
+
+Use `.apk` release assets on Android. Evidence ZIPs are for inspection, not installation. Core and Nano are both included; Nano is the assistant.
 
 ## Distribution boundary
 

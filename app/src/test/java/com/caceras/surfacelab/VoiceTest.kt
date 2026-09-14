@@ -244,6 +244,22 @@ class VoiceTest {
     }
 
     @Test
+    fun `quiet voice stays quiet and final text does not restore a misleading control`() {
+        val activity = open().get()
+        say("A thoughtful answer")
+        brain.emit("One.")
+        drain()
+        descendants(activity.window.decorView).filterIsInstance<TextView>()
+            .first { it.text == "Quiet voice · Keep reading" }.performClick()
+        brain.emit("One. Two.")
+        brain.complete("One. Two.")
+        drain()
+        assertFalse(descendants(activity.window.decorView).filterIsInstance<TextView>()
+            .any { it.text == "Quiet voice · Keep reading" && it.isClickable })
+        assertEquals(listOf("One."), spoken())
+    }
+
+    @Test
     fun `stopping a finished spoken reply does not restart the microphone`() {
         val activity = open().get()
         say("Tell me something")

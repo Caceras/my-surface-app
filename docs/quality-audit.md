@@ -2,6 +2,8 @@
 
 September 14, 2026 · Native Android preview · Pixel 10 Pro XL target.
 
+For the subsequent cross-flow polish and release-pipeline changes, see the [cohesion audit](cohesion-audit.md) and [iteration workflow](iteration-workflow.md). The screenshots below document the initial branding pass.
+
 ## Verdict
 
 The app now has a coherent Æ identity and a broader native workflow: chat/voice, useful Android app handoffs, responsive access surfaces, keyboard commands and explicit privacy controls. This is an implemented and tested preview, not evidence that every Android API should be enabled or that device quality is certified. The largest remaining quality gates are stable signing, physical speech/model evaluation, accessibility traversal, performance measurements and controlled production distribution.

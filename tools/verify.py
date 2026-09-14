@@ -723,7 +723,7 @@ def check_workflow(project, problems):
 
     if "app/build/outputs/apk/" not in body:
         fail(problems, "build.yml: does not reference any APK output path")
-    if "gh release create" not in body:
+    if "gh release create" not in body and not ("python tools/publish_preview.py" in body and os.path.isfile(os.path.join(project, "tools", "publish_preview.py"))):
         fail(problems, "build.yml: does not publish a release "
                        "(artifacts alone cannot be installed from a phone)")
     if "contents: write" not in body:

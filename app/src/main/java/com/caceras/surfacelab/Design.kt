@@ -77,3 +77,38 @@ fun View.buttonSemantics() {
         }
     }
 }
+
+/** One native toggle treatment: predictable text, contrast and spacing in either theme. */
+fun Context.preferenceSwitch(title: String, checked: Boolean = false, change: (Boolean) -> Unit) =
+    android.widget.Switch(this).apply {
+        text = title
+        textSize = 16f
+        setTextColor(ink(R.color.text_primary))
+        minHeight = dp(56)
+        switchPadding = dp(16)
+        padDp(0, 8, 0, 8)
+        thumbTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+            intArrayOf(ink(R.color.accent_text), ink(R.color.text_dim)))
+        trackTintList = ColorStateList(arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+            intArrayOf(ink(R.color.presence_bg), ink(R.color.outline)))
+        isChecked = checked
+        setOnCheckedChangeListener { _, value -> change(value) }
+    }
+
+fun Context.sheetHeader(title: String, close: () -> Unit) = android.widget.LinearLayout(this).apply {
+    gravity = Gravity.CENTER_VERTICAL
+    addView(label(title, 24f).apply { medium(); isAccessibilityHeading = true },
+        android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+    addView(pill("Done", onClick = close), android.widget.LinearLayout.LayoutParams(-2, -2))
+}
+
+/** Search and action fields request the same private, readable native editor. */
+fun android.widget.EditText.styleField() {
+    textSize = 16f
+    setTextColor(context.ink(R.color.text_primary))
+    setHintTextColor(context.ink(R.color.text_dim))
+    background = context.surface(R.color.composer_bg, 18, true)
+    padDp(16, 14, 16, 14)
+    minHeight = context.dp(52)
+    imeOptions = imeOptions or android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+}

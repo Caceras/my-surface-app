@@ -270,4 +270,29 @@ class ShotTest {
         shoot("aegentica-icon", view, shotWidth = context.dp(180), shotHeight = context.dp(180))
     }
 
+    @Test
+    @Config(qualifiers = "w411dp-h914dp-night-xxhdpi")
+    fun `settings preserve the design system in dark mode`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        fun children(v: View): List<View> = listOf(v) + if (v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
+        children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == "Settings" }.performClick()
+        shoot("cohesion-settings-night", org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView)
+    }
+
+    @Test
+    fun `timer form uses the shared private field treatment`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val sheet = NativeActions.show(activity)
+        fun children(v: View): List<View> = listOf(v) + if (v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
+        children(sheet.window!!.decorView).filterIsInstance<android.widget.TextView>().first { it.text == "Set a timer" }.performClick()
+        val form = org.robolectric.shadows.ShadowDialog.getLatestDialog()
+        // Render the dialog content on an explicit host; transparent window margins are not UI.
+        val content = form.findViewById<android.view.ViewGroup>(android.R.id.content)
+        val host = android.widget.FrameLayout(activity).apply { setBackgroundColor(activity.getColor(R.color.chat_bg)) }
+        val parent = content.parent as android.view.ViewGroup
+        parent.removeView(content)
+        host.addView(content, android.widget.FrameLayout.LayoutParams(-1, -2, android.view.Gravity.CENTER))
+        shoot("cohesion-timer", host, shotWidth = 1233, shotHeight = 1233)
+    }
+
 }

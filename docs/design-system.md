@@ -34,3 +34,7 @@ Measured token contrast: primary/body 13.59:1 light and 16.66:1 dark; secondary/
 ## Validation
 
 See [testing](testing.md) for native compact, landscape, wide, large-font, widget and icon renders. These are core-variant layouts with deterministic data, not real Gemini Nano answers. Physical-device checks remain required for themed icon masks, splash timing, gesture navigation, font/display settings and TalkBack.
+
+## Shared controls
+
+Use `sheetHeader` for Settings, History and Actions. The Done control has explicit wrap-content dimensions beside a weighted title. Use `preferenceSwitch` for native settings/voice toggles; it keeps semantic text colors, 56 dp minimum height and explicit state tints. Use `styleField` for private search/action inputs, with matching outline, 52 dp minimum height, readable hint/text colors and IME learning suppression. These helpers retain Android selection, focus, switch semantics and input behavior.

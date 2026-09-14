@@ -59,10 +59,10 @@ class VoiceActivity : Activity() {
         set(value) {
             field = value
             if (::guidance.isInitialized) {
-                guidance.isClickable = value == State.SPEAKING
-                guidance.isFocusable = value == State.SPEAKING
-                guidance.setTextColor(color(if (value == State.SPEAKING) R.color.accent_text else R.color.text_dim))
-                guidance.background = if (value == State.SPEAKING) surface(R.color.chip_bg, 24) else null
+                guidance.isClickable = value == State.SPEAKING && !speechQuiet
+                guidance.isFocusable = value == State.SPEAKING && !speechQuiet
+                guidance.setTextColor(color(if (value == State.SPEAKING && !speechQuiet) R.color.accent_text else R.color.text_dim))
+                guidance.background = if (value == State.SPEAKING && !speechQuiet) surface(R.color.chip_bg, 24) else null
             }
             if (::dot.isInitialized) dot.show(when (value) {
                 State.IDLE -> PresenceView.Mode.REST
@@ -88,6 +88,7 @@ class VoiceActivity : Activity() {
     private var generating = false
     private var lastQuestion = ""
     private var speechProblem: String? = null
+    private var speechQuiet = false
     private var continuous = false
     private lateinit var continuousSwitch: Switch
     private val main = Handler(Looper.getMainLooper())
@@ -174,6 +175,8 @@ class VoiceActivity : Activity() {
                         minHeight = dp(48)
                         gravity = Gravity.CENTER
                         isFocusable = true
+                        buttonSemantics()
+                        setTextColor(color(R.color.accent_text))
                         setOnClickListener { voiceOptions() }
                     }, wide())
                 }
@@ -181,14 +184,9 @@ class VoiceActivity : Activity() {
             }, wide())
         }
         action = pill(getString(R.string.talk_again), true) { requestListen() }
-        continuousSwitch = Switch(this).apply {
-            text = getString(R.string.keep_talking)
-            minHeight = dp(52)
-            setTextColor(color(R.color.text_primary))
-            setOnCheckedChangeListener { _, checked ->
-                continuous = checked
-                if (!checked) main.removeCallbacks(nextListen)
-            }
+        continuousSwitch = preferenceSwitch(getString(R.string.keep_talking)) { checked ->
+            continuous = checked
+            if (!checked) main.removeCallbacks(nextListen)
         }
         card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -431,6 +429,7 @@ class VoiceActivity : Activity() {
         generating = true
         lastQuestion = spoken
         speechProblem = null
+        speechQuiet = false
 
         scroller.latest()
         heard.text = spoken
@@ -523,7 +522,7 @@ class VoiceActivity : Activity() {
             if (note == null) said else said + "\n\n" + note, dp(18)
         )
         status.text = speechProblem ?: getString(R.string.answering)
-        guidance.text = "Quiet voice · Keep reading"
+        guidance.text = if (speechQuiet) "Reply ready to read" else "Quiet voice · Keep reading"
 
         // What you asked in the kitchen is on the home screen afterwards.
         Chat.append(this, Turn(spoken, said))
@@ -553,6 +552,7 @@ class VoiceActivity : Activity() {
     private fun quietVoice() {
         main.removeCallbacks(nextListen)
         continuousSwitch.isChecked = false
+        speechQuiet = true
         mouth?.hush()
         if (generating) {
             guidance.text = "Continuing in text…"

@@ -46,3 +46,5 @@ Speech's foreground MediaSession publishes only a generic Ægentica AI label, no
 ## Reporting safely
 
 Use redacted screenshots, dummy conversations, and the build number when reporting bugs. Do not attach a full export to a public GitHub issue if it contains personal or client information. No vulnerability-reporting SLA or production security certification is claimed for this preview.
+
+Search and native action fields request the same no-personalized-learning IME flag as the composer. Settings, History and Actions stop hidden microphone/generation work before opening. CI evidence uses deterministic fixture text and never captures your live conversations.

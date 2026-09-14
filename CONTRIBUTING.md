@@ -35,3 +35,7 @@ Tasks: add the enum/prompt definition and flavor alias, then test selected-text 
 ## Reports
 
 Include installed build number, Android/device details, reproduction steps, and redacted screenshots. Do not upload a private conversation export to a public issue. For security-sensitive concerns, avoid publishing exploit details or private data while seeking a suitable private contact route; this preview does not claim a response SLA.
+
+## Close the loop
+
+Use [the iteration workflow](docs/iteration-workflow.md): reproduce a scoped defect, run `python tools/check.py`, inspect native evidence, verify the exact build-specific APK and document device limits. Successful screenshots do not mean visual approval. Keep behavior, tests and current guides coherent in the same batch.

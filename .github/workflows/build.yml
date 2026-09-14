@@ -6,8 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Compilation/tests never need repository write access.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: build-${{ github.ref }}
@@ -17,215 +18,96 @@ jobs:
   verify:
     name: Static pre-flight
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          python-version: "3.12"
-      - run: pip install pyyaml
-      # Two seconds here, versus three minutes to discover the same dangling
-      # resource reference at the end of a Gradle build.
-      - run: python tools/verify.py .
-      - run: python tools/test_verify.py
-      - run: python tools/check_docs.py .
+          persist-credentials: false
+      - run: python -m pip install pyyaml
+      - run: python tools/check.py
 
-  test:
-    name: JVM tests
+  quality:
+    name: Android quality
     needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
         with:
           distribution: temurin
           java-version: "21"
-      # Pinned rather than defaulted, because the default package list is
-      # "tools platform-tools" and "tools" is an obsolete meta-package that
-      # drags in the ~1 GB Android Emulator. Nothing here needs it: the JVM
-      # tests run on Robolectric and the builds never start a device. It cost
-      # a red build once already, when that download unzipped corrupt --
-      # "Error on ZipFile unknown archive" -- and took the whole job with it
-      # before a single test ran.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools platforms;android-36 build-tools;36.0.0
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Ensure pinned Android SDK
+        shell: bash
+        run: |
+          if [ ! -d "$ANDROID_HOME/platforms/android-36" ] || [ ! -d "$ANDROID_HOME/build-tools/36.0.0" ]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          fi
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
         with:
           gradle-version: "9.7.1"
-      # Robolectric renders the real activities on the JVM. Run against the
-      # core flavour, whose brain is deterministic -- the nano brain would
-      # need AICore, which exists on no CI runner and no emulator.
-      - name: Unit tests
-        run: gradle testCoreDebugUnitTest --no-daemon --stacktrace
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: test-report
-          path: app/build/reports/tests/
-
-      # ShotTest rasterises the real screens through Robolectric's native
-      # graphics mode. There is no emulator here and no Android SDK on the
-      # machine these changes are written on, so this is the only way anyone
-      # -- person or model -- gets to see what was actually shipped before a
-      # phone does. always(), because a failed run is exactly when the
-      # picture is worth having.
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: screenshots
-          path: app/build/screenshots/
-          if-no-files-found: warn
-
-  build:
-    name: Build ${{ matrix.flavour }}
-    needs: verify
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - flavour: core
-            task: assembleCoreDebug
-            apk: app/build/outputs/apk/core/debug/app-core-debug.apk
-          - flavour: nano
-            task: assembleNanoDebug
-            apk: app/build/outputs/apk/nano/debug/app-nano-debug.apk
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      # Pinned rather than defaulted, because the default package list is
-      # "tools platform-tools" and "tools" is an obsolete meta-package that
-      # drags in the ~1 GB Android Emulator. Nothing here needs it: the JVM
-      # tests run on Robolectric and the builds never start a device. It cost
-      # a red build once already, when that download unzipped corrupt --
-      # "Error on ZipFile unknown archive" -- and took the whole job with it
-      # before a single test ran.
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools platforms;android-36 build-tools;36.0.0
-
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "9.7.1"
-
-      - name: Restore personal preview signing key
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+      - name: Restore private preview key
+        if: github.event_name != 'pull_request'
         env:
           SURFACE_KEYSTORE_BASE64: ${{ secrets.SURFACE_KEYSTORE_BASE64 }}
-        shell: bash
         run: |
           if [ -n "$SURFACE_KEYSTORE_BASE64" ]; then
             umask 077
-            key_path="$RUNNER_TEMP/surface-personal.jks"
+            key_path="$RUNNER_TEMP/aegentica-personal.jks"
             printf '%s' "$SURFACE_KEYSTORE_BASE64" | base64 --decode > "$key_path"
             echo "SURFACE_KEYSTORE_FILE=$key_path" >> "$GITHUB_ENV"
           fi
-
-      - name: Build
+      - name: Test, lint and build both variants
         env:
-          SURFACE_KEYSTORE_PASSWORD: ${{ secrets.SURFACE_KEYSTORE_PASSWORD }}
-          SURFACE_KEY_ALIAS: ${{ secrets.SURFACE_KEY_ALIAS }}
-          SURFACE_KEY_PASSWORD: ${{ secrets.SURFACE_KEY_PASSWORD }}
-        run: gradle ${{ matrix.task }} -PbuildNumber=${{ github.run_number }} --no-daemon --stacktrace
-
-      # Naming the APK after the flavour stops downloads from piling up as
-      # "app-debug(1).apk" in the phone's Downloads folder.
-      - name: Name the APK
-        run: |
-          cp "${{ matrix.apk }}" "aegentica-ai-${{ matrix.flavour }}.apk"
-          # Preserve bookmarked preview downloads during the rebrand.
-          cp "${{ matrix.apk }}" "pixel-surface-lab-${{ matrix.flavour }}.apk"
-
-      - uses: actions/upload-artifact@v4
+          SURFACE_KEYSTORE_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.SURFACE_KEYSTORE_PASSWORD || '' }}
+          SURFACE_KEY_ALIAS: ${{ github.event_name != 'pull_request' && secrets.SURFACE_KEY_ALIAS || '' }}
+          SURFACE_KEY_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.SURFACE_KEY_PASSWORD || '' }}
+        run: gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug -PbuildNumber=${{ github.run_number }} --continue --no-daemon --stacktrace
+      - name: Collect verified release evidence
+        # Reads app/build/outputs/apk/ plus JUnit, lint and native render outputs.
+        run: python tools/release_evidence.py collect dist/evidence
+      - name: Keep test and lint diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pixel-surface-lab-${{ matrix.flavour }}
+          name: android-diagnostics
           path: |
-            aegentica-ai-${{ matrix.flavour }}.apk
-            pixel-surface-lab-${{ matrix.flavour }}.apk
+            app/build/reports/
+            app/build/test-results/
+            app/build/screenshots/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Upload verified build bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: aegentica-evidence
+          path: dist/evidence/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/aegentica-personal.jks"
 
-  # A branch build is only useful if you can install it. Workflow artifacts
-  # are always served as a .zip and Android will not install one, so a branch
-  # gets its own release too -- marked prerelease, which keeps /releases/latest
-  # pointing at main so the bookmark on the phone still means "the real build".
   preview:
-    name: Publish branch preview
-    needs: [build, test]
-    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+    name: Publish verified preview
+    needs: quality
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          path: apks
-          merge-multiple: true
-
-      - name: Publish
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: aegentica-evidence
+          path: dist/evidence
+      - name: Verify and publish build-specific download
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          # Branch names carry slashes and capitals; tags are happier without.
-          slug=$(printf '%s' "$GITHUB_REF_NAME" | tr '[:upper:]' '[:lower:]' \
-                 | tr -c 'a-z0-9._-' '-' | sed 's/-\+/-/g; s/^-//; s/-$//')
-          tag="preview-$slug"
-
-          # One rolling tag per branch, so the phone can keep the same URL for
-          # as long as the branch exists. --target is required because the tag
-          # does not exist yet.
-          gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
-          gh release create "$tag" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --prerelease \
-            apks/*.apk \
-            --title "Preview: $GITHUB_REF_NAME (build $GITHUB_RUN_NUMBER)" \
-            --notes "Unmerged branch build of \`$GITHUB_REF_NAME\`. Open this page on your
-          phone and tap an .apk to install.
-
-          This is build **$GITHUB_RUN_NUMBER**; the app shows the same number behind
-          **Settings** on its first screen, so you can tell at a glance whether the install took.
-
-          Ægentica AI is the new name of Surface Preview. The package ID is preserved; open the Ægentica AI icon after installing. Download aegentica-ai-nano.apk for Gemini Nano. The pixel-surface-lab filenames are identical compatibility aliases for older bookmarks.
-
-          Upgrades between preview builds require the same signing key. Configure the private signing secrets described in docs/delivery.md for consistent upgrades.
-          Without them, a new debug key is generated and a preview may not upgrade an existing install. It is a prerelease, so
-          \`/releases/latest\` still points at the build from main."
-
-  release:
-    name: Publish rolling release
-    needs: [build, test]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: apks
-          merge-multiple: true
-
-      # A release asset is a direct .apk link, so it installs straight from the
-      # phone browser. Workflow artifacts are always served as a .zip, which
-      # Android will not install. This is the single most common place this
-      # workflow dies.
-      #
-      # One rolling tag is reused so the phone can bookmark /releases/latest and
-      # never need a new URL. Deleting first keeps the step idempotent.
-      - name: Publish
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release delete debug-latest --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
-          gh release create debug-latest \
-            --repo "$GITHUB_REPOSITORY" \
-            apks/*.apk \
-            --title "Debug build ${{ github.run_number }}" \
-            --notes "Open this page on your phone and tap an .apk to install.
-
-          This is build **${{ github.run_number }}**. The app shows the same number on its
-          first screen, so you can tell at a glance whether the install took.
-
-          - **nano** - Gemini Nano on the device. Select text anywhere, tap Ask, and prompt it freely. Summarise, Proofread and Make professional are presets. Works with the radios off.
-          - **core** - the zero-dependency template. No model, no dependencies.
-
-          Both can be installed side by side."
+        run: python tools/publish_preview.py

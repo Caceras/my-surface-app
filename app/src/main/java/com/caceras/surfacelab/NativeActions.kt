@@ -52,9 +52,10 @@ object NativeActions {
         fun form(title: String, hint: String, type: Int, initial: String = "", confirm: String = "Open", make: (String) -> Intent) {
             val field = EditText(activity).apply {
                 this.hint = hint; inputType = type; setText(initial); maxLines = 3
-                padDp(20, 14, 20, 14)
+                styleField()
+                filters = arrayOf(android.text.InputFilter.LengthFilter(if (type == InputType.TYPE_CLASS_PHONE) 40 else 500))
             }
-            val form = AlertDialog.Builder(activity).setTitle(title).setView(field)
+            val form = AlertDialog.Builder(activity).setTitle(title).setView(field, activity.dp(24), activity.dp(12), activity.dp(24), activity.dp(8))
                 .setNegativeButton("Cancel", null).setPositiveButton(confirm, null).create()
             form.show()
             NativePrivacy.apply(activity, form.window)
@@ -65,11 +66,7 @@ object NativeActions {
         }
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL; padDp(24, 16, 24, 24)
-            addView(LinearLayout(activity).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                addView(activity.label("On your phone", 26f).apply { medium(); isAccessibilityHeading = true }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(activity.pill("Done") { dialog.dismiss() })
-            })
+            addView(activity.sheetHeader("On your phone") { dialog.dismiss() })
             addView(activity.label("A little help with the everyday.", 16f, true).apply { padDp(0, 16, 0, 24) })
             fun action(title: String, hint: String, click: () -> Unit) {
                 addView(activity.pill(title) { click() }, LinearLayout.LayoutParams(-1, -2))

@@ -65,3 +65,9 @@ Native actions are constructed from validated form values, not arbitrary strings
 ## Extension points
 
 Add a task to `Task`, its prompt definitions, and the relevant flavor aliases. Keep device-specific AI behavior behind `SurfaceBrain`. New surfaces should call the existing conversation/voice flow and define their foreground and permission behavior explicitly. `tools/scaffold.py` generates a smaller starter and is not a source of truth for the complete assistant.
+
+## Shared interaction contracts
+
+`Design.kt` owns sheet headers, native preference switches and styled private editors, alongside the palette/typography helpers. Settings, History and Actions call the same navigation pause path before opening. It cancels the stream and audio, retains the pending draft, hides the keyboard and rejects late results. Voice retains an explicit quiet flag through final output so a muted reply does not re-advertise an active quiet control.
+
+The source-to-release boundary is described in [the iteration workflow](iteration-workflow.md). `release_evidence.py` reads actual JUnit/lint/APK outputs; `publish_preview.py` verifies provenance and downloaded bytes before updating aliases.

@@ -45,3 +45,5 @@ Headset/media Pause or Stop ends active foreground speech. Headphone disconnect 
 ## API references
 
 [Android intents](https://developer.android.com/guide/components/intents-common), [shortcuts](https://developer.android.com/develop/ui/compose/system/shortcuts/creating-shortcuts), [keyboard actions](https://developer.android.com/develop/ui/views/touch-and-input/keyboard-input/commands), [media callbacks](https://developer.android.com/media/legacy/audio/mediasession).
+
+All navigation sheets use the same pause-and-preserve-draft behavior. Action forms share the private editor styling used by History search and bound their field length before validated handoff.

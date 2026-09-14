@@ -8,6 +8,8 @@ Use the Nano APK on the Pixel. The core APK is a developer demo that uppercases 
 
 Installation and initial model/language downloads require connectivity. Open Settings and choose **Check / prepare on-device model**. A speech language download does not install the language model, and a model download does not install a text-to-speech voice: they are independent requirements.
 
+Each new handoff can use a build-specific APK link from its release or CI summary. The usual preview link remains a convenience alias. Verify the version in Settings after installing.
+
 ## Daily controls
 
 | Control | Behavior |
@@ -27,7 +29,7 @@ Installation and initial model/language downloads require connectivity. Open Set
 | New | Saves the current conversation or draft and starts an empty chat |
 | History | Searches saved content, resumes a conversation, or deletes saved entries |
 
-Leaving the app stops capture, speech, and active generation. A cancelled or failed partial answer is not saved as a completed exchange. AICore inference is a foreground capability; keeping an assistant session running behind other apps is not supported.
+Opening Settings, History or Actions pauses capture, speech and active generation, preserving your draft or pending question. Returning does not restart them automatically. Leaving the app also stops capture, speech, and active generation. A cancelled or failed partial answer is not saved as a completed exchange. AICore inference is a foreground capability; keeping an assistant session running behind other apps is not supported.
 
 ## Voice setup
 

@@ -83,7 +83,7 @@ Status legend: **This pass** = implemented in this delivery and covered by the v
 
 ## Test and deployment plan
 
-Automated: keep existing 118 regressions; add action input/intent tests, shortcut routing, privacy/widget tests, media-stop/unplug tests, keyboard commands, and native compact/landscape/wide/large-font/brand/widget renders. Run source/resource, documentation-link, and checker tests; build core and Nano. Fresh screenshots must be visually inspected; failed jobs block preview publishing.
+Automated: keep the pre-overhaul regression suite; add action input/intent tests, shortcut routing, privacy/widget tests, media-stop/unplug tests, keyboard commands, and native compact/landscape/wide/large-font/brand/widget renders. Run source/resource, documentation-link, and checker tests; build core and Nano. Fresh screenshots must be visually inspected; failed jobs block preview publishing.
 
 Physical Pixel: install and verify build; prepare model and voice; exercise all launcher entry points, back gestures, keyboard, media buttons, Bluetooth/unplug, widget resizing, privacy toggle, external apps, rotations and large text. Record Android/AICore versions and evaluate real answer quality/latency. No local emulator or CI fixture can certify these outcomes.
 
@@ -111,3 +111,5 @@ Release: preserve the rolling preview URL, verify the published commit, package,
 All six implementation phases are represented in the code and updated documentation. The native pass adds Æ branding, sky-blue text/fill tokens, adaptive/themed icons and splash attributes, a bounded reading column, compact/large-text navigation, scrollable voice content, cutout handling, native back opt-in, keyboard help/commands, launcher access/pinning, size-aware widgets, tile feedback, five explicit phone actions, foreground media stop/disconnect, and privacy controls.
 
 Validation is recorded in the [illustrated audit](quality-audit.md) and preview PR. Source changes are gated by CI; native screenshots use core fixtures. Later/Conditional rows remain a concrete backlog, not shipped claims. The most valuable next release work is stable signing, a physical Pixel acceptance run and performance/accessibility evidence, followed by transactional storage and evaluated model-controlled tools.
+
+The subsequent [cohesion pass](cohesion-audit.md) unifies controls/navigation and implements the [iteration workflow](iteration-workflow.md), including actual JUnit counts, lint, consolidated builds and verified build-specific downloads.

@@ -43,3 +43,5 @@ No wake word, background microphone service, background inference, guaranteed Bl
 - [Audio focus](https://developer.android.com/media/optimize/audio-focus)
 
 These links describe platform contracts. The JVM tests cover the app's handling of those contracts; real recognition and playback need the physical-device checklist.
+
+Opening chat navigation sheets stops capture/playback just as leaving the chat does. Quiet voice remains quiet through the final result; the UI does not restore an active mute control for an already muted response. Real headset/engine validation remains in the device checklist.

@@ -7,7 +7,7 @@ A native Android assistant for typing, talking, thinking things through, and ope
 [![Android checks](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg?branch=improve-pixel-assistant)](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-70CEFA.svg)](LICENSE)
 
-**[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Quality audit](docs/quality-audit.md) · [Contribute](CONTRIBUTING.md)
+**[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Quality audit](docs/cohesion-audit.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribute](CONTRIBUTING.md)
 
 > This is the **Ægentica AI** app on `improve-pixel-assistant`. The main branch and `/releases/latest` may contain an older experience. This preview is not a Play Store release. Export your conversations before any reinstall.
 
@@ -27,7 +27,7 @@ A native Android assistant for typing, talking, thinking things through, and ope
   <img src="docs/images/chat-night.png" alt="Ægentica AI chat in dark mode" width="260">
 </p>
 
-Native framework renders from the verified Ægentica AI source (see the [audit](docs/quality-audit.md#evidence)), using the deterministic core test fixture. These show the actual layouts, not real Nano responses or Pixel system chrome.
+Curated native framework illustrations from the original Ægentica AI branding pass (see the [audit](docs/quality-audit.md#evidence)), using the deterministic core test fixture. These are core test fixtures, not real Nano responses or Pixel system chrome. For current screens, download the release’s **aegentica-evidence.zip** and open **review.html**.
 
 ## Try it on a Pixel
 
@@ -72,10 +72,8 @@ The project is Kotlin with Android framework views. `main` and `core` declare no
 ```bash
 git clone --branch improve-pixel-assistant https://github.com/Caceras/my-surface-app.git
 cd my-surface-app
-python tools/verify.py .
-python tools/test_verify.py
-python tools/check_docs.py .
-gradle testCoreDebugUnitTest assembleCoreDebug assembleNanoDebug --no-daemon
+python tools/check.py
+gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug --no-daemon
 ```
 
 | Variant | Purpose | Application ID |
@@ -83,12 +81,14 @@ gradle testCoreDebugUnitTest assembleCoreDebug assembleNanoDebug --no-daemon
 | `nano` | The actual Gemini Nano assistant | `com.caceras.surface.nano` |
 | `core` | Deterministic demo and UI tests; uppercase output, no AI model | `com.caceras.surface` |
 
-APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots appear under `app/build/screenshots/`. CI runs static checks, JVM tests, and both builds; preview publishing requires the test and build jobs to pass. Tests exercise the core variant, so green CI does **not** establish Nano quality, real speech latency, or device gesture behavior. [Testing and device checklist](docs/testing.md).
+APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots appear under `app/build/screenshots/`. CI runs one shared Android job for JVM tests, lint and both builds. Successful runs generate a source-linked evidence bundle and verified build-specific APK links; failed runs retain diagnostics. Tests exercise the core variant, so green CI does **not** establish Nano quality, real speech latency, or device gesture behavior. [Testing and device checklist](docs/testing.md).
 
 ## Documentation
 
 | Guide | Covers |
 |---|---|
+| [Iteration workflow](docs/iteration-workflow.md) | Pipeline audit, automated evidence, verified releases and feedback loop |
+| [Cohesion audit](docs/cohesion-audit.md) | Current cross-flow fixes, fresh baseline and remaining device gates |
 | [Android capability plan](docs/android-native-plan.md) | 40+ capability areas, delivery contracts, follow-on priorities and gates |
 | [Native actions](docs/native-actions.md) | Clock, Calendar, Maps, Dialer and keyboard/shortcut behavior |
 | [Design system](docs/design-system.md) | Æ identity, sky-blue tokens, icon rules and accessibility |

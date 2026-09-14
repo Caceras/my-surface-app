@@ -29,21 +29,13 @@ class ConversationSheet(private val activity: Activity, private val open: (Strin
             setBackgroundColor(context.ink(R.color.chat_bg))
             padDp(24, 16, 24, 12)
             isFocusableInTouchMode = true
-            addView(LinearLayout(context).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                addView(context.label("Conversations", 25f).apply { medium(); isAccessibilityHeading = true }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(context.pill("Done") { dismiss() })
-            }, LinearLayout.LayoutParams(-1, -2))
+            addView(context.sheetHeader("History") { dismiss() }, LinearLayout.LayoutParams(-1, -2))
             addView(context.label("Pick up where you left off.", 15f, true).apply { padDp(0, 10, 0, 20) })
             search = EditText(context).apply {
                 tag = "conversation-search"
                 hint = "Search saved conversations"
-                textSize = 16f
                 setSingleLine(true)
-                setTextColor(context.ink(R.color.text_primary))
-                setHintTextColor(context.ink(R.color.text_dim))
-                background = context.surface(R.color.composer_bg, 18, true)
-                padDp(16, 14, 16, 14)
+                styleField()
                 addTextChangedListener(object : TextWatcher {
                     override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { if (::rows.isInitialized) refresh() }

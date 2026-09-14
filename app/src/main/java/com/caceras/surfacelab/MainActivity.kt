@@ -38,8 +38,7 @@ import android.widget.TextView
  *
  * Everything the app can do lives behind one conversation: type or speak a
  * question, watch the answer arrive, hear it back if you asked out loud. The
- * other five surfaces still exist and still work; they are simply not what
- * this screen is about, so they sit behind "More" instead of filling it.
+ * Android entry points share this conversation, with setup in Settings.
  *
  * Every dimension goes through dp(): setPadding takes pixels, and raw
  * numbers make the whole screen shrink as density rises.
@@ -200,9 +199,8 @@ class MainActivity : Activity() {
     }
 
     private fun showSettings(brain: SurfaceBrain) {
-        getSystemService(android.view.inputmethod.InputMethodManager::class.java)
-            .hideSoftInputFromWindow(input.windowToken, 0)
-        input.clearFocus()
+        if (settingsDialog?.isShowing == true) return
+        pauseForNavigation()
         val dialog = Dialog(this)
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
         settingsDialog = dialog
@@ -210,11 +208,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(color(R.color.chat_bg))
             padDp(24, 16, 24, 12)
-            addView(LinearLayout(this@MainActivity).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                addView(label("Make it yours", 28f).apply { medium() }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(pill("Done") { dialog.dismiss() })
-            })
+            addView(sheetHeader("Make it yours") { dialog.dismiss() })
             addView(ScrollView(this@MainActivity).apply {
                 tag = "settings"
                 addView(morePanel(brain), wide())
@@ -259,7 +253,7 @@ class MainActivity : Activity() {
             setTextColor(color(R.color.text_dim))
         })
 
-        panel.addView(label("YOUR ASSISTANT", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 22, 0, 8) })
+        panel.addView(label("YOUR ASSISTANT", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 22, 0, 8) })
         val modelState = label(status.text.toString(), 14f, true).apply {
             tag = "model-state"
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -272,15 +266,10 @@ class MainActivity : Activity() {
         })
 
         speakReplies = Chat.speakReplies(this)
-        panel.addView(Switch(this).apply {
-            text = getString(R.string.speak_replies)
-            isChecked = speakReplies
-            minHeight = dp(48)
-            setOnCheckedChangeListener { _, checked ->
-                speakReplies = checked
-                Chat.setSpeakReplies(this@MainActivity, checked)
-                if (!checked) hushPlayback()
-            }
+        panel.addView(preferenceSwitch(getString(R.string.speak_replies), speakReplies) { checked ->
+            speakReplies = checked
+            Chat.setSpeakReplies(this@MainActivity, checked)
+            if (!checked) hushPlayback()
         })
         panel.addView(pill("Set up voice & test playback") {
             settingsDialog?.dismiss()
@@ -288,7 +277,7 @@ class MainActivity : Activity() {
         })
         panel.addView(flatButton(getString(R.string.voice_settings)) {
             runCatching { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
-                .onFailure { status.text = getString(R.string.settings_unavailable) }
+                .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
         })
         panel.addView(flatButton(getString(R.string.default_assistant)) {
             runCatching {
@@ -297,30 +286,24 @@ class MainActivity : Activity() {
                     startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT), 2)
                 else startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
             }
-                .onFailure { status.text = getString(R.string.settings_unavailable) }
+                .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
         })
         panel.addView(flatButton(getString(R.string.open_voice)) {
             startActivity(Intent(this, VoiceActivity::class.java))
         })
         panel.addView(pill("On your phone · Actions") { settingsDialog?.dismiss(); showActions() })
         panel.addView(label("PRIVACY", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 8); isAccessibilityHeading = true })
-        panel.addView(Switch(this).apply {
-            text = "Show last answer on widget"; minHeight = dp(52)
-            isChecked = NativePrivacy.widgetPreview(this@MainActivity)
-            setOnCheckedChangeListener { _, checked -> NativePrivacy.setWidgetPreview(this@MainActivity, checked) }
+        panel.addView(preferenceSwitch("Show last answer on widget", NativePrivacy.widgetPreview(this)) { checked ->
+            NativePrivacy.setWidgetPreview(this, checked)
         })
         panel.addView(label("Off by default. People who can see your home screen can read an enabled preview.", 13f, true))
-        panel.addView(Switch(this).apply {
-            text = "Private screen"; minHeight = dp(52)
-            isChecked = NativePrivacy.privateScreen(this@MainActivity)
-            setOnCheckedChangeListener { _, checked ->
-                NativePrivacy.setPrivateScreen(this@MainActivity, checked)
-                NativePrivacy.apply(this@MainActivity, window)
-                NativePrivacy.apply(this@MainActivity, settingsDialog?.window)
-            }
+        panel.addView(preferenceSwitch("Private screen", NativePrivacy.privateScreen(this)) { checked ->
+            NativePrivacy.setPrivateScreen(this, checked)
+            NativePrivacy.apply(this, window)
+            NativePrivacy.apply(this, settingsDialog?.window)
         })
         panel.addView(label("Hide app previews and block screenshots or screen sharing. Widgets have their own setting above.", 13f, true))
-        panel.addView(label("EVERYWHERE YOU NEED IT", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 4) })
+        panel.addView(label("EVERYWHERE YOU NEED IT", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 4) })
         line("Digital assistant", "Choose Ægentica AI in Android settings to use the assistant gesture. Availability depends on your device settings.")
         line("Text selection", "Select text anywhere: " +
             brain.tasks.joinToString(", ") { it.alias })
@@ -357,7 +340,7 @@ class MainActivity : Activity() {
             })
         }
 
-        panel.addView(label("YOUR CONVERSATION", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
+        panel.addView(label("YOUR CONVERSATION", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
         panel.addView(label("Saved on this phone. Export before reinstalling to keep your conversation.", 14f, true))
         panel.addView(flatButton("Export conversation") {
             startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
@@ -659,10 +642,24 @@ class MainActivity : Activity() {
         playback.visibility = View.GONE
     }
 
+    /** No microphone, speech or hidden stream continues behind a navigation sheet. */
+    private fun pauseForNavigation() {
+        stopAnswer()
+        ears.cancel()
+        listening = false
+        setMicActive(false)
+        hushPlayback()
+        input.hint = getString(R.string.chat_hint)
+        updateSend()
+        Chat.saveDraft(this, input.text.toString())
+        getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            .hideSoftInputFromWindow(input.windowToken, 0)
+        input.clearFocus()
+    }
+
     private fun showActions() {
         if (actionsDialog?.isShowing == true) return
-        stopAnswer(); ears.cancel(); listening = false; setMicActive(false); hushPlayback(); updateSend()
-        getSystemService(android.view.inputmethod.InputMethodManager::class.java).hideSoftInputFromWindow(input.windowToken, 0)
+        pauseForNavigation()
         actionsDialog = NativeActions.show(this, input.text.toString())
     }
 
@@ -689,8 +686,7 @@ class MainActivity : Activity() {
 
     private fun showConversations() {
         if (conversationsDialog?.isShowing == true) return
-        getSystemService(android.view.inputmethod.InputMethodManager::class.java)
-            .hideSoftInputFromWindow(input.windowToken, 0)
+        pauseForNavigation()
         conversationsDialog = ConversationSheet(this) { id ->
             stopAnswer()
             ears.cancel()
