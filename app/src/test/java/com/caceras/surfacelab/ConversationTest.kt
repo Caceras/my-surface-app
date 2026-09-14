@@ -78,6 +78,7 @@ class ConversationTest {
     }
 
     @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     fun `streaming leaves the reading position alone until latest reply is requested`() {
         val activity = launch().get()
         exchange(activity, "Earlier question", "Earlier answer. ".repeat(400))
@@ -93,6 +94,7 @@ class ConversationTest {
         send(activity)
         layout()
         val scroll = descendants(content(activity)).filterIsInstance<ScrollView>().first { it.tag == "conversation" }
+        assertTrue("native text must extend below the viewport", scroll.getChildAt(0).height > scroll.height + 30)
         scroll.scrollTo(0, scroll.getChildAt(0).height)
         assertTrue("fixture needs a scrollable conversation", scroll.scrollY > 30)
         scroll.scrollTo(0, 30)
