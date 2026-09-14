@@ -393,6 +393,17 @@ class VoiceTest {
         assertEquals(0, brain.runs)
     }
 
+    @Test
+    fun `stopped voice question is available for typing and late replies are discarded`() {
+        val activity = open().get()
+        say("Please keep my question")
+        descendants(activity.findViewById(android.R.id.content)).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.stop_response) }.performClick()
+        brain.complete("Late result")
+        assertEquals("Please keep my question", Chat.draft(app()))
+        assertTrue(Chat.load(app()).isEmpty())
+    }
+
 }
 
 /**

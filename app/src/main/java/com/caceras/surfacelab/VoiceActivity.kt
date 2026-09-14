@@ -338,6 +338,7 @@ class VoiceActivity : Activity() {
         action.setOnClickListener {
             requestId++
             Brains.get().cancel()
+            if (Chat.draft(this).isBlank()) Chat.saveDraft(this, lastQuestion)
             generating = false
             continuousSwitch.isChecked = false
             mouth?.hush()
