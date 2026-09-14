@@ -558,7 +558,7 @@ class MainActivity : Activity() {
                 if (Prompts.isEcho(partial, Task.ASK)) return@run
                 val atBottom = !transcript.canScrollVertically(1)
                 answer.text = Markdown.render(Prompts.reply(partial), dp(18))
-                if (aloud) mouth?.follow(Markdown.strip(partial))
+                if (aloud) mouth?.follow(Markdown.strip(Prompts.reply(partial)))
                 if (atBottom) scrollToEnd()
             }
         ) { result ->

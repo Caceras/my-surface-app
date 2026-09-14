@@ -368,7 +368,7 @@ class VoiceActivity : Activity() {
             instruction = Prompts.conversation(Chat.load(this), spoken),
             onPartial = { partial ->
                 if (!gone && resumed && token == requestId && !Prompts.isEcho(partial, Task.ASK)) {
-                    answer.text = Markdown.render(partial, dp(18))
+                    answer.text = Markdown.render(Prompts.reply(partial), dp(18))
                     if (state == State.THINKING) {
                         state = State.SPEAKING
                         status.text = speechProblem ?: getString(R.string.answering)
@@ -376,7 +376,7 @@ class VoiceActivity : Activity() {
                     // Speech starts at the first finished sentence, not at
                     // the end of the answer. This is the whole difference
                     // between immediate and slow.
-                    voice.follow(Markdown.strip(partial))
+                    voice.follow(Markdown.strip(Prompts.reply(partial)))
                     scrollToEnd()
                 }
             }

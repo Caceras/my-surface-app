@@ -404,6 +404,17 @@ class VoiceTest {
         assertTrue(Chat.load(app()).isEmpty())
     }
 
+    @Test
+    fun `speaker labels are stripped consistently before streamed speech and its tail`() {
+        open()
+        say("say hello")
+        brain.emit("Assistant: Hello.")
+        drain()
+        brain.complete("Assistant: Hello. How are you")
+        drain()
+        assertEquals(listOf("Hello.", "How are you"), spoken())
+    }
+
 }
 
 /**
