@@ -46,6 +46,10 @@ class VoiceActivity : Activity() {
     private lateinit var scroller: ScrollView
     private lateinit var language: TextView
     private var setupMode = false
+    private val streamed = StreamUpdates { text ->
+        answer.text = Markdown.render(text, dp(18))
+        scrollToEnd()
+    }
     private lateinit var setupTools: LinearLayout
 
     private val ears by lazy { Ears(this) }
@@ -54,6 +58,12 @@ class VoiceActivity : Activity() {
     private var state = State.IDLE
         set(value) {
             field = value
+            if (::guidance.isInitialized) {
+                guidance.isClickable = value == State.SPEAKING
+                guidance.isFocusable = value == State.SPEAKING
+                guidance.setTextColor(color(if (value == State.SPEAKING) R.color.accent else R.color.text_dim))
+                guidance.background = if (value == State.SPEAKING) surface(R.color.chip_bg, 24) else null
+            }
             if (::dot.isInitialized) dot.show(when (value) {
                 State.IDLE -> PresenceView.Mode.REST
                 State.LISTENING -> PresenceView.Mode.LISTENING
@@ -215,6 +225,7 @@ class VoiceActivity : Activity() {
         main.removeCallbacks(nextListen)
         continuousSwitch.isChecked = false
         pendingListen = false
+        streamed.cancel()
         requestId++
         if (generating) {
             Brains.get().cancel()
@@ -277,12 +288,12 @@ class VoiceActivity : Activity() {
     }
 
     private fun chooseLanguage() {
-        val tags = arrayOf("en-US", "en-GB", "sv-SE", "es-ES", "fr-FR", "de-DE", "it-IT", "ja-JP", "ko-KR")
-        val names = tags.map { java.util.Locale.forLanguageTag(it).displayName }.toTypedArray()
+        val tags = arrayOf("", "en-US", "en-GB", "sv-SE", "es-ES", "fr-FR", "de-DE", "it-IT", "ja-JP", "ko-KR")
+        val names = tags.map { if (it.isBlank()) "System language" else java.util.Locale.forLanguageTag(it).displayName }.toTypedArray()
         AlertDialog.Builder(this).setTitle("Speaking language")
             .setItems(names) { _, which ->
                 stopForSetup()
-                getSharedPreferences("surfacelab", MODE_PRIVATE).edit().putString("speech_language", tags[which]).apply()
+                getSharedPreferences("surfacelab", MODE_PRIVATE).edit().putString("speech_language", tags[which].takeIf { it.isNotBlank() }).apply()
                 language.text = ears.locale().displayName
                 status.text = "Language selected"
                 answer.text = names[which] + ". Download offline speech if it is not installed, then tap Talk."
@@ -409,6 +420,7 @@ class VoiceActivity : Activity() {
 
     private fun ask(spoken: String) {
         if (gone || !resumed || generating || spoken.isBlank()) return
+        streamed.cancel()
         val token = ++requestId
         generating = true
         lastQuestion = spoken
@@ -423,6 +435,7 @@ class VoiceActivity : Activity() {
         action.text = getString(R.string.stop_response)
         action.visibility = View.VISIBLE
         action.setOnClickListener {
+            streamed.cancel()
             requestId++
             Brains.get().cancel()
             if (Chat.draft(this).isBlank()) Chat.saveDraft(this, lastQuestion)
@@ -455,7 +468,7 @@ class VoiceActivity : Activity() {
             instruction = Prompts.conversation(Chat.load(this), spoken),
             onPartial = { partial ->
                 if (!gone && resumed && token == requestId && !Prompts.isEcho(partial, Task.ASK)) {
-                    answer.text = Markdown.render(Prompts.reply(partial), dp(18))
+                    streamed.offer(Prompts.reply(partial))
                     if (state == State.THINKING) {
                         state = State.SPEAKING
                         status.text = speechProblem ?: getString(R.string.answering)
@@ -465,11 +478,11 @@ class VoiceActivity : Activity() {
                     // the end of the answer. This is the whole difference
                     // between immediate and slow.
                     voice.follow(Markdown.strip(Prompts.reply(partial)))
-                    scrollToEnd()
                 }
             }
         ) { result ->
             if (!gone && resumed && token == requestId) {
+                streamed.cancel()
                 generating = false
                 finished(spoken, result, voice)
             }
@@ -561,11 +574,14 @@ class VoiceActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        requestId++
-        if (generating) Brains.get().cancel()
-        generating = false
-        pendingListen = true
-        if (resumed) { pendingListen = false; requestListen() }
+        stopForSetup()
+        if (intent.getBooleanExtra("setup", false)) {
+            showSetup()
+        } else {
+            setupMode = false
+            pendingListen = true
+            if (resumed) { pendingListen = false; requestListen() }
+        }
     }
 
     override fun onResume() {
@@ -582,6 +598,7 @@ class VoiceActivity : Activity() {
         resumed = false
         main.removeCallbacks(nextListen)
         continuousSwitch.isChecked = false
+        streamed.cancel()
         requestId++
         if (generating) {
             Brains.get().cancel()
@@ -599,6 +616,7 @@ class VoiceActivity : Activity() {
 
     override fun onDestroy() {
         gone = true
+        streamed.cancel()
         ears.cancel()
         // stop() is barge-in; shutdown() is teardown. Skip it and every trip
         // through the tile leaves another engine connection bound.

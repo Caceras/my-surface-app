@@ -24,8 +24,8 @@ import java.util.concurrent.Executor
  * the narrower task APIs (genai-summarization and friends) cap you at
  * English, Japanese and Korean, and cannot be asked anything else.
  *
- * Every call goes to Android AICore. No model is bundled and nothing reaches
- * the network -- turn off wifi and mobile data and it still answers.
+ * Inference goes through Android AICore. No model is bundled in this APK;
+ * Android manages the initial model download separately.
  *
  * Two things the surrounding docs get wrong, both handled here: these APIs
  * hand back Guava ListenableFuture rather than a Play Services Task, and
@@ -226,8 +226,8 @@ private fun describe(code: Int?, error: Throwable?): BrainStatus = when (code) {
 }
 
 private fun unavailableMessage() =
-    "Gemini Nano is not available here. It needs a supported Pixel with a " +
-        "locked bootloader and a current version of the Android AICore system app."
+    "Gemini Nano is not available on this device or configuration. " +
+        "Update Android and the AICore system app, then try model setup again."
 
 /** Runs the callback on the main thread, exactly once, success or failure. */
 private fun <T> ListenableFuture<T>.whenDone(callback: (Result<T>) -> Unit) {

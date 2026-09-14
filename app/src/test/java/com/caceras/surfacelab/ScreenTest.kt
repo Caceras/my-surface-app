@@ -449,5 +449,23 @@ class ScreenTest {
         assertTrue(state.text.isNotBlank())
         assertTrue(state.text != activity.getString(R.string.working))
     }
+    @Test
+    fun `selection dictation appends to an existing prompt`() {
+        val application = org.robolectric.RuntimeEnvironment.getApplication()
+        shadowOf(application).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+        val activity = processText("Ask", "Selected material", readOnly = true).get()
+        val root = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+        val draft = descendants(root).filterIsInstance<EditText>().first()
+        draft.setText("Please explain")
+        descendants(root).filterIsInstance<android.widget.ImageButton>().first().performClick()
+        shadowOf(ShadowSpeechRecognizer.getLatestSpeechRecognizer()).triggerOnResults(android.os.Bundle().apply {
+            putStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION, arrayListOf("the last sentence"))
+        })
+        shadowOf(android.os.Looper.getMainLooper()).idle()
+        assertEquals("Please explain the last sentence", draft.text.toString())
+        assertTrue(!activity.isFinishing)
+    }
+
 
 }

@@ -90,6 +90,25 @@ class SpeechOutputTest {
         mouth.close()
     }
 
+    @Test fun `losing audio focus ends playback and keeps future chunks quiet`() {
+        ShadowTextToSpeech.addVoice(voice("local", Locale.US))
+        val mouth = Mouth(RuntimeEnvironment.getApplication())
+        val engine = ready(mouth)
+        var reason: String? = null
+        var idle = false
+        mouth.onProblem = { reason = it }
+        mouth.onIdle = { idle = true }
+        mouth.finish("First answer.")
+        val focus = org.robolectric.util.ReflectionHelpers.getField<android.media.AudioFocusRequest>(mouth, "focus")
+        focus.onAudioFocusChangeListener!!.onAudioFocusChange(android.media.AudioManager.AUDIOFOCUS_LOSS)
+        assertNotNull(reason)
+        assertTrue(idle)
+        assertFalse(mouth.speaking())
+        mouth.follow("First answer. Another sentence.")
+        assertEquals(listOf("First answer."), shadowOf(engine).spokenTextList)
+        mouth.close()
+    }
+
     @Test fun `long speech is split to the engine input limit`() {
         ShadowTextToSpeech.addVoice(voice("local", Locale.US))
         val mouth = Mouth(RuntimeEnvironment.getApplication())

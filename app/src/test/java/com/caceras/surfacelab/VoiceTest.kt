@@ -448,6 +448,18 @@ class VoiceTest {
     }
 
     @Test
+    fun `opening setup on an existing voice activity never restarts the microphone`() {
+        val controller = open()
+        val previous = ShadowSpeechRecognizer.getLatestSpeechRecognizer()
+        controller.newIntent(android.content.Intent().putExtra("setup", true))
+        drain()
+        assertEquals(previous, ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+        assertTrue(shadowOf(previous).isDestroyed)
+        assertTrue(texts(controller.get()).contains("Make yourself heard"))
+        assertFalse(texts(controller.get()).contains("Finish speaking"))
+    }
+
+    @Test
     fun `regional speech selection prefers exact then same language only`() {
         assertEquals("en-US", Ears.bestLanguage(java.util.Locale.forLanguageTag("en-SE"), listOf("sv-SE", "en-US")))
         assertEquals("en-GB", Ears.bestLanguage(java.util.Locale.UK, listOf("en-US", "en-GB")))

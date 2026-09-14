@@ -112,6 +112,52 @@ class ConversationTest {
         assertEquals(View.GONE, latest.visibility)
     }
 
+    @Test
+    fun `a final answer cannot be overwritten by a queued streaming update`() {
+        val activity = launch().get()
+        composer(activity).setText("Help me think")
+        send(activity)
+        brain.emit("First")
+        brain.emit("An older unfinished response")
+        brain.complete("The finished response.")
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(100))
+        assertTrue(bubbles(activity).contains("The finished response."))
+        assertFalse(bubbles(activity).contains("An older unfinished response"))
+    }
+
+    @Test
+    fun `backup limits count encoded bytes and oversized exports fail before writing`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val draft = "界".repeat(1_400_000)
+        Chat.saveDraft(context, draft)
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { Chat.backup(context) }
+        val raw = org.json.JSONObject().put("format", "surface-chat-v1")
+            .put("turns", org.json.JSONArray()).put("draft", draft).toString()
+        assertTrue(raw.length < Chat.MAX_BACKUP_BYTES)
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { Chat.readBackup(raw) }
+        assertEquals(draft, Chat.draft(context))
+    }
+
+    @Test
+    fun `conversation browser searches previews and resumes without losing the current draft`() {
+        val activity = launch().get()
+        Chat.save(activity, listOf(Turn("Weekend", "Walk by the lake.")))
+        Chat.archiveCurrent(activity, "")
+        Chat.save(activity, listOf(Turn("Dinner", "Roast vegetables.")))
+        Chat.archiveCurrent(activity, "")
+        Chat.clear(activity)
+        composer(activity).setText("Keep my current thought")
+        descendants(content(activity)).filterIsInstance<TextView>().first { it.text == "Conversations" }.performClick()
+        val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog()
+        val root = dialog.window!!.decorView
+        root.findViewWithTag<EditText>("conversation-search").setText("lake")
+        val buttons = descendants(root).filterIsInstance<TextView>().filter { it.text == "Resume" }
+        assertEquals(1, buttons.size)
+        buttons.single().performClick()
+        assertEquals("Weekend", Chat.load(activity).single().you)
+        assertTrue(Chat.archives(activity).any { it.draft == "Keep my current thought" })
+    }
+
     // --------------------------------------------------------------- rig
 
     private fun launch(): ActivityController<MainActivity> =

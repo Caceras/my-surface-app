@@ -84,6 +84,11 @@ class MainActivity : Activity() {
     private var speakReplies = false
     private lateinit var playback: TextView
     private var settingsDialog: Dialog? = null
+    private var conversationsDialog: Dialog? = null
+    private val streamed = StreamUpdates { text ->
+        pendingAnswer?.text = Markdown.render(text, dp(18))
+        scrollToEnd()
+    }
 
     /**
      * Set on the way out, and checked by every brain callback.
@@ -119,8 +124,8 @@ class MainActivity : Activity() {
         brain.status(this) { if (!gone && !busy) status.text = it.label }
 
         restoreHistory()
-        input.setText(savedInstanceState?.getString("draft") ?: Chat.draft(this))
         askedAloud = savedInstanceState?.getBoolean("aloud") ?: false
+        input.setText(savedInstanceState?.getString("draft") ?: Chat.draft(this))
         if (savedInstanceState == null) acceptIntent(intent)
     }
 
@@ -268,19 +273,6 @@ class MainActivity : Activity() {
                 if (!checked) hushPlayback()
             }
         })
-        panel.addView(flatButton(getString(R.string.speech_language)) {
-            AlertDialog.Builder(this).setTitle(R.string.speech_language)
-                .setItems(arrayOf("System language", "English", "Svenska")) { _, which ->
-                    ears.cancel()
-                    listening = false
-                    setMicActive(false)
-                    updateSend()
-                    hushPlayback()
-                    getSharedPreferences("surfacelab", MODE_PRIVATE).edit()
-                        .putString("speech_language", arrayOf<String?>(null, "en-US", "sv-SE")[which]).apply()
-                    status.text = getString(R.string.language_selected, ears.locale().displayLanguage)
-                }.show()
-        })
         panel.addView(pill("Set up voice & test playback") {
             settingsDialog?.dismiss()
             startActivity(Intent(this, VoiceActivity::class.java).putExtra("setup", true))
@@ -345,7 +337,13 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK || requestCode !in listOf(EXPORT_CHAT, IMPORT_CHAT)) return
         val uri = data?.data ?: return
-        val snapshot = if (requestCode == EXPORT_CHAT) Chat.backup(this) else null
+        val snapshot = if (requestCode == EXPORT_CHAT) {
+            Chat.saveDraft(this, input.text.toString())
+            try { Chat.backup(this) } catch (e: Exception) {
+                Toast.makeText(this, e.message ?: "Could not create the backup.", Toast.LENGTH_LONG).show()
+                return
+            }
+        } else null
         Thread {
             try {
                 if (snapshot != null) {
@@ -357,14 +355,14 @@ class MainActivity : Activity() {
                     val bytes = stream.use { source ->
                         val out = java.io.ByteArrayOutputStream()
                         val buffer = ByteArray(8192)
-                        while (out.size() <= 4_000_000) {
-                            val count = source.read(buffer, 0, minOf(buffer.size, 4_000_001 - out.size()))
+                        while (out.size() <= Chat.MAX_BACKUP_BYTES) {
+                            val count = source.read(buffer, 0, minOf(buffer.size, Chat.MAX_BACKUP_BYTES + 1 - out.size()))
                             if (count < 0) break
                             out.write(buffer, 0, count)
                         }
                         out.toByteArray()
                     }
-                    require(bytes.size <= 4_000_000) { "This backup is too large." }
+                    require(bytes.size <= Chat.MAX_BACKUP_BYTES) { "This backup is too large." }
                     val backup = bytes.toString(Charsets.UTF_8)
                     val (turns, draft) = Chat.readBackup(backup)
                     runOnUiThread {
@@ -605,6 +603,7 @@ class MainActivity : Activity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             padDp(16, 0, 16, 8)
+            followKeyboardMotion()
             addView(bar, wide())
             addView(LinearLayout(this@MainActivity).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -612,8 +611,8 @@ class MainActivity : Activity() {
                     startActivity(Intent(this@MainActivity, VoiceActivity::class.java))
                 }.apply { tag = "voice-entry"; padDp(16, 12, 16, 12) })
                 addView(flatButton("Conversations") { showConversations() }.apply { padDp(12, 12, 12, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(playback)
             }, wide())
+            addView(playback, wide())
         }
     }
 
@@ -623,10 +622,10 @@ class MainActivity : Activity() {
     }
 
     private fun showConversations() {
-        val saved = Chat.archives(this)
-        val dialog = AlertDialog.Builder(this).setTitle("Your conversations")
-        if (saved.isEmpty()) dialog.setMessage("Your previous conversations will appear here when you tap New. This conversation is saved on your phone automatically.")
-        else dialog.setItems(saved.map { it.title }.toTypedArray()) { _, position ->
+        if (conversationsDialog?.isShowing == true) return
+        getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            .hideSoftInputFromWindow(input.windowToken, 0)
+        conversationsDialog = ConversationSheet(this) { id ->
             stopAnswer()
             ears.cancel()
             listening = false
@@ -635,20 +634,13 @@ class MainActivity : Activity() {
             askedAloud = false
             input.hint = getString(R.string.chat_hint)
             Chat.saveDraft(this, input.text.toString())
-            if (Chat.openArchive(this, saved[position].id)) {
+            if (Chat.openArchive(this, id)) {
                 restoreHistory()
                 input.setText(Chat.draft(this))
                 history.lastOrNull()?.let { ResultStore.save(this, Task.ASK, it.reply) }
                     ?: ResultStore.clear(this)
             }
-        }
-        if (saved.isNotEmpty()) dialog.setNeutralButton("Clear saved") { _, _ ->
-            AlertDialog.Builder(this).setTitle("Clear saved conversations?")
-                .setMessage("Remove these saved conversations from your phone? Your current chat stays open.")
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Clear saved") { _, _ -> Chat.clearArchives(this) }.show()
-        }
-        dialog.setNegativeButton("Done", null).show()
+        }.also { it.show() }
     }
 
     // ------------------------------------------------------------ asking
@@ -671,6 +663,7 @@ class MainActivity : Activity() {
     }
 
     private fun stopAnswer() {
+        streamed.cancel()
         if (!busy) return
         requestId++
         Brains.get().cancel()
@@ -688,6 +681,7 @@ class MainActivity : Activity() {
         val text = question.trim()
         if (text.isEmpty() || busy) return
 
+        streamed.cancel()
         val token = ++requestId
         busy = true
         playback.visibility = View.GONE
@@ -728,12 +722,12 @@ class MainActivity : Activity() {
                 // ordinary text, and a small model asked "??" recites it back.
                 if (Prompts.isEcho(partial, Task.ASK)) return@run
                 thinkingMark?.let { mark -> mark.show(PresenceView.Mode.REST); mark.visibility = View.GONE }
-                answer.text = Markdown.render(Prompts.reply(partial), dp(18))
+                streamed.offer(Prompts.reply(partial))
                 if (aloud) mouth?.follow(Markdown.strip(Prompts.reply(partial)))
-                scrollToEnd()
             }
         ) { result ->
             if (gone || token != requestId) return@run
+            streamed.cancel()
             busy = false
             thinkingMark?.let { it.show(PresenceView.Mode.REST); it.visibility = View.GONE }
             pendingQuestion = ""
@@ -1041,6 +1035,8 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         gone = true
         settingsDialog?.dismiss()
+        conversationsDialog?.dismiss()
+        streamed.cancel()
         ears.cancel()
         mouth?.close()
         mouth = null
@@ -1083,25 +1079,6 @@ class MainActivity : Activity() {
             setTextColor(color(R.color.accent))
             padDp(0, 12, 0, 4)
             setOnClickListener { onTap() }
-        }
-
-    private fun chip(text: String, onTap: () -> Unit) =
-        TextView(this).apply {
-            this.text = text
-            textSize = 13f
-            minHeight = dp(48)
-            gravity = Gravity.CENTER
-            isFocusable = true
-            setTextColor(color(R.color.text_primary))
-            background = getDrawable(R.drawable.chip_bg)
-            padDp(14, 8, 14, 8)
-            setOnClickListener { onTap() }
-            val params = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-            params.rightMargin = dp(8)
-            layoutParams = params
         }
 
     private companion object {

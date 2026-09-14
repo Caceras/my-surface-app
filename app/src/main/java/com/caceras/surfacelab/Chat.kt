@@ -27,6 +27,7 @@ object Chat {
 
     /** Kept on disk. Older turns are dropped rather than growing forever. */
     private const val KEEP = 40
+    const val MAX_BACKUP_BYTES = 4_000_000
 
     fun load(context: Context): MutableList<Turn> {
         val raw = prefs(context).getString(KEY, null) ?: return mutableListOf()
@@ -99,6 +100,10 @@ object Chat {
         }
     }
 
+    fun deleteArchive(context: Context, id: String) {
+        writeArchives(context, archives(context).filterNot { it.id == id })
+    }
+
     fun clearArchives(context: Context) {
         prefs(context).edit().remove("conversations").apply()
     }
@@ -132,10 +137,15 @@ object Chat {
         .put("format", "surface-chat-v1")
         .put("turns", JSONArray().apply { load(context).forEach { put(JSONObject().put("q", it.you).put("a", it.reply)) } })
         .put("draft", draft(context))
-        .put("conversations", JSONArray(prefs(context).getString("conversations", "[]"))).toString(2)
+        .put("conversations", JSONArray(prefs(context).getString("conversations", "[]"))).toString().also {
+            require(it.toByteArray(Charsets.UTF_8).size <= MAX_BACKUP_BYTES) {
+                "This backup is too large. Shorten the draft or remove saved conversations, then export again."
+            }
+            readBackup(it)
+        }
 
     fun readBackup(raw: String): Pair<List<Turn>, String> {
-        require(raw.length <= 4_000_000) { "This backup is too large." }
+        require(raw.toByteArray(Charsets.UTF_8).size <= MAX_BACKUP_BYTES) { "This backup is too large." }
         val objectValue = JSONObject(raw)
         require(objectValue.getString("format") == "surface-chat-v1") { "Choose a Surface conversation backup." }
         val array = objectValue.getJSONArray("turns")

@@ -70,3 +70,38 @@ fun suggestionButton(context: Context, text: String, onTap: () -> Unit) =
         setOnClickListener { onTap() }
         (layoutParams as? ViewGroup.MarginLayoutParams)?.rightMargin = context.dp(8)
     }
+
+/** Keep a bottom composer visually attached to the keyboard during its native transition. */
+fun View.followKeyboardMotion() {
+    if (Build.VERSION.SDK_INT >= 30) setWindowInsetsAnimationCallback(KeyboardMotion(this))
+}
+
+@android.annotation.TargetApi(30)
+internal class KeyboardMotion(private val view: View) : android.view.WindowInsetsAnimation.Callback(DISPATCH_MODE_CONTINUE_ON_SUBTREE) {
+    private val location = IntArray(2)
+    private var start = 0
+    private var offset = 0f
+
+        override fun onPrepare(animation: android.view.WindowInsetsAnimation) {
+            if (animation.typeMask and WindowInsets.Type.ime() == 0) return
+            view.getLocationOnScreen(location)
+            start = location[1]
+        }
+        override fun onStart(animation: android.view.WindowInsetsAnimation, bounds: android.view.WindowInsetsAnimation.Bounds): android.view.WindowInsetsAnimation.Bounds {
+            if (animation.typeMask and WindowInsets.Type.ime() != 0) {
+                view.translationY = 0f
+                view.getLocationOnScreen(location)
+                offset = (start - location[1]).toFloat()
+                if (android.animation.ValueAnimator.areAnimatorsEnabled()) view.translationY = offset
+            }
+            return bounds
+        }
+        override fun onProgress(insets: WindowInsets, runningAnimations: MutableList<android.view.WindowInsetsAnimation>): WindowInsets {
+            val ime = runningAnimations.firstOrNull { it.typeMask and WindowInsets.Type.ime() != 0 }
+            if (ime != null) view.translationY = if (android.animation.ValueAnimator.areAnimatorsEnabled()) offset * (1f - ime.interpolatedFraction) else 0f
+            return insets
+        }
+        override fun onEnd(animation: android.view.WindowInsetsAnimation) {
+            if (animation.typeMask and WindowInsets.Type.ime() != 0) { view.translationY = 0f; offset = 0f }
+        }
+}

@@ -49,14 +49,14 @@ class ShotTest {
      * colours, and passed on a screen that was ninety per cent unpainted --
      * an assertion weak enough to be worthless.
      */
-    private fun shoot(name: String, decor: View, minPainted: Double = 0.9) {
+    private fun shoot(name: String, decor: View, minPainted: Double = 0.9, shotWidth: Int = width, shotHeight: Int = height) {
         decor.measure(
-            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+            View.MeasureSpec.makeMeasureSpec(shotWidth, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(shotHeight, View.MeasureSpec.EXACTLY)
         )
-        decor.layout(0, 0, width, height)
+        decor.layout(0, 0, shotWidth, shotHeight)
 
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(shotWidth, shotHeight, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.MAGENTA)   // so "drew nothing" is unmistakable
         decor.draw(Canvas(bitmap))
 
@@ -66,8 +66,8 @@ class ShotTest {
         }
 
         // A screen that drew nothing is a screenshot of the erase colour.
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val pixels = IntArray(shotWidth * shotHeight)
+        bitmap.getPixels(pixels, 0, shotWidth, 0, 0, shotWidth, shotHeight)
         val painted = pixels.count { it != Color.MAGENTA }.toDouble() / pixels.size
         assertTrue(
             "$name painted only ${"%.1f".format(painted * 100)}% of the screen, " +
@@ -162,5 +162,39 @@ class ShotTest {
             shoot("voice-answer", activity.window.decorView)
         } finally { Brains.useForTest(null) }
     }
+    @Test
+    fun `saved conversations have searchable previews`() {
+        val context = RuntimeEnvironment.getApplication()
+        Chat.clearArchives(context)
+        Chat.save(context, listOf(Turn("A slower Sunday", "A long walk, good coffee, and a little time to read.")))
+        Chat.archiveCurrent(context, "Find a quiet place nearby")
+        Chat.save(context, listOf(Turn("The right words", "Thank you for making time. I would love to hear what you think.")))
+        Chat.archiveCurrent(context, "")
+        Chat.clear(context)
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val sheet = ConversationSheet(activity) {}
+        sheet.show()
+        shoot("conversations", sheet.window!!.decorView)
+    }
+
+    @Test
+    @Config(qualifiers = "w320dp-h640dp-xxhdpi")
+    fun `compact chat keeps playback and navigation reachable`() {
+        val context = RuntimeEnvironment.getApplication()
+        Chat.save(context, listOf(Turn("A quick thought", "Make space for one thing at a time.")))
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        fun children(view: View): List<View> = if (view !is android.view.ViewGroup) listOf(view)
+            else listOf(view) + (0 until view.childCount).flatMap { children(view.getChildAt(it)) }
+        children(activity.window.decorView).filterIsInstance<android.widget.TextView>()
+            .first { it.text == "Listen" }.performClick()
+        shoot("chat-compact", activity.window.decorView, shotWidth = 960, shotHeight = 1920)
+        listOf("Voice", "Conversations", activity.getString(R.string.stop_speaking)).forEach { label ->
+            val control = children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == label }
+            val rect = android.graphics.Rect()
+            assertTrue("$label is not visible", control.getGlobalVisibleRect(rect))
+            assertTrue("$label is clipped", rect.height() >= activity.dp(48))
+        }
+    }
+
 
 }

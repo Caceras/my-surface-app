@@ -52,11 +52,14 @@ class ProcessTextActivity : Activity() {
     /** True while the pending question came from the microphone. */
     private var askedAloud = false
     private var listening = false
+    private var listenDraft = ""
+    private var receivedWords = false
 
     /** Set on the way out; see the same flag in MainActivity and docs/voice.md. */
     private var gone = false
     private var active = false
     private var requestId = 0
+    private var streamed: StreamUpdates? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -159,6 +162,7 @@ class ProcessTextActivity : Activity() {
     }
 
     private fun send(instruction: String) {
+        streamed?.cancel()
         val token = ++requestId
         active = true
         // Modality is inherited: this answer is spoken only because the
@@ -196,6 +200,10 @@ class ProcessTextActivity : Activity() {
             .setOnDismissListener { finish() }
             .show()
 
+        streamed = StreamUpdates { text ->
+            stream.text = Markdown.render(text, dp(18))
+            scroll.post { scroll.scrollTo(0, stream.height) }
+        }
         if (aloud) speaker().begin(ears.locale())
 
         Brains.get().run(
@@ -206,12 +214,12 @@ class ProcessTextActivity : Activity() {
             onPartial = { partial ->
                 if (gone || token != requestId) return@run
                 if (Prompts.isEcho(partial, task)) return@run
-                stream.text = Markdown.render(Prompts.reply(partial), dp(18))
+                streamed?.offer(Prompts.reply(partial))
                 if (aloud) mouth?.follow(Markdown.strip(Prompts.reply(partial)))
-                scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
             }
         ) { raw ->
             if (gone || token != requestId) return@run
+            streamed?.cancel()
             active = false
             val result = if (raw.ok && Prompts.isEcho(raw.text, task))
                 BrainResult.failure(getString(R.string.echoed))
@@ -300,21 +308,25 @@ class ProcessTextActivity : Activity() {
 
     private fun startListening() {
         val input = prompt ?: return
+        listenDraft = input.text.toString()
+        receivedWords = false
+        mouth?.hush()
         listening = true
         setMicActive(true)
 
         ears.listen(
             onLevel = { rms ->
-                val scale = 1f + (rms.coerceIn(0f, 10f) / 20f)
+                val scale = 1f + (rms.coerceIn(0f, 10f) / 70f)
                 mic?.scaleX = scale
                 mic?.scaleY = scale
             },
             onPartial = { partial ->
-                input.setText(partial)
+                input.setText(listenDraft + (if (listenDraft.isBlank()) "" else " ") + partial)
                 input.setSelection(input.text.length)
             },
             onFinal = { text ->
-                input.setText(text)
+                receivedWords = true
+                input.setText(listenDraft + (if (listenDraft.isBlank()) "" else " ") + text)
                 input.setSelection(input.text.length)
                 // The transcript stays editable here, unlike the hands-free
                 // screen: you are already looking at the box, so a misheard
@@ -322,6 +334,7 @@ class ProcessTextActivity : Activity() {
                 askedAloud = true
             },
             onStop = { problem ->
+                if (!receivedWords) { input.setText(listenDraft); input.setSelection(input.length()) }
                 listening = false
                 setMicActive(false)
                 if (problem != null) {
@@ -359,6 +372,7 @@ class ProcessTextActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        streamed?.cancel()
         ears.cancel()
         listening = false
         setMicActive(false)
@@ -373,6 +387,7 @@ class ProcessTextActivity : Activity() {
 
     override fun onDestroy() {
         gone = true
+        streamed?.cancel()
         requestId++
         if (active) Brains.get().cancel()
         // The microphone is not left held, and the engine is shut down rather

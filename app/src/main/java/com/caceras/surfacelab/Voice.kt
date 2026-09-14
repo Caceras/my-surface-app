@@ -311,7 +311,7 @@ class Mouth(context: Context) {
     private val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
         .setAudioAttributes(attributes)
         .setOnAudioFocusChangeListener { change ->
-            if (change < 0) hush()
+            if (change < 0) fail("Playback paused because another app needs audio. Your answer stays on screen.")
         }.build()
     private var hasFocus = false
 
