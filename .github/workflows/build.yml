@@ -27,6 +27,7 @@ jobs:
       # resource reference at the end of a Gradle build.
       - run: python tools/verify.py .
       - run: python tools/test_verify.py
+      - run: python tools/check_docs.py .
 
   test:
     name: JVM tests

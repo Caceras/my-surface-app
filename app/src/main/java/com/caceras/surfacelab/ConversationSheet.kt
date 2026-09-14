@@ -94,7 +94,7 @@ class ConversationSheet(private val activity: Activity, private val open: (Strin
                 padDp(18, 16, 18, 8)
                 addView(context.label(saved.title, 18f).apply { medium(); maxLines = 2; ellipsize = TextUtils.TruncateAt.END })
                 val date = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(saved.savedAt))
-                addView(context.label("$date · ${saved.turns.size} exchanges", 12f, true).apply { padDp(0, 6, 0, 10) })
+                addView(context.label("$date · ${saved.turns.size} ${if (saved.turns.size == 1) "exchange" else "exchanges"}", 12f, true).apply { padDp(0, 6, 0, 10) })
                 val preview = saved.draft.ifBlank { saved.turns.lastOrNull()?.reply.orEmpty() }
                 addView(context.label(Markdown.strip(preview), 15f, true).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END })
                 addView(LinearLayout(context).apply {

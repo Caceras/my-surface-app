@@ -1,5 +1,6 @@
 # Surface Preview 3 — Android overhaul
 
+> Historical record of an earlier implementation pass. For current behavior and open risks, use the [quality audit](quality-audit.md), [README](../README.md), and [phone guide](getting-started.md).
 This is the redesign of Pixel Surface Lab in PR #7. It remains a native Android app using framework UI and on-device Gemini Nano. The new launcher name is **Surface Preview**. Its Nano package is `com.caceras.surface.nano`, so it can be installed alongside the older `com.caceras.surfacelab.nano` app.
 
 ## Audit evidence

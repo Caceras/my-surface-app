@@ -1,5 +1,6 @@
 # Pixel assistant audit — 14 September 2026
 
+> Historical record of an earlier implementation pass. For current behavior and open risks, use the [quality audit](quality-audit.md), [README](../README.md), and [phone guide](getting-started.md).
 Repository: `Caceras/my-surface-app`. Audited baseline: `d462697` (main).
 Target device: Pixel 10 Pro XL. Changes: branch `improve-pixel-assistant`, PR #7.
 

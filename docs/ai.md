@@ -1,124 +1,27 @@
 # On-device AI
 
-Everything here runs on the phone. No key, no account, no request leaves the
-device. The honest limits are further down — read them before you plan around
-this.
+Surface's Nano flavor uses `com.google.mlkit:genai-prompt:1.0.0-beta4`, pinned in `app/build.gradle.kts`. The core flavor does not contain an AI model.
 
-## What is actually running
+## Runtime behavior
 
-The `nano` flavour uses the **ML Kit Prompt API** (`com.google.mlkit:genai-prompt`),
-a general generative client for **Gemini Nano**, hosted by **Android AICore** —
-a system service, not a library. Three consequences:
+The provider checks AICore feature status, prepares a downloadable model, and reports unsupported/downloading/error states. Generation checks whether separate system instructions are supported; otherwise the instruction is folded into the prompt. It returns cumulative text to the UI and rejects stale callbacks after cancellation.
 
-- No model ships inside the APK. The `nano` build is ~12 MB and none of that is
-  weights.
-- The first call may need a one-time feature download, handled by the system.
-  After that it works with the radios off.
-- If AICore is missing or the device is unsupported, there is nothing to fall
-  back to. The app says so plainly instead of failing at the call site.
+Successful output is saved only after the final request succeeds. Echoed instructions and failed streams are not treated as completed answers. `Prompts.kt` supplies the tasks and a bounded subset of conversation history; the on-screen retained history can be longer than the context sent to a model.
 
-```
-your prompt + your selection
-      │
-      ▼
-ProcessTextActivity ──► SurfaceBrain ──► Prompt API ──► AICore ──► Gemini Nano
-                          (interface)                   (system)   (on device)
-```
+The app currently accepts text. Although the underlying Prompt API offers other input/output capabilities, image input and structured tool execution are not implemented here. Summarise, Proofread and Make professional are prompt-defined operations, not separate ML Kit task clients.
 
-`SurfaceBrain` is the seam. `app/src/core/` implements it with `String.uppercase()`
-and no dependencies; `app/src/nano/` implements it with `GenerativeModelFutures`.
-Nothing else in the app changes between the two builds.
+## Device and service constraints
 
-## Why not the task-shaped APIs
+Google lists Pixel 10 Pro XL among supported Prompt API devices. Readiness is checked at runtime, and device configuration/model availability still matter. Google's current guidance restricts inference to the top foreground app and describes per-app quota/busy responses. Surface cancels active requests when leaving rather than attempting background inference. [ML Kit overview and support](https://developers.google.com/ml-kit/genai).
 
-ML Kit also ships `genai-summarization`, `genai-proofreading` and
-`genai-rewriting`. They look like the obvious starting point and they are a dead
-end for anything general:
+The Prompt API is beta. SDK behavior and compatibility can change; update the dependency deliberately and test both variants. [Prompt API documentation](https://developers.google.com/ml-kit/genai/prompt/android).
 
-| | Task APIs | Prompt API |
-|---|---|---|
-| Input | one fixed job each | any prompt |
-| Languages | EN, JA, KO (+DE, FR, IT, ES for two of them) | no declared list |
-| System instruction | no | yes, where the device supports it |
-| Streaming | yes | yes |
-| Temperature / topK / seed | no | yes |
-| Images | separate artifact | built in |
-| Structured output | no | yes |
-| Dependencies | one artifact per task | one, total |
+## Quality boundaries
 
-They are also on a different release train — beta1 against the Prompt API's
-beta4 — and they share `genai-common`, so mixing families lets Gradle resolve a
-single `genai-common` that one side was not built against. Pick one. This repo
-picked the Prompt API.
+On-device output can be wrong, incomplete or repetitive. Neither fluent speech nor fluent text establishes factual accuracy. The app has no live search, retrieval service, citation verification, tool execution, or access to private information beyond the supplied context.
 
-## Presets are just prompts
+Speech locale controls recognition/playback, not a guarantee of model competence. Evaluate representative English and Swedish tasks on the target Pixel, including short follow-ups, long selections, interruption, refusals and malformed output. The current Nordic-language caveat in `Lang.kt` is a heuristic, not an automatic language-quality evaluation.
 
-`Prompts.kt` holds a system instruction per task and nothing else. "Summarise"
-is not a feature; it is three lines of English. Adding your own:
+## Changes worth testing
 
-1. Add a case to the `Task` enum in `SurfaceBrain.kt`.
-2. Add its system instruction to `Prompts.kt`.
-3. Add an `<activity-alias>` to `app/src/nano/AndroidManifest.xml`.
-4. `python tools/verify.py .`
-
-No new classes, no changes to any surface. The alias name is what links the
-manifest entry to the enum case.
-
-## Availability
-
-| Requirement | Why |
-|---|---|
-| A supported Pixel (9 series and newer) | AICore ships the Nano weights |
-| **Locked bootloader** | the GenAI APIs refuse to run otherwise |
-| A current Android AICore system app | it is updated through Play, not OS releases |
-| API 26+ | the SDK minimum; this app sets minSdk 29 |
-
-Check it from the app: **Check / prepare on-device model**, or add the Quick
-Settings tile, whose subtitle reports live status and whose tap triggers the
-download.
-
-## Languages
-
-The Prompt API declares no language list, so nothing is refused. That is not the
-same as being good in every language: Nano is a small model trained mostly on
-English, and it will produce fluent Swedish that is subtly wrong — which is
-worse than an error.
-
-`Lang.kt` runs a cheap heuristic and attaches one note when the input looks
-Nordic. It never blocks the call. If Swedish output quality genuinely matters,
-the honest answer is a different model: Gemma 3n or Qwen3 1.7B through
-**MediaPipe LLM Inference** or **LiteRT-LM**, bundled or side-loaded. That is a
-much larger APK and a much larger job, and it is out of scope here.
-
-## Three traps worth knowing
-
-All three are handled in `app/src/nano/java/.../Brain.kt`:
-
-1. **These return Guava `ListenableFuture`, not a Play Services `Task`.** The
-   `.await()` shown in some samples will not compile. Only the
-   `listenablefuture` stub ships, so there is no `Futures.addCallback` either —
-   the working move is `future.addListener(runnable, executor)` and `get()`
-   inside the listener, which needs no extra dependency at all.
-2. **`FeatureStatus` is an int constant, not an enum.** `checkStatus()` resolves
-   to `ListenableFuture<Integer>`, compared against `FeatureStatus.AVAILABLE`.
-3. **System instructions are not supported on every device.** Call
-   `isSystemPromptAvailable()` first and fold the instruction into the prompt
-   when it comes back false. Skip this and the model appears to ignore its
-   instructions for no visible reason.
-
-`DownloadCallback` also fires off the main thread, so anything touching UI has
-to be posted back.
-
-## Knobs the app sets, and why
-
-| Setting | Value | Reason |
-|---|---|---|
-| `temperature` | 0.2 for presets, 0.7 for Ask | presets transform the user's own text and should not invent; Ask is open-ended |
-| `maxOutputTokens` | 512 | a dialog, not an essay |
-| streaming | on | text lands as it is produced, so there is never a blank spinner |
-
-Also available and unused here: `topK`, `seed`, `candidateCount`,
-`enableThinking`, context caching (`Caches`), token counting (`countTokens`,
-`getTokenLimit`) and structured output against a schema. `GenerativeModel` — the
-coroutine-flavoured interface behind `GenerativeModelFutures` — exposes all of
-them.
+When changing prompts or the SDK, compare output quality on a fixed device prompt set, record the model/device versions, and test readiness failures and cancellation. Build success cannot validate AICore inference on a machine without AICore. Keep any future remote-model option explicit in the product and privacy model; none exists today.
