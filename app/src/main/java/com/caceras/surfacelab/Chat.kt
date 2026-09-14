@@ -99,6 +99,10 @@ object Chat {
         }
     }
 
+    fun clearArchives(context: Context) {
+        prefs(context).edit().remove("conversations").apply()
+    }
+
     fun openArchive(context: Context, id: String): Boolean {
         val selected = archives(context).firstOrNull { it.id == id } ?: return false
         archiveCurrent(context)

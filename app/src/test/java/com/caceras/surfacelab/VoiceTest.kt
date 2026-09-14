@@ -244,6 +244,20 @@ class VoiceTest {
     }
 
     @Test
+    fun `stopping a finished spoken reply does not restart the microphone`() {
+        val activity = open().get()
+        say("Tell me something")
+        brain.complete("A useful answer.")
+        drain()
+        val previous = ShadowSpeechRecognizer.getLatestSpeechRecognizer()
+        descendants(activity.findViewById(android.R.id.content)).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.stop_speaking) }.performClick()
+        drain()
+        assertEquals(previous, ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+        assertTrue(texts(activity).contains(activity.getString(R.string.tap_to_talk)))
+    }
+
+    @Test
     fun `sentences finished before the engine started are spoken, in order`() {
         // TTS init is asynchronous, and by the time it lands the brain may
         // already have streamed several sentences. One slot that each new

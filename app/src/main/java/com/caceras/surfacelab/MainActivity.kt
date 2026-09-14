@@ -265,7 +265,7 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, checked ->
                 speakReplies = checked
                 Chat.setSpeakReplies(this@MainActivity, checked)
-                if (!checked) mouth?.hush()
+                if (!checked) hushPlayback()
             }
         })
         panel.addView(flatButton(getString(R.string.speech_language)) {
@@ -275,7 +275,7 @@ class MainActivity : Activity() {
                     listening = false
                     setMicActive(false)
                     updateSend()
-                    mouth?.hush()
+                    hushPlayback()
                     getSharedPreferences("surfacelab", MODE_PRIVATE).edit()
                         .putString("speech_language", arrayOf<String?>(null, "en-US", "sv-SE")[which]).apply()
                     status.text = getString(R.string.language_selected, ears.locale().displayLanguage)
@@ -401,7 +401,22 @@ class MainActivity : Activity() {
             gravity = Gravity.BOTTOM
             addView(emptyState(), wide())
         }
-        transcript = ScrollView(this).apply {
+        transcript = object : ScrollView(this) {
+            // Text reflow and a newly focusable answer can scroll during layout,
+            // independently of our streaming callbacks. Keep the reader anchored.
+            override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+                val preserve = !followReply
+                val position = scrollY
+                super.onLayout(changed, l, t, r, b)
+                if (preserve) scrollTo(0, position)
+            }
+            override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+                val preserve = !followReply
+                val position = scrollY
+                super.onSizeChanged(w, h, oldw, oldh)
+                if (preserve) scrollTo(0, position)
+            }
+        }.apply {
             tag = "conversation"
             isFillViewport = true
             clipToPadding = false
@@ -474,12 +489,17 @@ class MainActivity : Activity() {
                         gravity = Gravity.CENTER_VERTICAL
                         minimumHeight = dp(96)
                         padDp(16, 16, 12, 16)
-                        background = surface(if (index == 0) R.color.presence_bg else R.color.chip_bg, 22)
+                        background = android.graphics.drawable.RippleDrawable(
+                            android.content.res.ColorStateList.valueOf(color(R.color.outline)),
+                            surface(if (index == 0) R.color.presence_bg else R.color.chip_bg, 22), null)
                         addView(label(title, 16f).apply { medium() })
                         addView(label(hint, 12f, true).apply { padDp(0, 6, 0, 0) })
                         isFocusable = true
                         contentDescription = "$title. $hint"
-                        setOnClickListener { stagePrompt(prompt) }
+                        setOnClickListener {
+                            performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+                            stagePrompt(prompt)
+                        }
                     }, LinearLayout.LayoutParams(0, -2, 1f).apply { if (index == 0) rightMargin = dp(10) })
                 }
             }, wide())
@@ -619,6 +639,12 @@ class MainActivity : Activity() {
                     ?: ResultStore.clear(this)
             }
         }
+        if (saved.isNotEmpty()) dialog.setNeutralButton("Clear saved") { _, _ ->
+            AlertDialog.Builder(this).setTitle("Clear saved conversations?")
+                .setMessage("Remove these saved conversations from your phone? Your current chat stays open.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Clear saved") { _, _ -> Chat.clearArchives(this) }.show()
+        }
         dialog.setNegativeButton("Done", null).show()
     }
 
@@ -667,7 +693,7 @@ class MainActivity : Activity() {
         input.setText("")
         Chat.saveDraft(this, "")
         updateSend()
-        mouth?.hush()
+        hushPlayback()
 
         getSystemService(android.view.inputmethod.InputMethodManager::class.java)
             .hideSoftInputFromWindow(input.windowToken, 0)
@@ -760,7 +786,7 @@ class MainActivity : Activity() {
         askedAloud = false
         setMicActive(false)
         input.hint = getString(R.string.chat_hint)
-        mouth?.hush()
+        hushPlayback()
         val saved = Chat.archiveCurrent(this, input.text.toString())
         followReply = true
         latest.visibility = View.GONE
@@ -861,7 +887,7 @@ class MainActivity : Activity() {
             }, parent.indexOfChild(bubble) + 1)
         }
         bubble.setOnLongClickListener {
-            mouth?.hush()
+            hushPlayback()
             AlertDialog.Builder(this).setItems(arrayOf(
                 getString(R.string.copy), getString(R.string.read_aloud), getString(R.string.share_answer)
             )) { _, which ->
@@ -893,7 +919,7 @@ class MainActivity : Activity() {
 
     private fun startListening() {
         stopAnswer()
-        mouth?.hush()
+        hushPlayback()
         listenDraft = input.text.toString().trim()
         askedAloud = false
         listening = true
@@ -1005,7 +1031,7 @@ class MainActivity : Activity() {
         setMicActive(false)
         stopAnswer()
         Chat.saveDraft(this, input.text.toString())
-        mouth?.hush()
+        hushPlayback()
         updateSend()
     }
 

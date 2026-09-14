@@ -93,6 +93,8 @@ class ConversationTest {
         send(activity)
         layout()
         val scroll = descendants(content(activity)).filterIsInstance<ScrollView>().first { it.tag == "conversation" }
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        assertTrue("fixture needs a scrollable conversation", scroll.scrollY > 30)
         scroll.scrollTo(0, 30)
         val before = scroll.scrollY
         brain.emit("A new paragraph. ".repeat(100))

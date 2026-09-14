@@ -594,6 +594,7 @@ class VoiceActivity : Activity() {
         ears.cancel()
         mouth?.hush()
         state = State.IDLE
+        if (!setupMode) idleWith("Voice paused")
     }
 
     override fun onDestroy() {
