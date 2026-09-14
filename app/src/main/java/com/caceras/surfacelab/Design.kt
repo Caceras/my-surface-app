@@ -96,6 +96,8 @@ fun Context.preferenceSwitch(title: String, checked: Boolean = false, change: (B
     }
 
 fun Context.sheetHeader(title: String, close: () -> Unit) = android.widget.LinearLayout(this).apply {
+    layoutParams = android.widget.LinearLayout.LayoutParams(-1, -2)
+    tag = "sheet-header"
     gravity = Gravity.CENTER_VERTICAL
     addView(label(title, 24f).apply { medium(); isAccessibilityHeading = true },
         android.widget.LinearLayout.LayoutParams(0, -2, 1f))

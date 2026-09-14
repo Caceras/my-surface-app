@@ -56,6 +56,20 @@ class ShotTest {
         )
         decor.layout(0, 0, shotWidth, shotHeight)
 
+        // Drain immediate layout work posted by Dialog.show / setLayout before
+        // accepting a frame. A first measure alone can miss a header control.
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        decor.forceLayout()
+        decor.measure(View.MeasureSpec.makeMeasureSpec(shotWidth, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(shotHeight, View.MeasureSpec.EXACTLY))
+        decor.layout(0, 0, shotWidth, shotHeight)
+        decor.findViewWithTag<android.view.ViewGroup>("sheet-header")?.let { header ->
+            val done = header.getChildAt(1)
+            val rect = android.graphics.Rect()
+            assertTrue("$name close action is missing", done.getGlobalVisibleRect(rect))
+            assertTrue("$name close action is clipped", rect.width() >= done.context.dp(48) && rect.height() >= done.context.dp(48))
+        }
+
         val bitmap = Bitmap.createBitmap(shotWidth, shotHeight, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.MAGENTA)   // so "drew nothing" is unmistakable
         decor.draw(Canvas(bitmap))

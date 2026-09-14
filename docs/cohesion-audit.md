@@ -22,6 +22,6 @@ Each flow retains native controls, focus behavior and the Æ/sky-blue design. No
 
 ## Verification and follow-up
 
-Focused regressions cover every navigation sheet, cancelled dictation, retained drafts, late results, quiet voice completion, dark switches and private search. New native renders cover dark Settings and action forms. Existing compact, large-font, wide, landscape, widget, voice and conversation checks remain in the suite. Release tests reject missing/skipped/failed JUnit results, lint errors, wrong APK identity/version and tampered files.
+Focused regressions cover every navigation sheet, cancelled dictation, retained drafts, late results, quiet voice completion, dark switches and private search. New native renders cover dark Settings and action forms. Shared-header exits are measured after pending dialog layout work settles; a close control must be visibly reachable, not merely present in the view tree. Existing compact, large-font, wide, landscape, widget, voice and conversation checks remain in the suite. Release tests reject missing/skipped/failed JUnit results, lint errors, wrong APK identity/version and tampered files.
 
 The [workflow audit](iteration-workflow.md) gives the implemented loop, remaining automation boundaries and next investments. [Testing](testing.md) defines device acceptance. Automated quality does not establish 120 Hz performance, speech accuracy, full accessibility or production readiness.

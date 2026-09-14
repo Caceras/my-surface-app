@@ -8,6 +8,9 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.ImageView
 
 /** Real state feedback using the existing mark. No idle animation or background work. */
+// Nano brings transitive AppCompat classes, but this app uses framework themes
+// and explicitly tints this image; it is not an AppCompatActivity custom view.
+@android.annotation.SuppressLint("AppCompatCustomView")
 class PresenceView(context: Context, size: Int = 88) : ImageView(context) {
     enum class Mode { REST, LISTENING, THINKING, SPEAKING }
     var mode = Mode.REST

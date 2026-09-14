@@ -51,10 +51,17 @@ class SurfaceTileService : TileService() {
                 )
             )
         } else {
-            // Deprecated at 34, and the only overload that exists below it.
-            @Suppress("DEPRECATION")
-            startActivityAndCollapse(intent)
+            launchLegacy(intent)
         }
+    }
+
+    // PendingIntent overload does not exist below API 34. The runtime guard is
+    // intentional; this lint detector only considers targetSdk, not the branch.
+    @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated")
+    @Suppress("DEPRECATION")
+    private fun launchLegacy(intent: Intent) {
+        check(Build.VERSION.SDK_INT < 34)
+        startActivityAndCollapse(intent)
     }
 
     private fun render(status: BrainStatus) {

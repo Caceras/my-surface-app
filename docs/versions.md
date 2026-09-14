@@ -29,4 +29,8 @@ These are repository pins, not a claim that each is the latest upstream version.
 
 ## Upgrade deliberately
 
-Change one related toolchain set at a time. Run static checks, checker tests, JVM tests, and both APK builds. Inspect fresh screenshots when changing Android/graphics versions. Run hardware inference/speech checks after SDK upgrades. The workflow installs SDK packages explicitly: changing compileSdk alone does not update those package declarations.
+Change one related toolchain set at a time. Run `python tools/check.py`, JVM tests, both flavor lint tasks and both APK builds. Inspect fresh screenshots when changing Android/graphics versions. Run hardware inference/speech checks after SDK upgrades. The workflow installs SDK packages explicitly: changing compileSdk alone does not update those package declarations.
+
+## Workflow action pins
+
+Actions are pinned to full commit SHAs in the workflow. Reviewed releases for this pass: checkout 7.0.1, setup-java 6.0.1, upload-artifact 7.0.1, download-artifact 8.0.1 and Gradle actions 6.3.0. Hosted Ubuntu supplies Python; Android SDK installation is checked once per quality job. See [the workflow audit](iteration-workflow.md) for official sources and the update policy.

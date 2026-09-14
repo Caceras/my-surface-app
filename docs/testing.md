@@ -76,3 +76,9 @@ Every run retains **android-diagnostics** (JUnit XML, lint reports, screenshots)
 Additional regressions cover Settings/History/Actions cancelling hidden streams, dictation/draft retention, stale completion, quiet voice state, dark switch colors, private search and reachable History close. Native renders include dark Settings and the timer form. On a Pixel, also open each sheet during dictation/streaming and confirm no automatic restart when returning.
 
 Both APKs also pass Android `apksigner verify`; certificate fingerprints are retained in the evidence bundle. This proves signature integrity, not continuity with a previously installed preview key.
+
+## Narrow lint exceptions
+
+Two source-local exceptions are documented beside the code: the Intent tile overload is used only under an explicit runtime API < 34 check because the PendingIntent overload does not exist there; `PresenceView` deliberately extends the framework ImageView and applies its own tint despite Nano's transitive AppCompat dependency. Neither exception disables lint globally. Other errors/fatals still block the release.
+
+Screenshot capture drains immediate dialog layout work, remeasures the frame and verifies shared-header close controls before drawing. This catches missing or clipped exits that a painted-pixel threshold alone cannot detect.

@@ -7,10 +7,8 @@
 See [README](README.md#build-and-test) and the [pinned versions](docs/versions.md). Use the branch containing the experience you intend to change. The project has no Gradle wrapper; CI installs its pinned Gradle version directly.
 
 ```bash
-python tools/verify.py .
-python tools/test_verify.py
-python tools/check_docs.py .
-gradle testCoreDebugUnitTest assembleCoreDebug assembleNanoDebug --no-daemon
+python tools/check.py
+gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug --no-daemon
 ```
 
 ## Boundaries
