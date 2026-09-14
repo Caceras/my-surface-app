@@ -52,3 +52,5 @@ Use `.apk` release assets on Android. Evidence ZIPs are for inspection, not inst
 ## Distribution boundary
 
 These are debug/personal preview APKs. Publishing to Google Play requires a deliberate release build/signing strategy, device validation, current policy review and accurate product/privacy disclosures. The repository does not claim a production rollout, signing-key escrow service, or automatic cross-device migration.
+
+Both APKs also pass Android `apksigner verify`; certificate fingerprints are retained in the evidence bundle. This proves signature integrity, not continuity with a previously installed preview key.

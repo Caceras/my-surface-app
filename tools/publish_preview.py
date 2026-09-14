@@ -42,6 +42,8 @@ def main():
     repo, sha, branch = os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_SHA"], os.environ["GITHUB_REF_NAME"]
     if meta["source_sha"] != sha or meta["repository"] != repo or meta["run_id"] != os.environ["GITHUB_RUN_ID"]:
         raise ValueError("Build provenance does not match publication")
+    if meta["build"] != int(os.environ["GITHUB_RUN_NUMBER"]) or meta["attempt"] != int(os.environ["GITHUB_RUN_ATTEMPT"]):
+        raise ValueError("Build attempt does not match publication")
     head = json.loads(gh("api", f"repos/{repo}/git/ref/heads/{branch}"))["object"]["sha"]
     if head != sha:
         print("Branch advanced; preserving the newer preview. This run's evidence remains in Actions.")

@@ -129,7 +129,10 @@ def collect(destination, root=Path(".")):
         shutil.copy2(src, destination / name)
         shutil.copy2(src, destination / f"pixel-surface-lab-{flavor}.apk")
         meta["apks"][name] = identity
-    for src in [*tests, *lint]:
+    signatures = [build / f"reports/apk-signature-{flavor}.txt" for flavor in ("core", "nano")]
+    if any(not p.is_file() or "Signer #1 certificate SHA-256 digest:" not in p.read_text() for p in signatures):
+        raise ValueError("Missing APK signature verification reports")
+    for src in [*tests, *lint, *signatures]:
         folder = destination / "reports"
         folder.mkdir(exist_ok=True)
         shutil.copy2(src, folder / src.name)
@@ -163,6 +166,13 @@ def verify(folder):
     meta = json.loads((folder / "release-evidence.json").read_text())
     if meta.get("schema") != 1 or not re.fullmatch(r"[a-f0-9]{40}", meta["source_sha"]):
         raise ValueError("Invalid provenance")
+    if set(meta.get("apks", {})) != {"aegentica-ai-core.apk", "aegentica-ai-nano.apk"}:
+        raise ValueError("Both branded APK identities are required")
+    required = {f"{prefix}-{flavor}.apk" for prefix in ("aegentica-ai", "pixel-surface-lab") for flavor in ("core", "nano")}
+    required |= {f"screenshots/{name}.png" for name in REQUIRED_SHOTS}
+    required |= {"review.html", "reports/apk-signature-core.txt", "reports/apk-signature-nano.txt"}
+    if not required <= set(meta["files"]):
+        raise ValueError("Incomplete evidence inventory")
     for name, checksum in meta["files"].items():
         path = (folder / name).resolve()
         if not path.is_relative_to(folder.resolve()) or not path.is_file() or digest(path) != checksum:
@@ -171,6 +181,13 @@ def verify(folder):
         if apk_identity(folder / name) != identity:
             raise ValueError(f"APK identity mismatch: {name}")
         validate_identity(identity, name.removeprefix("aegentica-ai-").removesuffix(".apk"), meta["build"])
+        if digest(folder / name) != digest(folder / name.replace("aegentica-ai", "pixel-surface-lab")):
+            raise ValueError("Compatibility alias differs from branded APK")
+    checks = dict(meta["files"])
+    checks["release-evidence.json"] = digest(folder / "release-evidence.json")
+    expected = "".join(f"{value}  {name}\n" for name, value in sorted(checks.items()))
+    if (folder / "SHA256SUMS").read_text() != expected:
+        raise ValueError("Checksum index mismatch")
     if junit_summary(sorted((folder / "reports").glob("TEST-*.xml"))) != meta["tests"]:
         raise ValueError("JUnit summary mismatch")
     if lint_summary(sorted((folder / "reports").glob("lint-results-*.xml"))) != meta["lint"]:

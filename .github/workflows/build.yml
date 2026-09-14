@@ -66,6 +66,11 @@ jobs:
           SURFACE_KEY_ALIAS: ${{ github.event_name != 'pull_request' && secrets.SURFACE_KEY_ALIAS || '' }}
           SURFACE_KEY_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.SURFACE_KEY_PASSWORD || '' }}
         run: gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug -PbuildNumber=${{ github.run_number }} --continue --no-daemon --stacktrace
+      - name: Verify APK signatures
+        run: |
+          for flavor in core nano; do
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk" > "app/build/reports/apk-signature-$flavor.txt"
+          done
       - name: Collect verified release evidence
         # Reads app/build/outputs/apk/ plus JUnit, lint and native render outputs.
         run: python tools/release_evidence.py collect dist/evidence

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from release_evidence import junit_summary, lint_summary, validate_identity, verify
+from release_evidence import REQUIRED_SHOTS, junit_summary, lint_summary, validate_identity, verify
 
 
 class EvidenceTests(unittest.TestCase):
@@ -48,8 +48,23 @@ class EvidenceTests(unittest.TestCase):
     def test_tampered_missing_or_traversing_files_block(self):
         for path in ("missing.apk", "../outside", "tampered.apk"):
             (self.root / "tampered.apk").write_bytes(b"wrong data")
-            (self.root / "release-evidence.json").write_text(json.dumps(dict(schema=1, source_sha="a" * 40, files={path: "0" * 64})))
-            with self.assertRaises(ValueError): verify(self.root)
+            required = {f"{prefix}-{flavor}.apk" for prefix in ("aegentica-ai", "pixel-surface-lab") for flavor in ("core", "nano")}
+            required |= {f"screenshots/{name}.png" for name in REQUIRED_SHOTS}
+            required |= {"review.html", "reports/apk-signature-core.txt", "reports/apk-signature-nano.txt"}
+            files = {path: "0" * 64, **{name: "0" * 64 for name in required}}
+            meta = dict(schema=1, source_sha="a" * 40, files=files,
+                        apks={"aegentica-ai-core.apk": {}, "aegentica-ai-nano.apk": {}})
+            (self.root / "release-evidence.json").write_text(json.dumps(meta))
+            with self.assertRaisesRegex(ValueError, "Artifact mismatch"): verify(self.root)
+
+    def test_missing_apk_inventory_blocks(self):
+        (self.root / "release-evidence.json").write_text(json.dumps(dict(schema=1, source_sha="a" * 40, apks={})))
+        with self.assertRaisesRegex(ValueError, "Both branded APK"): verify(self.root)
+
+    def test_missing_render_or_signature_inventory_blocks(self):
+        meta = dict(schema=1, source_sha="a" * 40, files={}, apks={"aegentica-ai-core.apk": {}, "aegentica-ai-nano.apk": {}})
+        (self.root / "release-evidence.json").write_text(json.dumps(meta))
+        with self.assertRaisesRegex(ValueError, "Incomplete evidence"): verify(self.root)
 
 
 if __name__ == "__main__":

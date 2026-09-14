@@ -55,7 +55,11 @@ object NativeActions {
                 styleField()
                 filters = arrayOf(android.text.InputFilter.LengthFilter(if (type == InputType.TYPE_CLASS_PHONE) 40 else 500))
             }
-            val form = AlertDialog.Builder(activity).setTitle(title).setView(field, activity.dp(24), activity.dp(12), activity.dp(24), activity.dp(8))
+            val fieldContainer = android.widget.FrameLayout(activity).apply {
+                padDp(24, 12, 24, 8)
+                addView(field, android.widget.FrameLayout.LayoutParams(-1, -2))
+            }
+            val form = AlertDialog.Builder(activity).setTitle(title).setView(fieldContainer)
                 .setNegativeButton("Cancel", null).setPositiveButton(confirm, null).create()
             form.show()
             NativePrivacy.apply(activity, form.window)

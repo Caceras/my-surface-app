@@ -67,3 +67,5 @@ The package tool rejects incomplete evidence and stale non-empty destinations. P
 ## Sources
 
 Least-privilege tokens follow [GitHub's authentication guidance](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token). Pinned action versions were checked against the official [checkout](https://github.com/actions/checkout/releases), [setup-java](https://github.com/actions/setup-java/releases), [upload-artifact](https://github.com/actions/upload-artifact/releases), [download-artifact](https://github.com/actions/download-artifact/releases) and [Gradle actions](https://github.com/gradle/actions/releases) repositories. Native switches retain the [Android Switch API](https://developer.android.com/reference/android/widget/Switch) interaction model.
+
+Both APKs also pass Android `apksigner verify`; certificate fingerprints are retained in the evidence bundle. This proves signature integrity, not continuity with a previously installed preview key.

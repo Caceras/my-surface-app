@@ -1,0 +1,47 @@
+name: App experience or voice problem
+description: Report a reproducible Ægentica AI interaction, layout or speech problem
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove private chats and personal details from screenshots/logs.
+        Start with the [phone checklist](https://github.com/Caceras/my-surface-app/blob/improve-pixel-assistant/docs/testing.md).
+        We use these details to reproduce one failure and add a focused regression.
+  - type: input
+    id: build
+    attributes:
+      label: Installed version from Settings
+      placeholder: "3.0.102-nano"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Phone, Android version and AICore version if relevant
+      placeholder: "Pixel 10 Pro XL, Android …, AICore …"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Entry point or flow
+      options: ["Chat", "Voice / speech setup", "History", "Settings / privacy", "Actions / destination app", "Widget / shortcut / tile", "Assistant gesture", "Share / text selection", "Install / restore"]
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps, expected result and actual result
+      description: Include whether the keyboard, microphone or answer was active when the problem happened.
+    validations:
+      required: true
+  - type: input
+    id: configuration
+    attributes:
+      label: Relevant configuration
+      description: "Speech language, speaker/headset, light/dark mode, font/display size, destination app."
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted evidence
+      description: Optional screenshot, exact message, or CI/build-specific release link. Do not attach private exports.

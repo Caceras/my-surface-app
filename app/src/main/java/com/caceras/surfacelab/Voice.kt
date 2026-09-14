@@ -72,7 +72,7 @@ class Ears(private val context: Context) {
         onFinal: (String) -> Unit = {},
         onStop: (VoiceProblem?) -> Unit = {}
     ) {
-        if (!available() || listening) return
+        if (Build.VERSION.SDK_INT < 31 || !available() || listening) return
 
         // Every SpeechRecognizer method must run on the main thread, and the
         // instance must be destroyed or the microphone stays held after this
@@ -220,7 +220,7 @@ class Ears(private val context: Context) {
      * download another and the Swedish speaker is exactly where they started.
      */
     fun fetchLanguage(onOutcome: (String) -> Unit) {
-        if (!canFetchLanguage()) { onOutcome(settingsHint()); return }
+        if (Build.VERSION.SDK_INT < 33 || !canFetchLanguage()) { onOutcome(settingsHint()); return }
         cancelSetup()
         val token = setupGeneration
         val client = try { SpeechRecognizer.createOnDeviceSpeechRecognizer(context) }

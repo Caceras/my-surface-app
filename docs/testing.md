@@ -74,3 +74,5 @@ Run `python tools/check.py` for local preflight, then `gradle testCoreDebugUnitT
 Every run retains **android-diagnostics** (JUnit XML, lint reports, screenshots); successful runs additionally provide **aegentica-evidence**. Extract it, run `python tools/release_evidence.py verify <directory>`, and open `review.html`. The bundle records source/build/run, test counts, APK identities and hashes. [Iteration workflow](iteration-workflow.md) explains reproducible reproduction, visual review and release verification.
 
 Additional regressions cover Settings/History/Actions cancelling hidden streams, dictation/draft retention, stale completion, quiet voice state, dark switch colors, private search and reachable History close. Native renders include dark Settings and the timer form. On a Pixel, also open each sheet during dictation/streaming and confirm no automatic restart when returning.
+
+Both APKs also pass Android `apksigner verify`; certificate fingerprints are retained in the evidence bundle. This proves signature integrity, not continuity with a previously installed preview key.
