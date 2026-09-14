@@ -1,6 +1,6 @@
 # Architecture
 
-Surface is one native Android app with two product flavors. The UI uses framework views and shared tokens; there is no WebView, Compose runtime, backend, or cloud-model routing layer.
+Ægentica AI is one native Android app with two product flavors. The UI uses framework views and shared tokens; there is no WebView, Compose runtime, backend, or cloud-model routing layer.
 
 ## Responsibilities
 
@@ -14,6 +14,11 @@ Surface is one native Android app with two product flavors. The UI uses framewor
 | `nano/…/Brain.kt` | ML Kit Prompt client, readiness, system-instruction fallback, generation fencing |
 | `core/…/Brain.kt` | Deterministic uppercase implementation for tests and scaffolding |
 | `Voice.kt` | Recognition lifecycle, language downloads, installed offline TTS selection, audio focus |
+| `NativeActions.kt` | Validated explicit Android Clock/Calendar/Maps/Dialer handoffs |
+| `NativeShortcuts.kt` | Static navigation action IDs and user-requested pinning |
+| `NativePrivacy.kt` | Screen protection, widget-preview preference and sensitive clipboard metadata |
+| `AdaptiveFrame.kt` | Centered reading column capped at 720 dp |
+| `SpeechControls.kt` | Foreground MediaSession and headphone-disconnect handling |
 | `ReadingScrollView.kt` | Reader-controlled scrolling for voice and selection streams |
 | `StreamUpdates.kt` | Immediate first paint, then coalesced text updates at a minimum 48 ms interval |
 | `Chat.kt` | Current exchanges, draft, recent archives, backup validation |
@@ -48,6 +53,14 @@ Preferences use the `surfacelab` file in app-private storage. Current turns, a d
 Current chat retains the newest 40 exchanges. Archives retain at most 12 whole conversations under a soft 512,000-character serialized budget; the newest archive is retained in full even when larger. The first retained item is therefore an exception to the soft size budget. Old archives can be evicted by either limit. This is recent history, not unlimited storage.
 
 Conversation exports use `surface-chat-v1`. Optional `conversations` extends the older single-chat format. Import/export use the same 4,000,000-byte UTF-8 limit; exports are validated before writing. The parser limits turn/archive counts. Restore replaces the active chat after confirmation and merges retained archives with deduplication.
+
+## Android surface contracts
+
+Main and Voice are wrapped in an AdaptiveFrame; dialogs use the same reading width. Voice identity/status live inside the scrollable content, leaving the foreground action/navigation controls reachable in short windows. Insets combine system bars, keyboard and display cutout. Default system back is explicitly enabled without an always-consuming app callback.
+
+Static History/Actions shortcuts route through explicit action names to MainActivity. They open navigation without sending or replacing the draft. Pin requests use Android's ShortcutManager confirmation. Widget RemoteViews share production/test construction, switch between compact/full layouts using launcher options, and expose no last-answer text unless opted in. Widget broadcasts target a non-exported receiver.
+
+Native actions are constructed from validated form values, not arbitrary strings interpreted as intents. Failed/missing handlers produce a visible recovery message. Leaving for a destination app invokes the same cancellation and draft-saving lifecycle as any other foreground exit.
 
 ## Extension points
 

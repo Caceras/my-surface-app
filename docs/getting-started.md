@@ -1,10 +1,10 @@
 # Get started
 
-[Download Nano](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/pixel-surface-lab-nano.apk) · [README](../README.md)
+[Download Nano](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk) · [README](../README.md)
 
 ## Install
 
-Use the Nano APK on the Pixel. The core APK is a developer demo that uppercases text; it does not contain an AI model. Open **Surface Preview**, not the older Pixel Surface Lab icon. Check Settings for the version and compare it with the release title.
+Use the Nano APK on the Pixel. The core APK is a developer demo that uppercases text; it does not contain an AI model. Open **Ægentica AI**, not the older Pixel Surface Lab icon. Check Settings for the version and compare it with the release title.
 
 Installation and initial model/language downloads require connectivity. Open Settings and choose **Check / prepare on-device model**. A speech language download does not install the language model, and a model download does not install a text-to-speech voice: they are independent requirements.
 
@@ -23,8 +23,9 @@ Installation and initial model/language downloads require connectivity. Open Set
 | Stop speaking | Stops playback after generation has finished |
 | Listen / Copy / Share | Acts on a completed answer |
 | Latest reply | Returns to the bottom after reading earlier chat messages or voice text |
+| Actions | Opens Clock, Calendar, Maps and Dialer handoffs you choose |
 | New | Saves the current conversation or draft and starts an empty chat |
-| Conversations | Searches saved content, resumes a conversation, or deletes saved entries |
+| History | Searches saved content, resumes a conversation, or deletes saved entries |
 
 Leaving the app stops capture, speech, and active generation. A cancelled or failed partial answer is not saved as a completed exchange. AICore inference is a foreground capability; keeping an assistant session running behind other apps is not supported.
 
@@ -38,27 +39,47 @@ Leaving the app stops capture, speech, and active generation. A cancelled or fai
 
 Setup itself does not start recording. Actual recognition, voice quality, availability, and download behavior depend on the installed Android services. Changing the speaking language controls speech; it does not guarantee the language model answers accurately in that language.
 
+## Pixel Quick Tap
+
+For quick access, choose **Android Settings → System → Gestures → Quick Tap → Open app → Ægentica AI**. Double-tapping the back of the phone can then open chat. This is a Pixel setting you configure, not a permission the app can silently grant itself. [Pixel gesture guide](https://support.google.com/pixelphone/answer/7443425).
+
+## Android shortcuts
+
+Long-press the Ægentica AI launcher icon for Chat, Voice (Android 12+), History and Actions. Settings can request pinned Chat/Voice shortcuts with your launcher's confirmation. No conversation text or private title is published as a shortcut label.
+
+With a hardware keyboard: **Ctrl+Enter** sends, **Ctrl+N** saves the current chat and starts a new one, **Ctrl+L** focuses the composer, and **Ctrl+Shift+M** opens voice. Plain Enter remains available for a new line. Android's keyboard-shortcut help lists these commands.
+
+Use **Actions** for a timer, alarm, calendar draft, place search or phone number. These open the destination Android app; Ægentica AI does not execute commands found in an AI answer. [Action details](native-actions.md).
+
+## Privacy controls
+
+**Settings → Show last answer on widget** defaults off. Enable it only if you want the home screen to display your answer. Both widget sizes keep Type and Talk; a compact widget omits the answer entirely.
+
+**Private screen** hides app previews and blocks screenshots/screen sharing of the app's windows. This is separate from the widget preference and does not encrypt exported files. Copies use Android's sensitive-clipboard marker to suppress compatible clipboard previews; a keyboard's no-personalized-learning flag is a request, not a universal guarantee.
+
+Headset pause/stop and headphone disconnect stop spoken output. The app never resumes an interrupted answer or microphone automatically in response to these events. Real Bluetooth behavior depends on Android and the output device.
+
 ## Save and restore
 
-The app keeps up to 40 completed exchanges in the current conversation. New stores a recent conversation, subject to archive retention limits. Conversations shows dates and previews; searching also matches saved questions, replies, and drafts.
+The app keeps up to 40 completed exchanges in the current conversation. New stores a recent conversation, subject to archive retention limits. History shows dates and previews; searching also matches saved questions, replies, and drafts.
 
 Use **Settings → Export conversation** to export the current conversation, current draft, and retained archives. Open **Restore conversation** to select the JSON file and confirm restoration. Existing current content is first archived, subject to the same retention limits. Export before important migrations. Read the file after export if it contains data you cannot afford to lose.
 
-Settings such as the speech language and read-aloud preference are not part of this conversation backup. Android backup is disabled. Do not expect an uninstall or a new application ID to migrate app-private data automatically.
+Settings such as speech language, privacy options and the read-aloud preference are not part of this conversation backup. Android backup is disabled. Do not expect an uninstall or a new application ID to migrate app-private data automatically.
 
 ## Troubleshooting
 
 | Symptom | Next action |
 |---|---|
 | Replies are uppercase | Install the **Nano** APK; the core variant is a demo |
-| The old UI still appears | Open Surface Preview and verify the version in Settings |
+| The old UI still appears | Open Ægentica AI and verify the version in Settings |
 | Package/signature conflict | Export first, then reinstall and restore; see [signing](delivery.md#signing) |
 | Model unavailable | Update Android/AICore, check device support, and retry model setup |
 | Model busy or quota reached | Wait and retry with a shorter request; repeated taps are not useful |
 | Missing offline language | Choose a supported locale and prepare its speech pack |
-| Permission denied | Android Settings → Apps → Surface Preview → Permissions → Microphone |
+| Permission denied | Android Settings → Apps → Ægentica AI → Permissions → Microphone |
 | Text appears but nothing is spoken | Test the speaker, check media volume/output device, and install an offline TTS voice |
-| Another app interrupts playback | Return and use Listen when audio is available; Surface does not fight for focus |
+| Another app interrupts playback | Return and use Listen when audio is available; Ægentica AI does not fight for focus |
 | “This backup is too large” | Shorten the draft or remove unwanted saved conversations, then export again |
 | Share/selection action absent | The source app must expose plain text and support Android's relevant action |
 

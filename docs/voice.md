@@ -24,6 +24,12 @@ Speech follows complete sentences as they arrive; the final response flushes an 
 
 Quiet voice mutes future chunks while text generation continues. Stop response cancels generation. Stop speaking ends playback after the answer is complete. Scrolling the Voice screen does not itself mute speech. Audio-focus loss pauses playback with an explanation and prevents the interrupted answer from speaking again automatically.
 
+## Native audio controls
+
+A framework MediaSession is active while foreground speech is queued/playing. Pause and Stop requests use the same muting/failure path as interruption, so future streamed chunks remain quiet. There is deliberately no automatic Play/resume command. The session exposes only generic branding, never the answer text. ACTION_AUDIO_BECOMING_NOISY stops speech on headphone disconnect. Session and receiver resources are released when the speaker closes.
+
+This does not add background playback, lock-screen recording or a notification player. Device-level media-button routing and Bluetooth interruption must be tested on the Pixel.
+
 ## Boundaries
 
 No wake word, background microphone service, background inference, guaranteed Bluetooth routing, or universal speech-language support is implemented. A working language pack and a working TTS voice are separate from Gemini Nano's language quality. Device vendors/services may differ in permission, language download, and audio behavior.

@@ -1,4 +1,4 @@
-name: Build debug APKs
+name: Build Ægentica AI APKs
 
 on:
   push:
@@ -135,12 +135,17 @@ jobs:
       # Naming the APK after the flavour stops downloads from piling up as
       # "app-debug(1).apk" in the phone's Downloads folder.
       - name: Name the APK
-        run: cp "${{ matrix.apk }}" "pixel-surface-lab-${{ matrix.flavour }}.apk"
+        run: |
+          cp "${{ matrix.apk }}" "aegentica-ai-${{ matrix.flavour }}.apk"
+          # Preserve bookmarked preview downloads during the rebrand.
+          cp "${{ matrix.apk }}" "pixel-surface-lab-${{ matrix.flavour }}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
           name: pixel-surface-lab-${{ matrix.flavour }}
-          path: pixel-surface-lab-${{ matrix.flavour }}.apk
+          path: |
+            aegentica-ai-${{ matrix.flavour }}.apk
+            pixel-surface-lab-${{ matrix.flavour }}.apk
 
   # A branch build is only useful if you can install it. Workflow artifacts
   # are always served as a .zip and Android will not install one, so a branch
@@ -182,7 +187,7 @@ jobs:
           This is build **$GITHUB_RUN_NUMBER**; the app shows the same number behind
           **Settings** on its first screen, so you can tell at a glance whether the install took.
 
-          Surface Preview 3 installs alongside the old Pixel Surface Lab app. Open the new Surface Preview icon after installing.
+          Ægentica AI is the new name of Surface Preview. The package ID is preserved; open the Ægentica AI icon after installing. Download aegentica-ai-nano.apk for Gemini Nano. The pixel-surface-lab filenames are identical compatibility aliases for older bookmarks.
 
           Upgrades between preview builds require the same signing key. Configure the private signing secrets described in docs/delivery.md for consistent upgrades.
           Without them, a new debug key is generated and a preview may not upgrade an existing install. It is a prerelease, so

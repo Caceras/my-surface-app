@@ -1,6 +1,6 @@
 # Contributing
 
-Surface is a native personal-assistant preview. Focus contributions on an observable user problem and keep changes small enough to review.
+Ægentica AI is a native personal-assistant preview. Focus contributions on an observable user problem and keep changes small enough to review.
 
 ## Set up
 

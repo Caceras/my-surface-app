@@ -407,6 +407,7 @@ class Mouth(context: Context) {
     }
 
     fun close() {
+        if (closed) return
         closed = true
         onIdle = null
         onProblem = null

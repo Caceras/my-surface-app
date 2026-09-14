@@ -31,6 +31,12 @@ Native graphics are required for tests that depend on text wrapping and measured
 
 Screenshots are inspection evidence, not a pixel-perfect comparison gate or proof that every font size and orientation works. Keep the source commit and run alongside any published screenshot. Demo/core screenshots must not be presented as proof of a real Nano answer.
 
+## Native capability regressions
+
+NativeFeaturesTest exercises Clock validation and visible intent handoff, shortcut navigation with a retained draft, keyboard send/new behavior, widget privacy, screen/clipboard protection and media interruption. SpeechOutputTest checks that a headset Stop mutes future generated sentences. ShotTest adds Actions, landscape voice, a wide reading column, 200% text, compact widget and the adaptive Æ icon.
+
+Use real framework view measurements before asserting scroll or touch geometry. Color contrast calculations cover text/background token pairs; they do not certify all rendered states. The evidence report names the screenshot source commit and distinguishes fixtures from real Nano output.
+
 ## Physical Pixel checklist
 
 Before calling a release ready for wider use, record build number, Android/AICore versions, speech language, keyboard, font/display size, and output device. Do not mark this checklist passed based on CI.
@@ -45,6 +51,9 @@ Before calling a release ready for wider use, record build number, Android/AICor
 - [ ] Interrupt playback with a call or another audio app; confirm no unexpected microphone restart.
 - [ ] Background, lock, rotate and reopen the app; confirm microphone/speech stop and no stale answer appears.
 - [ ] Exercise assistant gesture, widget Type/Talk, tile, launcher shortcuts, share text and editable/read-only selection.
+- [ ] Test Actions against installed Clock/Calendar/Maps/Dialer apps, including cancel and absent-handler behavior.
+- [ ] Pin shortcuts, resize widgets, toggle preview privacy, and verify Private screen for activities/dialogs.
+- [ ] Verify Ctrl shortcuts, media Pause/Stop, wired unplug, splash and themed launcher icon.
 - [ ] Check TalkBack order/actions, large font/display settings, dark theme, contrast, landscape and reduced animation.
 - [ ] Check model quality and refusal/error behavior with representative English and Swedish prompts; speech language support is not evidence of answer accuracy.
 

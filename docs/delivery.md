@@ -1,17 +1,19 @@
 # Delivery and updates
 
-[Download Nano preview](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/pixel-surface-lab-nano.apk) · [Install guide](getting-started.md)
+[Download Nano preview](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk) · [Install guide](getting-started.md)
+
+The rebrand preserves `com.caceras.surface.nano` and existing backups. Ægentica AI replaces the Surface Preview display name; it does not create a new app data identity. Signing compatibility still governs in-place updates.
 
 ## Which release
 
-`improve-pixel-assistant` publishes a prerelease at `preview-improve-pixel-assistant`. Its Nano asset is the current Surface Preview experience. The main branch publishes the rolling `debug-latest` release. GitHub's `/releases/latest` points to the non-prerelease experience and may therefore be older.
+`improve-pixel-assistant` publishes a prerelease at `preview-improve-pixel-assistant`. Its Nano asset is the current Ægentica AI experience. The main branch publishes the rolling `debug-latest` release. GitHub's `/releases/latest` points to the non-prerelease experience and may therefore be older.
 
 The release title includes the CI build number. The app uses version `3.0.<build>-nano` and displays it in Settings. A stable URL is a convenience, not proof that Android accepted an update: verify the installed version.
 
 | Build | Application ID | Use |
 |---|---|---|
-| Surface Nano | `com.caceras.surface.nano` | Actual assistant on supported devices |
-| Surface core | `com.caceras.surface` | Deterministic developer demo |
+| Ægentica AI Nano | `com.caceras.surface.nano` | Actual assistant on supported devices |
+| Ægentica AI core | `com.caceras.surface` | Deterministic developer demo |
 | Original Pixel Surface Lab Nano | `com.caceras.surfacelab.nano` | Earlier application identity; no automatic data migration |
 
 ## Signing
@@ -32,6 +34,8 @@ For consistent personal-preview updates, the workflow already supports these **p
 The workflow restores the key into the runner's temporary directory and passes credentials through environment variables. It does not include the keystore in APK artifacts. Keep a private, recoverable backup of the key; do not commit it, publish it as an artifact, or put it in a public cache. These secrets have not been provisioned by the app overhaul. Moving from a generated debug key to a personal key can require one export/reinstall/restore cycle.
 
 For a local build, `app/build.gradle.kts` accepts the equivalent `SURFACE_KEYSTORE_FILE`, password and alias environment variables. Do not put secret values in a shell history or shared logs.
+
+The branded assets are `aegentica-ai-nano.apk` and `aegentica-ai-core.apk`. Legacy `pixel-surface-lab` asset names are byte-identical aliases so existing bookmarks keep working.
 
 ## CI
 

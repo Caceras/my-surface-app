@@ -21,7 +21,7 @@ This plan inventories the relevant Android platform families, not every Android 
 
 ## Capability inventory
 
-Status legend: **This pass** = implement and verify in this delivery; **Existing** = retain and check; **Device gate** = implementation cannot substitute for physical verification; **Later** = concrete follow-on; **Conditional** = needs another product mode, owner setup, hardware, or platform eligibility.
+Status legend: **This pass** = implemented in this delivery and covered by the validation section; **Existing** = retain and check; **Device gate** = implementation cannot substitute for physical verification; **Later** = concrete follow-on; **Conditional** = needs another product mode, owner setup, hardware, or platform eligibility.
 
 | Family | Capability / gap | Decision and rationale | Gate |
 |---|---|---|---|
@@ -40,6 +40,8 @@ Status legend: **This pass** = implement and verify in this delivery; **Existing
 | Widget | Resize, preview, battery | This pass: compact/full layouts, Æ identity, event-driven updates, no periodic polling | Small/large widget render and launcher resize |
 | Widget | Private answer exposure | This pass: last-answer preview off by default; explicit toggle | No private text in default widget |
 | Quick Settings | Tile, add request, lock handling | Existing unlock-before-launch; this pass branded label, setup subtitle and add-result feedback | Locked-device and rejected-add checks |
+| Pixel gestures | Quick Tap / power gesture | Device gate: configure Quick Tap to open Ægentica AI in Pixel System → Gestures; the app cannot change this setting silently | Physical Pixel configuration |
+| AI orchestration | Android AppFunctions | Conditional: experimental OS-level app functions; full agent integration is limited to selected apps/agents. Prioritize structured tool schemas and caller eligibility before adding dependencies | AppFunctions registration, EXECUTE_APP_FUNCTIONS eligibility, EAP/device validation |
 | Assistant role | Gesture / default assistant | Existing ACTION_ASSIST and role request; document configuration | Device gate: button/gesture eligibility varies |
 | Assistant service | VoiceInteractionService / hotword | Conditional: separate service/session architecture and assistant eligibility; not permission to bypass foreground AI limits | Hardware/hotword capabilities, battery and privacy review |
 | Cross-app text | Sharesheet / PROCESS_TEXT | Existing explicit text intake; this pass retains editable drafts and privacy handling | Source app support and cancelled handoff |
@@ -89,6 +91,8 @@ Release: preserve the rolling preview URL, verify the published commit, package,
 
 ## Primary references
 
+- [Pixel gestures and Quick Tap](https://support.google.com/pixelphone/answer/7443425)
+- [Android AppFunctions](https://developer.android.com/ai/appfunctions)
 - [Core app quality](https://developer.android.com/docs/quality-guidelines/core-app-quality)
 - [Adaptive quality](https://developer.android.com/guide/topics/large-screens/tier-2-overview)
 - [Adaptive and themed icons](https://developer.android.com/develop/ui/compose/system/icon_design_adaptive)
@@ -101,3 +105,9 @@ Release: preserve the rolling preview URL, verify the published commit, package,
 - [Sensitive clipboard](https://developer.android.com/privacy-and-security/risks/secure-clipboard-handling)
 - [Conversation bubbles](https://developer.android.com/develop/ui/compose/notifications/bubbles)
 - [ML Kit capabilities and foreground limits](https://developers.google.com/ml-kit/genai)
+
+## Delivery outcome
+
+All six implementation phases are represented in the code and updated documentation. The native pass adds Æ branding, sky-blue text/fill tokens, adaptive/themed icons and splash attributes, a bounded reading column, compact/large-text navigation, scrollable voice content, cutout handling, native back opt-in, keyboard help/commands, launcher access/pinning, size-aware widgets, tile feedback, five explicit phone actions, foreground media stop/disconnect, and privacy controls.
+
+Validation is recorded in the [illustrated audit](quality-audit.md) and preview PR. Source changes are gated by CI; native screenshots use core fixtures. Later/Conditional rows remain a concrete backlog, not shipped claims. The most valuable next release work is stable signing, a physical Pixel acceptance run and performance/accessibility evidence, followed by transactional storage and evaluated model-controlled tools.

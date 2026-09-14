@@ -18,7 +18,7 @@ object NativeShortcuts {
         }
         val shortcut = ShortcutInfo.Builder(activity, if (voice) "pinned-voice" else "pinned-chat")
             .setShortLabel(if (voice) "Talk to Æ" else "Ask Æ")
-            .setIcon(Icon.createWithResource(activity, R.drawable.ic_launcher_foreground))
+            .setIcon(Icon.createWithResource(activity, R.mipmap.ic_launcher))
             .setIntent(Intent(activity, if (voice) VoiceActivity::class.java else MainActivity::class.java).setAction(Intent.ACTION_VIEW))
             .build()
         runCatching { manager.requestPinShortcut(shortcut, null) }.onFailure {

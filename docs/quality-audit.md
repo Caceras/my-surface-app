@@ -1,85 +1,95 @@
-# Quality audit
+# Ægentica AI quality audit
 
-**Scope:** Surface Preview on `improve-pixel-assistant`, September 14, 2026. This pass reviews the implemented Android flows, source, storage, documentation, and automated tests. It does not certify production readiness or accessibility compliance.
+September 14, 2026 · Native Android preview · Pixel 10 Pro XL target.
 
-**Goal:** type or dictate, hear an answer, stop or resume without surprises, and understand installation/data behavior. Preserve the established warm visual system while improving interaction clarity and reliability.
+## Verdict
+
+The app now has a coherent Æ identity and a broader native workflow: chat/voice, useful Android app handoffs, responsive access surfaces, keyboard commands and explicit privacy controls. This is an implemented and tested preview, not evidence that every Android API should be enabled or that device quality is certified. The largest remaining quality gates are stable signing, physical speech/model evaluation, accessibility traversal, performance measurements and controlled production distribution.
+
+The [Android capability plan](android-native-plan.md) inventories more than 40 areas, the six-phase implementation sequence, acceptance tests, and conditional/future work. [Native actions](native-actions.md) explains exact side effects; [design tokens](design-system.md) explains the branding and contrast choices.
 
 ## Evidence
 
-The baseline was freshly rendered for this audit from commit `5280b31175f4ca8456ee0ebe527c46bc8871c766` by rerunning the JVM job in [run 34872298157](https://github.com/Caceras/my-surface-app/actions/runs/34872298157). The new baseline screenshots were generated at 17:31 UTC, not reused from the earlier conversation. Native Skia screenshots show framework/core layouts with deterministic data, not real Gemini Nano output or Pixel system UI.
+The baseline was freshly captured in this audit by rerunning the native JVM job for commit `ce46952613b68da19b6aabb9c8ea6f4bd2ad18c4`, [run 34877620946](https://github.com/Caceras/my-surface-app/actions/runs/34877620946), screenshot artifact **10364295005**, generated at **18:47 UTC**. Compact chat and voice setup were inspected before accepting baseline findings. The previous conversation's cached images were not used as evidence for this pass.
 
-The updated screenshots below were generated from `e148efaa8f339e64dedb68e25f2fc4bd97686af3` in [run 34876844848](https://github.com/Caceras/my-surface-app/actions/runs/34876844848) and visually reviewed. A later copy-only correction changes “1 exchanges” to “1 exchange”; the captured source remains explicit. The latest passing source run is linked from the preview PR/release. Findings about callbacks, exports, and model behavior come from source and tests, not from still images.
+Updated images below are actual framework/Skia renders of the core test variant. They use deterministic content, not real Nano output, a Pixel screen recording, or a measured frame-time trace. The final source/run and APK verification are recorded in the preview PR. The reviewed screenshots come from commit `5f84ef075eeff1146abed17b9005b503ef22cc6f`, [run 34884129693](https://github.com/Caceras/my-surface-app/actions/runs/34884129693), which passed **133 JVM tests** and both APK builds. Final packaging changes receive the same CI gates.
 
-## Flow review
+## Eight steps
 
-| Step | Task | Baseline finding | Result / remaining check |
+| Step | Flow | Baseline gap | Result / health |
 |---|---|---|---|
-| 1 | Open chat and type | Clear hierarchy, useful starters and persistent Voice entry; keyboard transition and compact playback layout need deeper checks | Composer follows IME transitions; playback gets its own full-width row; hardware animation timing still unmeasured |
-| 2 | Read a streamed reply | Main chat already preserves reading position; all three text surfaces repeatedly reformat partial replies and voice/selection force the scroll position | First partial paints immediately; bursts are coalesced; final/stop clears queued paints; speech submission remains immediate; voice/selection preserve a reader’s position |
-| 3 | Configure voice | Settings exposes overlapping language/setup routes | One guided setup route, including System language; opening setup on an existing Voice activity cannot start capture |
-| 4 | Speak and interrupt | Quiet voice is visually styled like passive guidance; audio focus loss can leave stale playback state | Action styling while speaking; interruption reports why playback paused and keeps subsequent chunks muted |
-| 5 | Resume a saved chat | The archive dialog exposes titles with little context and only bulk deletion | Search, date, preview, Resume, and individual confirmed Delete; current drafts survive switching |
-| 6 | Export / restore | Import counted bytes but parsing/export used different size assumptions; export validation could throw outside error handling | Shared UTF-8 byte limit, pre-write validation, recoverable error; Unicode overflow regression coverage |
-| 7 | Use selected text | Dictation replaced a prompt that was already typed | Dictation appends to the existing selection prompt; silence/error restores the original prompt |
-| 8 | Install and understand limits | README mixes preview/prototype instructions and includes stale broad claims | Current preview download first; explicit core/Nano distinction, signing/data guidance, source-backed limits and focused guides |
+| 1 | Launch and recognize the app | Green Surface identity; missing branded monochrome/splash treatment | Ægentica AI, custom Æ vectors and sky-blue semantic colors; launcher masks/splash remain a device check |
+| 2 | Type and navigate | Compact header and wide-window behavior need stronger handling; limited keyboard discovery | Adaptive header/reading width, native keyboard help and commands, system back opt-in; device gesture/IME timing unmeasured |
+| 3 | Speak, read and interrupt | Voice hero consumes fixed height; no media-button/unplug integration | Scrollable voice content, retained stop controls, foreground media transport and disconnect muting; real headset routing needs testing |
+| 4 | Do an everyday phone task | No in-app route to Clock/Calendar/Maps/Dialer | Explicit validated Actions forms and Android handoffs; destination success is not inferred from launching an intent |
+| 5 | Return through Android surfaces | Generic widget styling, default answer exposure, periodic polling, few shortcuts | Branded compact/full widget, previews opt-in, event-driven updates, History/Actions and pin requests; launcher behavior needs device check |
+| 6 | Protect private content | No screenshot/Recents preference or sensitive clipboard marker | Private screen across app windows, widget privacy and clipboard metadata; not encryption or control over destination apps |
+| 7 | Read at different sizes | Limited evidence for large type, landscape, desktop-sized windows | Dedicated native renders and measurable layout tests; TalkBack/Switch Access and real folding remain device gates |
+| 8 | Install, maintain and understand | Surface branding and missing capability roadmap | Updated README, plan, design/actions/privacy/setup/architecture/test guides; verified direct Nano APK; persistent signing remains owner setup |
 
-## Visual evidence
+## Native screenshots
 
-### Chat
+### 1–2 · Identity and chat
 
-<img src="images/chat.png" alt="Reviewed native chat layout" width="330">
+<img src="images/chat.png" alt="Ægentica AI chat with sky-blue accents" width="320">
+<img src="images/chat-night.png" alt="Ægentica AI chat in dark mode" width="320">
 
-Steps 1–2. The established spacing, type hierarchy and starter cards remain. The composer and navigation are inspected again at 320 dp width with active playback. Smoothness claims are limited to implemented behavior and timing tests; no device frame-time benchmark has been run.
+The sky accent is paired with dark text on primary controls and a darker blue for links on light backgrounds. The checked token pairs exceed 4.5:1; this is not a blanket accessibility conformance claim.
 
-<img src="images/chat-compact.png" alt="Compact chat keeps playback and navigation visible" width="290">
+### 3 · Voice
 
-### Settings
+<img src="images/voice.png" alt="Ægentica AI voice with clear quiet and stop controls" width="320">
 
-<img src="images/before-settings.png" alt="Baseline settings with overlapping speech entries" width="330">
+Voice status and identity scroll with the transcript, so short windows have a usable text viewport. Stop/quiet behavior and stream cancellation are exercised independently from the still image.
 
-Step 3, before. “Speech language” and the separate guided voice setup create competing paths. The duplicate language chooser is removed; the guided setup is now the single app-owned language route. Android's own TTS settings remain a recovery destination.
+### 4 · Native actions
 
-<img src="images/settings.png" alt="Updated Settings uses one guided voice setup route" width="330">
+<img src="images/actions.png" alt="Android phone actions with clear destination descriptions" width="320">
 
-### Voice
+Actions explain what goes to Clock, Calendar, Maps or the dialer. Forms validate input and preserve the chat draft. No generated model text is executed as an intent.
 
-<img src="images/voice.png" alt="Reviewed voice response layout" width="330">
+### 5 · Access
 
-Step 4. Quiet voice has an action treatment while speaking. Its disabled/idle states should not masquerade as active buttons. Voice setup re-entry, interruption, cancellation and microphone release are tested separately from this render.
+<img src="images/widget.png" alt="Compact Ægentica AI widget with Type and Talk controls" width="280">
+<img src="images/icon.png" alt="Adaptive Æ signum launcher icon" width="180">
 
-### Conversations
+The compact widget never contains the answer. Default full widgets also omit it until the user enables previews. A launcher ultimately controls sizing, pin confirmation and themed-icon display.
 
-<img src="images/conversations.png" alt="Reviewed saved conversations browser" width="330">
+### 6 · Privacy
 
-Step 5. The new browser offers context before resuming and separate confirmed deletion. Search matches retained questions, replies and drafts. Retention remains bounded; this is recent history, not an unlimited archive.
+<img src="images/settings.png" alt="Settings with separate widget-preview and private-screen controls" width="320">
 
-## Reliability findings
+Each control explains its scope before it is enabled. The screenshot uses test data with screen protection off.
 
-| Priority | Finding | Handling |
+### 7 · Window adaptation
+
+<img src="images/voice-landscape.png" alt="Landscape voice keeps controls and scrollable content reachable" width="650">
+
+The wide reading column is capped at 720 dp; the app still fills its window. Large-font and wide renders are also emitted by the screenshot test suite. A native still cannot prove smooth hardware resize or correct accessibility traversal.
+
+## Reliability and privacy
+
+- Kept earlier regression fixes for draft recovery, stale streaming callbacks, Unicode backup limits, voice setup re-entry, audio-focus interruption and searchable archives.
+- Added user-selected Android handoffs with input bounds, URI encoding and missing-handler recovery. No broad contacts/location/calendar/call permission was added.
+- Media Stop/Pause and headphone disconnect mute future streamed speech. The session does not expose answer text as media metadata and does not implement background playback.
+- Widget update polling is removed; refresh follows app/launcher events. Widget receiver is non-exported; activity PendingIntents remain explicit and immutable.
+- Screen protection is opt-in; answer previews are opt-in; clipboard carries sensitive metadata; IME personalized-learning suppression is requested. These controls have different scopes and are explained separately.
+- Backup/transfer exclusions and package IDs preserve the intended local-data boundary and rebrand compatibility. Debug signing continuity is still a separate problem.
+
+## Remaining quality work
+
+| Priority | Work | Required evidence / dependency |
 |---|---|---|
-| High | Existing Voice activity ignores a setup intent and can enter listening | Fixed with an explicit setup branch and regression test |
-| High | A backup can pass a character limit but exceed the file reader's UTF-8 byte limit | Fixed with one shared byte limit and Unicode test |
-| High | Audio-focus interruption leaves UI/session state out of sync with silent playback | Fixed through the existing failure/idle path; interruption test checks muting and completion |
-| Medium | Multiple partial callbacks rebuild spans/layout repeatedly | Coalesced UI work; final/cancellation fencing tested |
-| Medium | Selection dictation overwrites typed context | Existing draft retained and appended to; regression test |
-| Medium | Archive navigation lacks search/context/individual deletion | New native conversation browser and interaction/screenshot coverage |
-| Medium | Documentation conflates on-device inference with universal offline/network guarantees | Rewritten current behavior, privacy boundaries and platform references |
-
-## Accessibility
-
-The reviewed screens have readable light/dark palettes, labeled primary controls and 48 dp minimum control targets in the relevant flows. The current test suite checks several touch targets and layout/inset cases. The new archive actions name their target conversation for assistive technology. Motion honors Android's animator setting; the composer translation resets at the end of the keyboard transition.
-
-Still required on a Pixel: TalkBack traversal and announcements, large font/display scaling, switch semantics, landscape, keyboard accessibility, real contrast evaluation of every state, and system reduced-motion behavior. No WCAG or platform accessibility certification is claimed. Text-only source inspection and a few phone-size screenshots cannot establish that.
-
-## Remaining risks
-
-- **Signing continuity:** no persistent private signing key has been provisioned. A future preview may require export/reinstall/restore. The workflow supports private secrets; publishing a key in source or a public cache is not an acceptable workaround.
-- **Hardware behavior:** Gemini Nano accuracy/latency, speech packs, TTS quality, Bluetooth/call interruption, power use and assistant gestures need physical-device validation.
-- **Foreground boundary:** no background inference, always-on wake word or general phone automation is implemented.
-- **Retention/privacy:** older archives can be evicted; the widget can display the last answer; exports are plain JSON. These behaviors are now documented rather than described as unlimited/private in every context.
-- **Performance:** partial rendering is bounded, but Markdown work and some preference serialization still occur on the main thread. Large real conversations need profiling before performance targets can be claimed.
-- **Model dependency:** the Prompt API is beta, and readiness/quotas can change. CI validates compilation, not AICore execution.
+| P0 | Stable private signing and dependable upgrades | Owner-controlled private key and recovery process; never publish keys |
+| P0 | Pixel acceptance run | Real Nano output, speech languages, interruption, shortcuts, widgets, back, external app actions and lifecycle |
+| P1 | Accessibility qualification | TalkBack, Switch Access, text/display scaling, complete contrast/state review and keyboard traversal |
+| P1 | Performance budgets | On-device startup, first-text/audio, frame timing, memory, battery and long-history profiles |
+| P1 | Production release pathway | Release signing/AAB, Play internal testing, pre-launch report, privacy disclosures and support |
+| P2 | Transactional history / richer AI | Storage migration and fixed prompt evals before large history, images or model-controlled actions |
+| Conditional | Background, hotword, bubbles, companions, cloud/MCP | Separate product/lifecycle/privacy design and platform or account eligibility; not enabled by this preview |
 
 ## Verification
 
-The updated source passed all 118 declared JVM tests and both APK builds in run 34876844848. Run the commands in [testing.md](testing.md) and inspect the `screenshots` artifact from the corresponding source commit. This pass adds coverage for streamed paint cancellation, Unicode backup limits, voice setup re-entry, focus interruption, archive search/resume, selected-text draft preservation, keyboard translation and compact playback controls. The review handoff records the passing run and installable build after validation.
+Source/resource and documentation checks, checker regressions, JVM activity/logic tests and both APK builds are required. New tests cover Actions handoff/input validation, keyboard and shortcut routing, widget privacy, screen/clipboard protection, media stop/disconnect, and adaptive native layouts. [Testing guide](testing.md) gives the full reproducible commands and physical Pixel checklist.
+
+The final handoff must match the release commit and APK package/version/checksum. A passing core test suite does not establish Nano accuracy, real speech quality, 120 Hz performance, or accessibility certification.
