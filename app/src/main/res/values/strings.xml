@@ -65,7 +65,7 @@
     <string name="finish_dictation">Finish dictation</string>
     <string name="type_instead">Type</string>
     <string name="widget_empty">Ask by text or voice. Your last answer appears here.</string>
-    <string name="keep_talking">Keep talking while this screen is open</string>
+    <string name="keep_talking">Keep talking</string>
     <string name="speech_language">Speech language</string>
     <string name="language_selected">Speech language: %1$s</string>
 </resources>

@@ -117,6 +117,7 @@ class VoiceActivity : Activity() {
         // screen is never silent while it is listening -- a blank spinner is
         // the thing this app does not do anywhere.
         dot = View(this).apply {
+            visibility = View.GONE
             background = getDrawable(R.drawable.dot)
             contentDescription = getString(R.string.listening)
         }
