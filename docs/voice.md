@@ -146,8 +146,8 @@ lands in the box you were already looking at and Send stays where it is,
 because the promise there is that a misheard word is a fix rather than a redo.
 The surface decides, the same way it decides the modality.
 
-**4. Barge-in.** Any touch, and the mic button itself, calls `tts.stop()`
-immediately. `stop()` only clears what is already queued, though, and the brain
+**4. Barge-in.** Explicit Quiet voice and Stop speaking controls call `tts.stop()`
+immediately. Scrolling does not interrupt speech. `stop()` only clears what is already queued, though, and the brain
 is very likely still streaming — so barge-in must also set a muted flag the
 chunker checks, or the next sentence boundary starts it talking again half a
 second later. Not being able to shut it up is what makes a voice assistant feel

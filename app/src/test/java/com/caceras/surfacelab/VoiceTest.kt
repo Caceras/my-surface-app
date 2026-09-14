@@ -248,7 +248,8 @@ class VoiceTest {
         val activity = open().get()
         say("Tell me something")
         brain.complete("A useful answer.")
-        drain()
+        // The shadow completes speech on the next looper turn. Tap while the
+        // utterance is active, before delivering its completion callback.
         val previous = ShadowSpeechRecognizer.getLatestSpeechRecognizer()
         descendants(activity.findViewById(android.R.id.content)).filterIsInstance<TextView>()
             .first { it.text == activity.getString(R.string.stop_speaking) }.performClick()

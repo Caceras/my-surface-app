@@ -143,8 +143,8 @@ breaks it:
 
 Speech starts at the **first finished sentence**, not at the end of the answer,
 so the time to the first spoken word is one clause rather than the whole reply.
-Any touch stops it dead — and mutes the rest of the answer, since the model is
-usually still streaming.
+Quiet voice mutes the remaining speech while the answer continues in text.
+Stop response cancels generation; Stop speaking ends completed-answer playback.
 
 `RECORD_AUDIO` is the first runtime permission this app has ever asked for. It
 is requested on the first microphone tap, never at launch. Below API 31 there

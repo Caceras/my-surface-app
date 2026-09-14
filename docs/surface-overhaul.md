@@ -19,7 +19,7 @@ The initial audit used the two supplied phone screenshots (8110.png and 8109.png
 1. Download the **nano APK** from the [branch preview](https://github.com/Caceras/my-surface-app/releases/tag/preview-improve-pixel-assistant). Open the APK on the phone and follow Android's installer. Open **Surface Preview**, not the older Pixel Surface Lab icon. Settings must show version **3.0** and the release's build number.
 2. In Settings, prepare the on-device model. The first model and speech downloads require a connection. Once installed, requests and speech use on-device engines.
 3. Open **Set up voice & test playback**. Choose your speaking language; for English, try English (United States). Download offline speech, then use Test speaker in Voice options. Android speech settings are linked if the device needs an installed playback voice.
-4. Tap **Talk** and pause to send. Enable **Keep talking** for a back-and-forth session. Touching the screen interrupts playback; leaving the voice screen stops the microphone. **Type** returns to the shared conversation. The chat microphone dictates an editable draft; Send submits it.
+4. Tap **Talk** and pause to send. Enable **Keep talking** for a back-and-forth session. Use Quiet voice to keep reading or Stop speaking to end playback; leaving the voice screen stops the microphone. **Type** returns to the shared conversation. The chat microphone dictates an editable draft; Send submits it.
 5. In Settings, set Surface Preview as the digital assistant, add its Quick Settings tile, and add its home-screen widget. Long-press its launcher icon for shortcuts. Android chooses which assistant gestures are supported by the device's configuration.
 
 ## Verification and boundaries
@@ -41,6 +41,7 @@ New saves the conversation being left; Conversations resumes it and preserves
 any current draft. Up to 12 recent conversations are retained, with a soft
 512 KB archive budget (the newest conversation is retained in full). Exports
 include these conversations and still read older single-conversation backups.
+Clear saved removes the archived conversations after confirmation.
 
 Voice uses explicit quiet/stop controls. Scrolling and toggling Keep talking no
 longer hush playback or change a button's action midway through a touch.
