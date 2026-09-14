@@ -2,6 +2,7 @@ package com.caceras.surfacelab
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Bundle
@@ -43,6 +44,9 @@ class VoiceActivity : Activity() {
     private lateinit var answer: TextView
     private lateinit var action: TextView
     private lateinit var scroller: ScrollView
+    private lateinit var language: TextView
+    private var setupMode = false
+    private lateinit var setupTools: LinearLayout
 
     private val ears by lazy { Ears(this) }
     private var mouth: Mouth? = null
@@ -86,15 +90,19 @@ class VoiceActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(build())
+        readableSystemBars()
+        setupMode = intent.getBooleanExtra("setup", false)
 
         when {
+            setupMode -> showSetup()
             // Opening on an honest status beats opening on a microphone that
             // cannot be used. A shortcut promising "tap, talk" on a phone
             // with no on-device recogniser is worse than no shortcut.
             !ears.available() -> {
                 state = State.IDLE
                 status.text = getString(R.string.voice_unavailable)
-                dot.visibility = View.GONE
+                dot.visibility = View.VISIBLE
+        dot.alpha = 0.45f
                 action.visibility = View.GONE
             }
             granted() -> pendingListen = true
@@ -108,127 +116,165 @@ class VoiceActivity : Activity() {
     // ------------------------------------------------------------- chrome
 
     private fun build(): View {
-        status = TextView(this).apply {
-            textSize = 17f
-            setTextColor(color(R.color.text_primary))
+        status = label("Ready when you are", 28f).apply {
+            gravity = Gravity.CENTER
+            letterSpacing = -0.03f
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
-
-        // One dot, scaled by the microphone level. The point is only that the
-        // screen is never silent while it is listening -- a blank spinner is
-        // the thing this app does not do anywhere.
-        dot = View(this).apply {
-            visibility = View.GONE
-            background = getDrawable(R.drawable.dot)
-            contentDescription = getString(R.string.listening)
-        }
-
-        val head = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            addView(dot, LinearLayout.LayoutParams(dp(14), dp(14)).apply {
-                rightMargin = dp(12)
-            })
-            addView(status)
-        }
-
-        heard = TextView(this).apply {
-            textSize = 20f
-            setTextColor(color(R.color.text_primary))
-            padDp(0, 14, 0, 0)
-        }
-
-        answer = TextView(this).apply {
-            textSize = 16f
-            setTextColor(color(R.color.text_dim))
-            padDp(0, 10, 0, 0)
-        }
-
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(heard, wide())
-            addView(answer, wide())
-        }
-
+        dot = presence(96).apply { visibility = View.INVISIBLE }
+        heard = label("", 23f).apply { padDp(4, 20, 4, 4) }
+        answer = label("", 17f, true).apply { padDp(4, 12, 4, 20); setLineSpacing(dp(3).toFloat(), 1.15f) }
         scroller = ScrollView(this).apply {
-            isFillViewport = false
-            addView(column, ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT)
+            addView(LinearLayout(this@VoiceActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(heard, wide())
+                addView(answer, wide())
+                setupTools = LinearLayout(this@VoiceActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    visibility = View.GONE
+                    addView(pill("Choose speaking language") { chooseLanguage() }, wide().apply { bottomMargin = dp(8) })
+                    addView(pill("Download offline speech") { downloadLanguage() }, wide().apply { bottomMargin = dp(8) })
+                    addView(pill("Test speaker & settings") { voiceOptions() }, wide())
+                }
+                addView(setupTools, wide())
+            }, wide())
         }
-
-        action = TextView(this).apply {
-            text = getString(R.string.talk_again)
-            textSize = 15f
-            setTextColor(color(R.color.accent))
-            padDp(0, 16, 24, 4)
-            visibility = View.GONE
-            minHeight = dp(48)
-            isFocusable = true
-            setOnClickListener { requestListen() }
+        action = pill(getString(R.string.talk_again), true) { requestListen() }
+        language = pill(ears.locale().displayName) { chooseLanguage() }
+        continuousSwitch = Switch(this).apply {
+            text = getString(R.string.keep_talking)
+            minHeight = dp(52)
+            setTextColor(color(R.color.text_primary))
+            setOnCheckedChangeListener { _, checked ->
+                continuous = checked
+                if (!checked) main.removeCallbacks(nextListen)
+            }
         }
-
-        val close = TextView(this).apply {
-            text = getString(R.string.close)
-            textSize = 15f
-            setTextColor(color(R.color.text_dim))
-            padDp(0, 16, 0, 4)
-            minHeight = dp(48)
-            isFocusable = true
-            setOnClickListener { finish() }
-        }
-
-        val feet = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            addView(action)
-            addView(TextView(this@VoiceActivity).apply {
-                text = getString(R.string.type_instead)
-                textSize = 15f
-                minHeight = dp(48)
-                isFocusable = true
-                padDp(12, 16, 24, 4)
-                setTextColor(color(R.color.accent))
-                setOnClickListener {
+        card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(color(R.color.chat_bg))
+            padDp(24, 12, 24, 12)
+            addView(LinearLayout(this@VoiceActivity).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(label("Surface / voice", 18f).apply { medium() }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(pill(getString(R.string.close)) { finish() })
+            }, wide())
+            addView(dot, LinearLayout.LayoutParams(dp(96), dp(96)).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                topMargin = dp(28)
+                bottomMargin = dp(24)
+            })
+            addView(status, wide())
+            addView(label("Speak, pause, and hear a reply.", 14f, true).apply {
+                gravity = Gravity.CENTER
+                padDp(0, 10, 0, 10)
+            }, wide())
+            addView(scroller, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(continuousSwitch, wide())
+            addView(action, wide().apply { bottomMargin = dp(10) })
+            addView(LinearLayout(this@VoiceActivity).apply {
+                addView(pill(getString(R.string.type_instead)) {
                     startActivity(Intent(this@VoiceActivity, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
                     finish()
-                }
-            })
-            addView(close)
-        }
-
-        card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            isClickable = true
-            background = getDrawable(R.drawable.bubble_ai)
-            padDp(22, 20, 22, 14)
-            addView(head, wide())
-            continuousSwitch = Switch(this@VoiceActivity).apply {
-                text = getString(R.string.keep_talking)
-                minHeight = dp(48)
-                setTextColor(color(R.color.text_dim))
-                setOnCheckedChangeListener { _, checked ->
-                    continuous = checked
-                    if (!checked) main.removeCallbacks(nextListen)
-                }
-            }
-            addView(continuousSwitch, wide())
-            addView(scroller, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-            ))
-            addView(feet, wide())
-        }
-
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setBackgroundColor(color(R.color.scrim))
-            padDp(18, 18, 18, 18)
-            addView(card, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                (resources.displayMetrics.heightPixels * 0.7f).toInt()
-            ))
-            // Tapping the scrim, rather than the card, closes the session.
-            setOnClickListener { finish() }
+                }, LinearLayout.LayoutParams(0, -2, 1f).apply { rightMargin = dp(8) })
+                addView(pill("Voice setup") { stopForSetup(); showSetup() }, LinearLayout.LayoutParams(0, -2, 1f))
+            }, wide())
+            addView(label("On-device speech · Microphone stops when you leave", 11f, true).apply {
+                gravity = Gravity.CENTER
+                padDp(0, 14, 0, 4)
+            }, wide())
             padForSystemBars()
+        }
+        return card
+    }
+
+    private fun stopForSetup() {
+        main.removeCallbacks(nextListen)
+        continuousSwitch.isChecked = false
+        pendingListen = false
+        requestId++
+        if (generating) {
+            Brains.get().cancel()
+            if (Chat.draft(this).isBlank()) Chat.saveDraft(this, lastQuestion)
+        }
+        generating = false
+        ears.cancel()
+        mouth?.hush()
+        state = State.IDLE
+    }
+
+    private fun showSetup() {
+        setupMode = true
+        dot.visibility = View.VISIBLE
+        dot.alpha = 0.45f
+        status.text = "Make yourself heard"
+        heard.text = "A quick voice check"
+        answer.text = "1. Choose your speaking language.\n2. Download its offline speech pack.\n3. Test the speaker, then tap Talk.\n\nSpeech and Gemini Nano are separate. A ready model does not mean your speech language is installed."
+        action.text = "Voice options"
+        action.visibility = View.VISIBLE
+        action.setOnClickListener { voiceOptions() }
+        setupTools.visibility = View.VISIBLE
+    }
+
+    private fun voiceOptions() {
+        AlertDialog.Builder(this).setTitle("Voice · " + ears.locale().displayName)
+            .setItems(arrayOf("Choose language", "Download offline speech", "Test speaker", "Android speech settings", "Talk now")) { _, which ->
+                when (which) {
+                    0 -> chooseLanguage()
+                    1 -> downloadLanguage()
+                    2 -> {
+                        status.text = "Testing your speaker"
+                        val voice = speaker()
+                        voice.onProblem = { if (!gone) { status.text = "Speaker needs setup"; answer.text = it + " Open Android speech settings to install a voice." } }
+                        voice.onIdle = { if (!gone) idle() }
+                        voice.begin(ears.locale())
+                        voice.finish(if (ears.locale().language == "sv") "Hej! Jag är redo att hjälpa dig." else "Hello. I am ready to help. This voice is running on your phone.")
+                    }
+                    3 -> AlertDialog.Builder(this).setTitle("Android speech settings")
+                        .setItems(arrayOf("Spoken replies", "Voice input", "Microphone permission")) { _, option ->
+                            val target = when (option) {
+                                0 -> Intent("com.android.settings.TTS_SETTINGS")
+                                1 -> Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
+                                else -> Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    android.net.Uri.parse("package:$packageName"))
+                            }
+                            runCatching { startActivity(target) }.onFailure { answer.text = getString(R.string.settings_unavailable) }
+                        }.show()
+                    4 -> requestListen()
+                }
+            }.setNegativeButton("Done", null).show()
+    }
+
+    private fun chooseLanguage() {
+        val tags = arrayOf("en-US", "en-GB", "sv-SE", "es-ES", "fr-FR", "de-DE", "it-IT", "ja-JP", "ko-KR")
+        val names = tags.map { java.util.Locale.forLanguageTag(it).displayName }.toTypedArray()
+        AlertDialog.Builder(this).setTitle("Speaking language")
+            .setItems(names) { _, which ->
+                stopForSetup()
+                getSharedPreferences("surfacelab", MODE_PRIVATE).edit().putString("speech_language", tags[which]).apply()
+                language.text = ears.locale().displayName
+                status.text = "Language selected"
+                answer.text = names[which] + ". Download offline speech if it is not installed, then tap Talk."
+                idleAction()
+                AlertDialog.Builder(this).setTitle(names[which])
+                    .setMessage("Prepare offline speech for this language? The initial download needs an internet connection.")
+                    .setPositiveButton("Download") { _, _ -> downloadLanguage() }
+                    .setNegativeButton("Try talking") { _, _ -> requestListen() }.show()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
+    private fun downloadLanguage() {
+        stopForSetup()
+        status.text = "Preparing offline speech"
+        answer.text = "Keep an internet connection for the initial download. You can type while Android prepares the language."
+        action.visibility = View.GONE
+        ears.fetchLanguage { outcome ->
+            if (!gone && resumed) {
+                answer.text = outcome
+                status.text = "Voice setup"
+                idleAction()
+            }
         }
     }
 
@@ -249,12 +295,17 @@ class VoiceActivity : Activity() {
         ears.cancel()
         mouth?.hush()
 
+        setupMode = false
+        setupTools.visibility = View.GONE
+        dot.alpha = 1f
         state = State.LISTENING
         status.text = getString(R.string.listening_hint)
         heard.text = ""
         answer.text = ""
         dot.visibility = View.VISIBLE
-        action.visibility = View.GONE
+        action.visibility = View.VISIBLE
+        action.text = "Finish speaking"
+        action.setOnClickListener { ears.stop() }
 
         ears.listen(
             onLevel = { level(it) },
@@ -266,7 +317,7 @@ class VoiceActivity : Activity() {
 
     /** rmsdB runs from roughly -2 to 10, and only the loud half is useful. */
     private fun level(rms: Float) {
-        val scale = 1f + (rms.coerceIn(0f, 10f) / 10f)
+        val scale = 1f + (rms.coerceIn(0f, 10f) / 70f)
         dot.scaleX = scale
         dot.scaleY = scale
     }
@@ -285,8 +336,11 @@ class VoiceActivity : Activity() {
 
         continuousSwitch.isChecked = false
         state = State.IDLE
-        dot.visibility = View.GONE
-        status.text = problem.message
+        dot.visibility = View.VISIBLE
+        dot.alpha = 0.45f
+        setupTools.visibility = View.VISIBLE
+        status.text = "Let’s get voice ready"
+        answer.text = problem.message + "\n\nChoose English (United States) if your system uses an English region without an offline pack. Voice setup lets you change language and test the speaker."
 
         if (problem.languageMissing && ears.canFetchLanguage()) {
             // The recogniser is here, the language pack is not. That is the
@@ -295,9 +349,7 @@ class VoiceActivity : Activity() {
             action.text = getString(R.string.get_offline_speech)
             action.visibility = View.VISIBLE
             action.setOnClickListener {
-                action.visibility = View.GONE
-                status.text = getString(R.string.working)
-                ears.fetchLanguage { outcome -> if (!gone) idleWith(outcome) }
+                downloadLanguage()
             }
         } else {
             idleAction()
@@ -308,7 +360,8 @@ class VoiceActivity : Activity() {
 
     private fun idleWith(line: String) {
         state = State.IDLE
-        dot.visibility = View.GONE
+        dot.visibility = View.VISIBLE
+        dot.alpha = 0.45f
         status.text = line
         idleAction()
     }
@@ -331,7 +384,8 @@ class VoiceActivity : Activity() {
         heard.text = spoken
         state = State.THINKING
         status.text = getString(R.string.working)
-        dot.visibility = View.GONE
+        dot.visibility = View.VISIBLE
+        dot.alpha = 0.45f
 
         action.text = getString(R.string.stop_response)
         action.visibility = View.VISIBLE
@@ -484,7 +538,7 @@ class VoiceActivity : Activity() {
         if (pendingListen) {
             pendingListen = false
             listen()
-        } else if (state == State.IDLE && ears.available()) idleAction()
+        } else if (state == State.IDLE && ears.available() && !setupMode) idleAction()
     }
 
     override fun onPause() {

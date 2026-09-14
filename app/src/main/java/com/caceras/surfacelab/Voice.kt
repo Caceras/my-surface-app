@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.ModelDownloadListener
 import android.speech.RecognitionListener
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
@@ -36,6 +37,10 @@ class Ears(private val context: Context) {
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
     private var session = 0
+    private var setupClient: SpeechRecognizer? = null
+    private var setupGeneration = 0
+    private val handler = Handler(Looper.getMainLooper())
+    private var setupTimeout: Runnable? = null
 
     /**
      * True when speech can be recognised entirely on this phone.
@@ -101,6 +106,8 @@ class Ears(private val context: Context) {
             override fun onResults(results: Bundle?) {
                 if (token != session || !listening) return
                 listening = false
+                recognizer = null
+                client.destroy()
                 first(results)?.takeIf { it.isNotBlank() }?.let(onFinal)
                 onStop(null)
             }
@@ -108,6 +115,8 @@ class Ears(private val context: Context) {
             override fun onError(error: Int) {
                 if (token != session || !listening) return
                 listening = false
+                recognizer = null
+                client.destroy()
                 // Saying nothing is the normal way a session ends, not a
                 // failure. Reporting it produces a toast storm.
                 val quiet = error == SpeechRecognizer.ERROR_NO_MATCH ||
@@ -135,6 +144,15 @@ class Ears(private val context: Context) {
         listening = false
         recognizer?.destroy()
         recognizer = null
+        cancelSetup()
+    }
+
+    private fun cancelSetup() {
+        setupGeneration++
+        setupTimeout?.let { handler.removeCallbacks(it) }
+        setupTimeout = null
+        setupClient?.destroy()
+        setupClient = null
     }
 
     private fun intent(): Intent =
@@ -168,7 +186,7 @@ class Ears(private val context: Context) {
     }
 
     private fun missingLanguage(): String =
-        if (canFetchLanguage()) "No offline speech for ${locale().displayLanguage} yet."
+        if (canFetchLanguage()) "Offline speech for ${locale().displayName} is not ready yet."
         else settingsHint()
 
     private fun settingsHint(): String =
@@ -202,50 +220,70 @@ class Ears(private val context: Context) {
      * download another and the Swedish speaker is exactly where they started.
      */
     fun fetchLanguage(onOutcome: (String) -> Unit) {
-        if (!canFetchLanguage()) {
-            onOutcome(settingsHint())
-            return
+        if (!canFetchLanguage()) { onOutcome(settingsHint()); return }
+        cancelSetup()
+        val token = setupGeneration
+        val client = try { SpeechRecognizer.createOnDeviceSpeechRecognizer(context) }
+            catch (_: Exception) { onOutcome(settingsHint()); return }
+        setupClient = client
+        fun report(message: String, terminal: Boolean = false) {
+            if (token != setupGeneration) return
+            if (terminal) cancelSetup()
+            onOutcome(message)
         }
-
-        val request = intent()
-        val tag = locale().toLanguageTag()
-        val client = try {
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-        } catch (e: Exception) {
-            onOutcome(settingsHint())
-            return
-        }
-
-        // Every SpeechRecognizer method is main-thread only, this one
-        // included, and the instance has to be destroyed either way.
-        try {
-            client.triggerModelDownload(request)
-            client.checkRecognitionSupport(
-                request,
-                context.mainExecutor,
-                object : RecognitionSupportCallback {
-                    override fun onSupportResult(support: RecognitionSupport) {
-                        val ready = support.installedOnDeviceLanguages
-                            .any { it.equals(tag, ignoreCase = true) }
-                        client.destroy()
-                        onOutcome(
-                            if (ready) "Offline speech is ready. Tap the microphone."
-                            else "Downloading offline speech for " +
-                                "${locale().displayLanguage}. Try again shortly."
-                        )
-                    }
-
-                    override fun onError(error: Int) {
-                        client.destroy()
-                        onOutcome(settingsHint())
-                    }
+        setupTimeout = Runnable {
+            report("Android has not confirmed this download yet. Check your connection, open voice input settings, or try again. You can keep typing.", true)
+        }.also { handler.postDelayed(it, 120_000) }
+        val requested = locale()
+        fun download(tag: String) {
+            val request = intent().putExtra(RecognizerIntent.EXTRA_LANGUAGE, tag)
+            try {
+                if (Build.VERSION.SDK_INT >= 34) {
+                    client.triggerModelDownload(request, context.mainExecutor, object : ModelDownloadListener {
+                        override fun onProgress(completedPercent: Int) {
+                            report("Downloading " + Locale.forLanguageTag(tag).displayName + ": " + completedPercent.coerceIn(0, 100) + "%")
+                        }
+                        override fun onSuccess() { report("Offline speech is ready. Tap Talk to try it.", true) }
+                        override fun onScheduled() { report("Android has queued the speech download. Keep a connection, then return and tap Talk. The download is not ready yet.", true) }
+                        override fun onError(error: Int) { report("Android could not complete the speech download (" + error + "). Try another language or open voice input settings.", true) }
+                    })
+                } else {
+                    client.triggerModelDownload(request)
+                    report("Speech download requested. Android does not report progress on this version. Return shortly and tap Talk to check it.", true)
                 }
-            )
-        } catch (e: Exception) {
-            client.destroy()
-            onOutcome(settingsHint())
+            } catch (_: Exception) { report(settingsHint(), true) }
         }
+        try {
+            client.checkRecognitionSupport(intent(), context.mainExecutor, object : RecognitionSupportCallback {
+                override fun onSupportResult(support: RecognitionSupport) {
+                    if (token != setupGeneration) return
+                    val installed = bestLanguage(requested, support.installedOnDeviceLanguages)
+                    val target = installed ?: bestLanguage(requested, support.supportedOnDeviceLanguages)
+                        ?: bestLanguage(requested, support.pendingOnDeviceLanguages)
+                    if (target == null) {
+                        report("Android does not offer an offline pack for " + requested.displayName + ". Choose another speaking language in Voice setup.", true)
+                        return
+                    }
+                    // Persist the supported regional tag so the next listen and TTS request agree.
+                    context.getSharedPreferences("surfacelab", Context.MODE_PRIVATE).edit()
+                        .putString("speech_language", target).apply()
+                    if (installed != null) report("Offline speech is ready in " + Locale.forLanguageTag(target).displayName + ". Tap Talk.", true)
+                    else download(target)
+                }
+                override fun onError(error: Int) {
+                    if (token == setupGeneration) download(requested.toLanguageTag())
+                }
+            })
+        } catch (_: Exception) { download(requested.toLanguageTag()) }
     }
+
+    companion object {
+        /** Exact region wins; a same-language installed pack beats an unavailable locale. */
+        fun bestLanguage(requested: Locale, tags: List<String>): String? =
+            tags.firstOrNull { it.equals(requested.toLanguageTag(), ignoreCase = true) }
+                ?: tags.firstOrNull { Locale.forLanguageTag(it).language == requested.language }
+    }
+
 }
 
 /**

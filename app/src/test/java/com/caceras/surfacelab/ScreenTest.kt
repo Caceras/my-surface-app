@@ -242,7 +242,7 @@ class ScreenTest {
 
         more.performClick()
 
-        val body = visibleTexts(content(activity))
+        val body = visibleTexts(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView)
         listOf("Text selection", "Quick Settings tile", "Home screen widget",
                "App shortcuts", "Share sheet").forEach { surface ->
             assertTrue("missing after More: $surface", body.any { it.contains(surface) })
@@ -385,7 +385,11 @@ class ScreenTest {
         input.getLocationOnScreen(position)
         assertTrue("composer is outside the window", position[1] + input.height <= height)
         assertTrue("composer lost its height", input.height >= activity.dp(40))
-        val settings = descendants(decor).filterIsInstance<ScrollView>().first { it.tag == "settings" }
+        val settingsDecor = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+        settingsDecor.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        settingsDecor.layout(0, 0, width, height)
+        val settings = descendants(settingsDecor).filterIsInstance<ScrollView>().first { it.tag == "settings" }
         assertTrue("settings do not scroll", settings.getChildAt(0).height > settings.height)
     }
 
@@ -397,6 +401,33 @@ class ScreenTest {
             android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
         )
         assertTrue(candidates.any { it.activityInfo.name == VoiceActivity::class.java.name })
+    }
+
+    @Test
+    fun `welcome has a visible greeting and direct voice entry at phone size`() {
+        val activity = launchMain().get()
+        val decor = activity.window.decorView
+        val width = activity.dp(411)
+        val height = activity.dp(914)
+        decor.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        decor.layout(0, 0, width, height)
+        val greeting = descendants(decor).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.empty_title) }
+        val bounds = android.graphics.Rect()
+        assertTrue("greeting is clipped or missing", greeting.getGlobalVisibleRect(bounds))
+        assertTrue("greeting has no measurable height", bounds.height() >= activity.dp(40))
+        descendants(decor).filterIsInstance<TextView>().first { it.text == "Let’s talk" }.performClick()
+        assertEquals(VoiceActivity::class.java.name, shadowOf(activity).nextStartedActivity.component!!.className)
+    }
+
+    @Test
+    fun `reply actions are visible without discovering a long press`() {
+        val activity = launchMain().get()
+        composer(activity).setText("hello")
+        button(activity, activity.getString(R.string.send)).performClick()
+        val body = visibleTexts(content(activity))
+        assertTrue(body.containsAll(listOf("Listen", "Copy", "Share")))
     }
 
 }

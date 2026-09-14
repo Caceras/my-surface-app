@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_bg"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="20dp">
 
     <!--
         The value used to be a timestamp, which is why it was 28sp and bold.
@@ -21,8 +21,8 @@
         android:maxLines="1"
         android:ellipsize="end"
         android:textColor="#FFFFFF"
-        android:alpha="0.7"
-        android:textSize="12sp"
+        android:alpha="0.8"
+        android:textSize="13sp"
         android:textAllCaps="true"
         android:letterSpacing="0.08" />
 

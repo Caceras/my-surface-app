@@ -8,6 +8,9 @@
         the platform gives us, including day/night.
     -->
     <style name="Chat" parent="@android:style/Theme.DeviceDefault.DayNight">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@color/chat_bg</item>

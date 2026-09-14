@@ -1,6 +1,7 @@
 package com.caceras.surfacelab
 
 import android.Manifest
+import android.app.Dialog
 import android.app.AlertDialog
 import android.app.Activity
 import android.app.StatusBarManager
@@ -76,6 +77,7 @@ class MainActivity : Activity() {
     private var listenDraft = ""
     private var speakReplies = false
     private lateinit var playback: TextView
+    private var settingsDialog: Dialog? = null
 
     /**
      * Set on the way out, and checked by every brain callback.
@@ -90,6 +92,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val brain = Brains.get()
+        speakReplies = Chat.speakReplies(this)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(color(R.color.chat_bg))
@@ -103,7 +106,10 @@ class MainActivity : Activity() {
         root.addView(composer(), wide())
 
         setContentView(root)
+        root.isFocusableInTouchMode = true
+        root.requestFocus()
         root.padForSystemBars()
+        readableSystemBars()
 
         brain.status(this) { if (!gone && !busy) status.text = it.label }
 
@@ -150,80 +156,49 @@ class MainActivity : Activity() {
     // ------------------------------------------------------------- chrome
 
     private fun header(brain: SurfaceBrain): View {
-        val title = TextView(this).apply {
-            text = getString(R.string.app_name)
-            textSize = 20f
-            setTextColor(color(R.color.text_primary))
-        }
-
-        status = TextView(this).apply {
-            text = getString(R.string.working)
-            textSize = 13f
-            setTextColor(color(R.color.text_dim))
-        }
-
         val titles = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(title)
+            addView(label("Surface", 24f).apply { medium(); letterSpacing = -0.035f })
+            status = label("Your on-device assistant", 11f, true).apply {
+                maxLines = 2
+                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            }
             addView(status)
         }
-
-        val more = TextView(this).apply {
-            text = getString(R.string.more)
-            textSize = 14f
-            setTextColor(color(R.color.text_dim))
-            minHeight = dp(48)
-            gravity = Gravity.CENTER
-            isFocusable = true
-            padDp(12, 8, 4, 8)
-        }
-
-        val panel = ScrollView(this).apply {
-            tag = "settings"
-            addView(morePanel(brain), wide())
-            visibility = View.GONE
-        }
-        more.setOnClickListener {
-            if (panel.visibility == View.GONE) {
-                getSystemService(android.view.inputmethod.InputMethodManager::class.java)
-                    .hideSoftInputFromWindow(input.windowToken, 0)
-                input.clearFocus()
-            }
-            panel.visibility =
-                if (panel.visibility == View.GONE) View.VISIBLE else View.GONE
-        }
-
-        // Now that the screen remembers, it needs a way to stop remembering:
-        // stale context makes later answers worse, not better.
-        val fresh = TextView(this).apply {
-            text = getString(R.string.new_chat)
-            textSize = 14f
-            setTextColor(color(R.color.text_dim))
-            minHeight = dp(48)
-            gravity = Gravity.CENTER
-            isFocusable = true
-            padDp(4, 8, 4, 8)
-            setOnClickListener { newChat() }
-        }
-
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            addView(titles, LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(fresh)
-            addView(more)
-        }
-
         return LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            padDp(20, 14, 20, 6)
-            addView(row, wide())
-            addView(panel, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                minOf(dp(320), resources.displayMetrics.heightPixels / 3)
-            ))
+            gravity = Gravity.CENTER_VERTICAL
+            padDp(20, 12, 20, 12)
+            addView(titles, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(pill(getString(R.string.new_chat)) { newChat() })
+            addView(flatButton(getString(R.string.more)) { showSettings(brain) }.apply { padDp(12, 14, 0, 14) })
         }
+    }
+
+    private fun showSettings(brain: SurfaceBrain) {
+        getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            .hideSoftInputFromWindow(input.windowToken, 0)
+        input.clearFocus()
+        val dialog = Dialog(this)
+        settingsDialog = dialog
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(color(R.color.chat_bg))
+            padDp(24, 16, 24, 12)
+            addView(LinearLayout(this@MainActivity).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(label("Make it yours", 28f).apply { medium() }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(pill("Done") { dialog.dismiss() })
+            })
+            addView(ScrollView(this@MainActivity).apply {
+                tag = "settings"
+                addView(morePanel(brain), wide())
+            }, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
+        dialog.setContentView(body)
+        dialog.window?.setBackgroundDrawableResource(R.color.chat_bg)
+        dialog.show()
+        dialog.window?.setLayout(-1, -1)
+        body.padForSystemBars()
     }
 
     /**
@@ -234,15 +209,16 @@ class MainActivity : Activity() {
     private fun morePanel(brain: SurfaceBrain): View {
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            padDp(0, 10, 0, 4)
+            padDp(0, 18, 0, 24)
         }
 
         fun line(title: String, hint: String) {
             panel.addView(TextView(this).apply {
                 text = title
-                textSize = 14f
+                textSize = 17f
+                medium()
                 setTextColor(color(R.color.text_primary))
-                padDp(0, 8, 0, 0)
+                padDp(0, 24, 0, 4)
             })
             panel.addView(TextView(this).apply {
                 text = hint
@@ -257,6 +233,7 @@ class MainActivity : Activity() {
             setTextColor(color(R.color.text_dim))
         })
 
+        panel.addView(label("YOUR ASSISTANT", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 22, 0, 8) })
         panel.addView(flatButton(getString(R.string.prepare_model)) {
             status.text = getString(R.string.working)
             brain.prepare(this) { if (!gone) status.text = it.label }
@@ -286,6 +263,10 @@ class MainActivity : Activity() {
                     status.text = getString(R.string.language_selected, ears.locale().displayLanguage)
                 }.show()
         })
+        panel.addView(pill("Set up voice & test playback") {
+            settingsDialog?.dismiss()
+            startActivity(Intent(this, VoiceActivity::class.java).putExtra("setup", true))
+        })
         panel.addView(flatButton(getString(R.string.voice_settings)) {
             runCatching { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                 .onFailure { status.text = getString(R.string.settings_unavailable) }
@@ -302,11 +283,18 @@ class MainActivity : Activity() {
         panel.addView(flatButton(getString(R.string.open_voice)) {
             startActivity(Intent(this, VoiceActivity::class.java))
         })
+        panel.addView(label("EVERYWHERE YOU NEED IT", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 4) })
         line("Digital assistant", "Choose Pixel Surface Lab in Android settings to use the assistant gesture. Availability depends on your device settings.")
         line("Text selection", "Select text anywhere: " +
             brain.tasks.joinToString(", ") { it.alias })
         line("Quick Settings tile", "Shade, Edit tiles, or the button below.")
-        line("Home screen widget", "Long-press home, Widgets. Shows the last answer.")
+        line("Home screen widget", "Continue the conversation or talk from your home screen.")
+        panel.addView(flatButton("Add home screen widget") {
+            val widgets = getSystemService(android.appwidget.AppWidgetManager::class.java)
+            if (widgets.isRequestPinAppWidgetSupported) widgets.requestPinAppWidget(
+                ComponentName(this, SurfaceWidgetProvider::class.java), null, null)
+            else Toast.makeText(this, "Long-press your home screen, then choose Widgets.", Toast.LENGTH_LONG).show()
+        })
         line("App shortcuts", "Long-press the app icon in the launcher.")
         line("Share sheet", "Share any text into this app.")
 
@@ -330,7 +318,7 @@ class MainActivity : Activity() {
     private fun buildTranscript(): View {
         messages = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            padDp(14, 6, 14, 6)
+            padDp(20, 6, 20, 16)
             // Messages sit at the bottom, against the composer, the way every
             // chat does. Top-aligned they floated above a screenful of empty
             // grey -- the single thing that made this look unfinished.
@@ -359,28 +347,44 @@ class MainActivity : Activity() {
      * the least finished screen in the app.
      */
     private fun emptyState(): View {
-        val hello = TextView(this).apply {
-            text = getString(R.string.empty_title)
-            textSize = 22f
-            gravity = Gravity.CENTER_HORIZONTAL
-            setTextColor(color(R.color.text_primary))
-        }
-        val why = TextView(this).apply {
-            text = getString(R.string.empty_body)
-            textSize = 15f
-            gravity = Gravity.CENTER_HORIZONTAL
-            setLineSpacing(0f, 1.2f)
-            setTextColor(color(R.color.text_dim))
-            padDp(24, 8, 24, 0)
-        }
         blank = LinearLayout(this).apply {
+            tag = "welcome"
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            padDp(0, 0, 0, 40)
-            addView(hello, wide())
-            addView(why, wide())
+            gravity = Gravity.CENTER_HORIZONTAL
+            padDp(10, 24, 10, 24)
+            addView(presence(), LinearLayout.LayoutParams(dp(88), dp(88)).apply { bottomMargin = dp(24) })
+            addView(label(getString(R.string.empty_title), 34f).apply {
+                gravity = Gravity.CENTER
+                letterSpacing = -0.04f
+                setLineSpacing(0f, 1.02f)
+            }, wide())
+            addView(label(getString(R.string.empty_body), 15f, true).apply {
+                gravity = Gravity.CENTER
+                padDp(4, 16, 4, 24)
+            }, wide())
+            addView(pill("Let’s talk", primary = true) {
+                startActivity(Intent(this@MainActivity, VoiceActivity::class.java))
+            }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(24) })
+            val starters = listOf(
+                "Find the right words" to "Help me write a thoughtful message. Ask me who it is for and what I want to say.",
+                "Untangle a thought" to "Help me think through a decision. Ask me one question at a time."
+            )
+            starters.forEach { (title, prompt) ->
+                addView(pill(title) {}.apply {
+                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                    setOnClickListener { stagePrompt(prompt) }
+                }, wide().apply { bottomMargin = dp(8) })
+            }
         }
         return blank
+    }
+
+    private fun stagePrompt(prompt: String) {
+        input.setText(prompt)
+        input.setSelection(input.length())
+        input.requestFocus()
+        input.post { getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            .showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT) }
     }
 
     /** Centre the greeting when there is nothing else; otherwise sit low. */
@@ -392,13 +396,11 @@ class MainActivity : Activity() {
     private fun buildOpeners(): View {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            padDp(14, 0, 14, 8)
+            padDp(20, 0, 20, 12)
         }
         Prompts.OPENERS.forEach { opener ->
             row.addView(chip(opener) {
-                input.setText("$opener ")
-                input.setSelection(input.text.length)
-                input.requestFocus()
+                stagePrompt("$opener ")
             })
         }
         openers = HorizontalScrollView(this).apply {
@@ -434,7 +436,7 @@ class MainActivity : Activity() {
                 }
                 override fun afterTextChanged(s: Editable?) {}
             })
-            padDp(16, 12, 8, 12)
+            padDp(18, 16, 12, 16)
         }
 
         send = ImageButton(this).apply {
@@ -450,7 +452,8 @@ class MainActivity : Activity() {
 
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.BOTTOM
+            gravity = Gravity.CENTER_VERTICAL
+            padDp(4, 4, 6, 4)
             background = getDrawable(R.drawable.composer_bg)
             addView(input, LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
@@ -486,9 +489,13 @@ class MainActivity : Activity() {
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            padDp(12, 0, 12, 12)
+            padDp(16, 0, 16, 8)
             addView(bar, wide())
             addView(playback, wide())
+            addView(label("Private by design · Answers can be imperfect", 11f, true).apply {
+                gravity = Gravity.CENTER
+                padDp(0, 10, 0, 6)
+            }, wide())
         }
     }
 
@@ -634,14 +641,15 @@ class MainActivity : Activity() {
         showBlank(false)
         val bubble = TextView(this).apply {
             this.text = text
-            textSize = 16f
+            textSize = 17f
+            setLineSpacing(dp(3).toFloat(), 1.12f)
             background = getDrawable(
                 if (fromUser) R.drawable.bubble_you else R.drawable.bubble_ai
             )
             setTextColor(color(
                 if (fromUser) R.color.bubble_you_text else R.color.bubble_ai_text
             ))
-            padDp(16, 12, 16, 12)
+            padDp(if (fromUser) 18 else 4, 14, if (fromUser) 18 else 4, 14)
             // Tapping an answer stops it being spoken.
             if (!fromUser) setOnClickListener { mouth?.hush() }
         }
@@ -654,7 +662,7 @@ class MainActivity : Activity() {
             topMargin = dp(6)
             bottomMargin = dp(6)
             // A bubble that runs the full width stops reading as a bubble.
-            if (fromUser) leftMargin = dp(48) else rightMargin = dp(48)
+            if (fromUser) leftMargin = dp(42) else rightMargin = dp(8)
         }
 
         messages.addView(bubble, params)
@@ -687,6 +695,21 @@ class MainActivity : Activity() {
         // Keep the answer itself readable by TalkBack; actions are a hint.
         bubble.contentDescription = text + ". " + getString(R.string.answer_actions)
         bubble.isFocusable = true
+        val parent = bubble.parent as? LinearLayout
+        if (parent != null && parent.findViewWithTag<View>(bubble) == null) {
+            parent.addView(LinearLayout(this).apply {
+                tag = bubble
+                addView(flatButton("Listen") { readAloud(text) }.apply { padDp(4, 10, 18, 10) })
+                addView(flatButton("Copy") {
+                    getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Answer", text))
+                    Toast.makeText(this@MainActivity, "Copied", Toast.LENGTH_SHORT).show()
+                }.apply { padDp(12, 10, 18, 10) })
+                addView(flatButton("Share") {
+                    startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(Intent.EXTRA_TEXT, text), getString(R.string.share_answer)))
+                }.apply { padDp(12, 10, 12, 10) })
+            }, parent.indexOfChild(bubble) + 1)
+        }
         bubble.setOnLongClickListener {
             mouth?.hush()
             AlertDialog.Builder(this).setItems(arrayOf(
@@ -762,16 +785,11 @@ class MainActivity : Activity() {
      */
     private fun report(problem: VoiceProblem) {
         status.text = problem.message
-        if (!problem.languageMissing || !ears.canFetchLanguage()) {
-            status.setOnClickListener(null)
-            return
-        }
-        status.text = problem.message + " " + getString(R.string.get_offline_speech)
-        status.setOnClickListener {
-            status.setOnClickListener(null)
-            status.text = getString(R.string.working)
-            ears.fetchLanguage { outcome -> if (!gone) status.text = outcome }
-        }
+        AlertDialog.Builder(this).setTitle("Let’s get voice ready")
+            .setMessage(problem.message + " Your draft is safe. Open voice setup to choose a language, download speech or test the speaker.")
+            .setPositiveButton("Voice setup") { _, _ ->
+                startActivity(Intent(this, VoiceActivity::class.java).putExtra("setup", true))
+            }.setNegativeButton("Keep typing", null).show()
     }
 
     private fun setMicActive(active: Boolean) {
@@ -840,6 +858,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         gone = true
+        settingsDialog?.dismiss()
         ears.cancel()
         mouth?.close()
         mouth = null
@@ -877,7 +896,8 @@ class MainActivity : Activity() {
             this.text = text
             minHeight = dp(48)
             isFocusable = true
-            textSize = 14f
+            textSize = 15f
+            medium()
             setTextColor(color(R.color.accent))
             padDp(0, 12, 0, 4)
             setOnClickListener { onTap() }
@@ -887,6 +907,9 @@ class MainActivity : Activity() {
         TextView(this).apply {
             this.text = text
             textSize = 13f
+            minHeight = dp(48)
+            gravity = Gravity.CENTER
+            isFocusable = true
             setTextColor(color(R.color.text_primary))
             background = getDrawable(R.drawable.chip_bg)
             padDp(14, 8, 14, 8)

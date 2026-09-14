@@ -163,9 +163,11 @@ jobs:
           phone and tap an .apk to install.
 
           This is build **$GITHUB_RUN_NUMBER**; the app shows the same number behind
-          **More** on its first screen, so you can tell at a glance whether the install took.
+          **Settings** on its first screen, so you can tell at a glance whether the install took.
 
-          Upgrades require the same signing key. This workflow does not persist a
+          Surface Preview 3 installs alongside the old Pixel Surface Lab app. Open the new Surface Preview icon after installing.
+
+          Upgrades between preview builds require the same signing key. This workflow does not persist a
           keystore, so a preview may not upgrade an existing install. It is a prerelease, so
           \`/releases/latest\` still points at the build from main."
 

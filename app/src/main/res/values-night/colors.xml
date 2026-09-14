@@ -1,16 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dark values for every colour in values/colors.xml that is not an icon. -->
 <resources>
-    <color name="chat_bg">#0D141C</color>
-    <color name="bubble_you">#2A5A73</color>
-    <color name="bubble_you_text">#FFFFFF</color>
-    <color name="bubble_ai">#17212B</color>
-    <color name="bubble_ai_text">#E7EDF3</color>
-    <color name="composer_bg">#17212B</color>
-    <color name="chip_bg">#1E2A36</color>
-    <color name="text_primary">#E7EDF3</color>
-    <color name="text_dim">#8C9AA8</color>
-    <color name="accent">#5FD3C4</color>
-    <color name="scrim">#CC000000</color>
-    <color name="listening">#FF6B6B</color>
+    <color name="chat_bg">#141B18</color>
+    <color name="bubble_you">#2B3A31</color>
+    <color name="bubble_you_text">#F2F3EC</color>
+    <color name="bubble_ai">#141B18</color>
+    <color name="bubble_ai_text">#F2F3EC</color>
+    <color name="composer_bg">#202B24</color>
+    <color name="chip_bg">#27322B</color>
+    <color name="text_primary">#F2F3EC</color>
+    <color name="text_dim">#A7B4A9</color>
+    <color name="accent">#CEE5AD</color>
+    <color name="on_accent">#203525</color>
+    <color name="outline">#3A473D</color>
+    <color name="presence_bg">#34462E</color>
+    <color name="scrim">#F2141B18</color>
+    <color name="listening">#CEE5AD</color>
 </resources>

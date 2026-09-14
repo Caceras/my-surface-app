@@ -113,7 +113,22 @@ class ShotTest {
             else listOf(view) + (0 until view.childCount).flatMap { children(view.getChildAt(it)) }
         children(activity.window.decorView).filterIsInstance<android.widget.TextView>()
             .first { it.text == activity.getString(R.string.more) }.performClick()
-        shoot("chat-settings", activity.window.decorView)
+        shoot("chat-settings", org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView)
+    }
+
+    @Test
+    fun `voice setup with an explicit path back to typing`() {
+        val activity = Robolectric.buildActivity(VoiceActivity::class.java,
+            android.content.Intent().putExtra("setup", true)).setup().get()
+        shoot("voice-setup", activity.window.decorView)
+    }
+
+    @Test
+    @Config(qualifiers = "w411dp-h914dp-xxhdpi-night")
+    fun `chat in dark mode`() {
+        Chat.clear(RuntimeEnvironment.getApplication())
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        shoot("chat-night", activity.window.decorView)
     }
 
 }

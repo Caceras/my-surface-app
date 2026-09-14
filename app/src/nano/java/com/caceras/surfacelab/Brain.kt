@@ -73,7 +73,7 @@ private object NanoBrain : SurfaceBrain {
 
                 override fun onDownloadCompleted() {
                     main.post {
-                        onStatus(BrainStatus("Nano ready - fully offline", ready = true))
+                        onStatus(BrainStatus("Gemini Nano · On device", ready = true))
                     }
                 }
 
@@ -214,7 +214,7 @@ private fun generate(
 
 private fun describe(code: Int?, error: Throwable?): BrainStatus = when (code) {
     FeatureStatus.AVAILABLE ->
-        BrainStatus("Nano ready - fully offline", ready = true)
+        BrainStatus("Gemini Nano · On device", ready = true)
     FeatureStatus.DOWNLOADABLE ->
         BrainStatus("Model not downloaded - tap to fetch it", ready = false, preparable = true)
     FeatureStatus.DOWNLOADING ->

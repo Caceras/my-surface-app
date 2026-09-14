@@ -474,4 +474,29 @@ internal class StreamingBrain : SurfaceBrain {
         done = true
         result?.invoke(BrainResult.failure(note))
     }
+    @Test
+    fun `language error releases the microphone and offers typing and setup`() {
+        val activity = open().get()
+        val client = recognizer()
+        client.triggerOnError(SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE)
+        drain()
+        assertTrue("microphone connection survived a terminal error", client.isDestroyed)
+        assertTrue(texts(activity).containsAll(listOf("Type", "Voice setup", "Choose speaking language")))
+    }
+
+    @Test
+    fun `speech setup does not start the microphone`() {
+        val activity = Robolectric.buildActivity(VoiceActivity::class.java,
+            android.content.Intent().putExtra("setup", true)).setup().get()
+        assertNull(ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+        assertTrue(texts(activity).contains("A quick voice check"))
+    }
+
+    @Test
+    fun `regional speech selection prefers exact then same language only`() {
+        assertEquals("en-US", Ears.bestLanguage(java.util.Locale.forLanguageTag("en-SE"), listOf("sv-SE", "en-US")))
+        assertEquals("en-GB", Ears.bestLanguage(java.util.Locale.UK, listOf("en-US", "en-GB")))
+        assertNull(Ears.bestLanguage(java.util.Locale.forLanguageTag("sv-SE"), listOf("en-US")))
+    }
+
 }

@@ -99,7 +99,7 @@
             android:name=".ProcessTextActivity"
             android:exported="false"
             android:excludeFromRecents="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+            android:theme="@style/VoiceOverlay" />
 
     </application>
 
