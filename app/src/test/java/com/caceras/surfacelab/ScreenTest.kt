@@ -92,7 +92,7 @@ class ScreenTest {
     /** Bubbles live in the column inside the transcript scroller. */
     private fun bubbles(activity: android.app.Activity): List<String> {
         val scroll = descendants(content(activity))
-            .filterIsInstance<ScrollView>().first()
+            .filterIsInstance<ScrollView>().first { it.tag == "conversation" }
         val column = scroll.getChildAt(0) as ViewGroup
         return (0 until column.childCount)
             .map { column.getChildAt(it) }
@@ -367,6 +367,36 @@ class ScreenTest {
         decor.layout(0, 0, width, height)
         val scroll = descendants(decor).filterIsInstance<ScrollView>().first()
         assertTrue("voice transcript collapsed to zero height", scroll.height > activity.dp(120))
+    }
+
+    @Test
+    fun `More scrolls without pushing the composer off a compact screen`() {
+        val activity = launchMain().get()
+        descendants(content(activity)).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.more) }.performClick()
+        val decor = activity.window.decorView
+        val width = activity.dp(360)
+        val height = activity.dp(640)
+        decor.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        decor.layout(0, 0, width, height)
+        val input = composer(activity)
+        val position = IntArray(2)
+        input.getLocationOnScreen(position)
+        assertTrue("composer is outside the window", position[1] + input.height <= height)
+        assertTrue("composer lost its height", input.height >= activity.dp(40))
+        val settings = descendants(decor).filterIsInstance<ScrollView>().first { it.tag == "settings" }
+        assertTrue("settings do not scroll", settings.getChildAt(0).height > settings.height)
+    }
+
+    @Test
+    fun `assistant intent resolves to the voice surface`() {
+        val activity = launchMain().get()
+        val candidates = activity.packageManager.queryIntentActivities(
+            Intent(Intent.ACTION_ASSIST).setPackage(activity.packageName),
+            android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+        )
+        assertTrue(candidates.any { it.activityInfo.name == VoiceActivity::class.java.name })
     }
 
 }

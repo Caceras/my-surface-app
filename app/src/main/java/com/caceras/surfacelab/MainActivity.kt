@@ -178,8 +178,17 @@ class MainActivity : Activity() {
             padDp(12, 8, 4, 8)
         }
 
-        val panel = morePanel(brain).apply { visibility = View.GONE }
+        val panel = ScrollView(this).apply {
+            tag = "settings"
+            addView(morePanel(brain), wide())
+            visibility = View.GONE
+        }
         more.setOnClickListener {
+            if (panel.visibility == View.GONE) {
+                getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                    .hideSoftInputFromWindow(input.windowToken, 0)
+                input.clearFocus()
+            }
             panel.visibility =
                 if (panel.visibility == View.GONE) View.VISIBLE else View.GONE
         }
@@ -210,7 +219,10 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             padDp(20, 14, 20, 6)
             addView(row, wide())
-            addView(panel, wide())
+            addView(panel, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                minOf(dp(320), resources.displayMetrics.heightPixels / 3)
+            ))
         }
     }
 
@@ -326,6 +338,7 @@ class MainActivity : Activity() {
             addView(emptyState(), wide())
         }
         transcript = ScrollView(this).apply {
+            tag = "conversation"
             isFillViewport = true
             clipToPadding = false
             addView(messages, ViewGroup.LayoutParams.MATCH_PARENT,

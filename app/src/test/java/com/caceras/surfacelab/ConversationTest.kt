@@ -71,7 +71,7 @@ class ConversationTest {
             .performClick()
 
     private fun bubbles(activity: android.app.Activity): List<String> {
-        val scroll = descendants(content(activity)).filterIsInstance<ScrollView>().first()
+        val scroll = descendants(content(activity)).filterIsInstance<ScrollView>().first { it.tag == "conversation" }
         val column = scroll.getChildAt(0) as ViewGroup
         return (0 until column.childCount)
             .map { column.getChildAt(it) }

@@ -1,5 +1,10 @@
 # Voice
 
+The current behavior is documented in [the Pixel assistant audit](pixel-assistant-audit.md).
+The sections below explain the original design. The app now also has optional continuous
+foreground conversation, read-aloud controls, language preferences, strict locale-matched
+offline TTS selection, and shared chat history.
+
 Built. Everything here is framework-only and both flavours get it, which is
 the reason it looks the way it does.
 

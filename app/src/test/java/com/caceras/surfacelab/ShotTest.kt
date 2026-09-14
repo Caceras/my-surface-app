@@ -106,4 +106,14 @@ class ShotTest {
         val activity = Robolectric.buildActivity(VoiceActivity::class.java).setup().get()
         shoot("voice", activity.window.decorView, minPainted = 0.05)
     }
+    @Test
+    fun `the settings panel remains contained`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        fun children(view: View): List<View> = if (view !is android.view.ViewGroup) listOf(view)
+            else listOf(view) + (0 until view.childCount).flatMap { children(view.getChildAt(it)) }
+        children(activity.window.decorView).filterIsInstance<android.widget.TextView>()
+            .first { it.text == activity.getString(R.string.more) }.performClick()
+        shoot("chat-settings", activity.window.decorView)
+    }
+
 }

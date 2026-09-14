@@ -32,10 +32,9 @@ on the phone itself — no account, no API key, no network. Turn off wifi and
 mobile data and it still works.
 
 Speech goes the same way. The recogniser is the on-device one or there is no
-microphone at all, and the answer is read back by a voice that does not need
-the radios. Ask out loud and you hear the answer; type and you do not. There is
-no voice mode to turn on, because modality is inherited rather than
-configured.
+microphone at all, and the answer is read back by an installed offline voice.
+Ask out loud to hear the answer; typed replies are quiet by default. Read them
+aloud on demand, or enable **Read every reply aloud** under More.
 
 It is a prompt box, not a fixed menu. Summarise, Proofread and Make professional
 are there too, but they are ordinary prompts with a system instruction, defined
@@ -93,7 +92,7 @@ tile and the widget have no idea which implementation they got.
 | Text selection action | `processtext` | Select text → popup overflow | 23+ |
 
 In the `nano` build these stop being demos: the launcher screen is a working
-prompt box, the tile reports whether Nano is present and downloads it on tap,
+prompt box, the tile reports whether Nano is present and opens a foreground assistant,
 the widget shows the last answer, and anything shared into the app arrives as
 material for a prompt.
 
@@ -118,7 +117,8 @@ Glance, Quick Share), which saves you going looking.
 
 The whole feature is one rule: **how you asked decides how you are answered.**
 Speak and the reply is spoken as well as printed; type and it is only printed.
-No toggle, no settings screen, no preference to persist.
+This is the default. More also offers read-every-reply and speech-language
+preferences. The voice screen offers a session-only Keep talking toggle.
 
 The offline promise is the hard part, and it is where the easy path quietly
 breaks it:
@@ -132,7 +132,7 @@ breaks it:
   promise.
 - The text-to-speech voice has to be one that neither needs the network nor
   still needs downloading. If nothing qualifies, the answer is printed and the
-  phone stays quiet rather than half-succeeding.
+  phone displays an explanation instead of using an unchecked voice.
 - Missing a language pack is the Swedish case, and the only speech failure
   with anything to do about it: from API 33 the app offers
   `triggerModelDownload()` and re-checks, rather than guessing. Below that it
@@ -149,8 +149,7 @@ is requested on the first microphone tap, never at launch. Below API 31 there
 is no on-device recogniser API, so there is no microphone and no **Talk**
 shortcut — that entry lives in `res/xml-v31/` and older devices never load it.
 
-The reasoning, the traps and the parts deliberately not built (a wake word,
-continuous conversation, a settings screen) are in
+The reasoning, the traps and the original design tradeoffs (including the absence of a wake word) are in
 [`docs/voice.md`](docs/voice.md).
 
 ---
