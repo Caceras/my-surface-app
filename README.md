@@ -16,6 +16,14 @@
 
 ---
 
+## Assistant improvements
+
+The current assistant work is documented in [the Pixel audit and device checklist](docs/pixel-assistant-audit.md).
+It adds shared text/voice history, draft recovery, stop-generation and read-aloud controls,
+English/Swedish speech selection, an opt-in continuous voice session, Type/Talk widget
+buttons, and Android assistant-role entry. See that document for current behavior;
+older design rationale below describes the original prototype.
+
 ## What this is
 
 Select text in any app on your Pixel, tap **Ask Nano**, and type — or say —
@@ -220,8 +228,8 @@ forever.
 prerelease at `/releases/tag/preview-<branch>`, with both APKs attached and the
 same rolling-tag trick, so a branch keeps one URL for as long as it exists. It
 is marked as a prerelease, which is what keeps `/releases/latest` meaning "the
-build from `main`". Same debug key as everything else here, so it installs
-straight over whatever is already on the phone.
+build from `main`". Upgrading an existing install requires the same signing key; the current workflow
+does not persist one. See [Signing](docs/delivery.md#signing) before installing.
 
 ---
 

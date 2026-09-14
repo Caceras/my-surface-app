@@ -45,15 +45,5 @@
             android:targetPackage="com.caceras.surfacelab.nano" />
     </shortcut>
 
-    <shortcut
-        android:enabled="true"
-        android:icon="@drawable/ic_surface"
-        android:shortcutId="beta"
-        android:shortcutShortLabel="@string/shortcut_beta">
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:targetClass="com.caceras.surfacelab.MainActivity"
-            android:targetPackage="com.caceras.surfacelab.nano" />
-    </shortcut>
 
 </shortcuts>

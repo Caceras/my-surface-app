@@ -278,9 +278,10 @@ class ConversationTest {
 
     @Test
     fun `shared text is staged and does not send or replace a draft`() {
-        val activity = launch().get()
+        val controller = launch()
+        val activity = controller.get()
         composer(activity).setText("my draft")
-        activity.onNewIntent(android.content.Intent(android.content.Intent.ACTION_SEND)
+        controller.newIntent(android.content.Intent(android.content.Intent.ACTION_SEND)
             .putExtra(android.content.Intent.EXTRA_TEXT, "selected material"))
         assertEquals("my draft\n\nselected material", composer(activity).text.toString())
         assertEquals(0, brain.runs)

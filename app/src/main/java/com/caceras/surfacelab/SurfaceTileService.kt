@@ -6,7 +6,6 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import android.widget.Toast
 
 /**
  * Quick Settings tile. The system binds this service only while the shade is
@@ -35,17 +34,7 @@ class SurfaceTileService : TileService() {
         if (isSecure) unlockAndRun { launch() } else launch()
     }
 
-    /**
-     * A tile is tappable on the lock screen, and for this tile that means
-     * opening a microphone and writing the answer somewhere the home screen
-     * widget will show it. isSecure() and unlockAndRun() make the phone ask
-     * for the PIN first. Nothing else in this app has needed that, because
-     * nothing else in it starts a private session from the shade.
-     */
-    private fun talk() {
-        if (isSecure) unlockAndRun { launch() } else launch()
-    }
-
+    /** Open a foreground surface so permission and model setup remain visible. */
     private fun launch() {
         // A service is not an activity, so the intent inside needs
         // FLAG_ACTIVITY_NEW_TASK or the launch is refused outright.

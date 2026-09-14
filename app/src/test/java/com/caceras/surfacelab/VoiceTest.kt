@@ -365,6 +365,34 @@ class VoiceTest {
             shadowOf(activity).nextStartedActivity.component?.className)
     }
 
+    @Test
+    fun `continuous conversation listens again only when explicitly enabled`() {
+        val activity = open().get()
+        val toggle = descendants(activity.findViewById(android.R.id.content))
+            .filterIsInstance<android.widget.Switch>().first()
+        assertFalse(toggle.isChecked)
+        toggle.isChecked = true
+        say("first question")
+        val first = ShadowSpeechRecognizer.getLatestSpeechRecognizer()
+        brain.complete("First answer.")
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
+        assertTrue(first !== ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+        say("and then?")
+        assertTrue(brain.instruction.contains("first question"))
+    }
+
+    @Test
+    fun `silence ends continuous conversation without a retry loop`() {
+        val activity = open().get()
+        val toggle = descendants(activity.findViewById(android.R.id.content))
+            .filterIsInstance<android.widget.Switch>().first()
+        toggle.isChecked = true
+        recognizer().triggerOnError(SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
+        drain()
+        assertFalse(toggle.isChecked)
+        assertEquals(0, brain.runs)
+    }
+
 }
 
 /**

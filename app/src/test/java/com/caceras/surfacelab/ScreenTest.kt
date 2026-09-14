@@ -337,4 +337,36 @@ class ScreenTest {
         assertTrue((row!!.getChildAt(0) as LinearLayout).childCount ==
             Prompts.ABOUT_SELECTION.size)
     }
+    @Test
+    fun `send and microphone have accessible touch targets`() {
+        ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+        val activity = launchMain().get()
+        val controls = descendants(content(activity)).filterIsInstance<android.widget.ImageButton>()
+        controls.forEach { control ->
+            assertTrue(control.minimumHeight >= activity.dp(48))
+            assertTrue(control.minimumWidth >= activity.dp(48))
+        }
+    }
+
+    @Test
+    fun `keyboard send submits the current draft`() {
+        val activity = launchMain().get()
+        composer(activity).setText("keyboard message")
+        composer(activity).onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_SEND)
+        assertEquals(listOf("keyboard message", "KEYBOARD MESSAGE"), bubbles(activity))
+    }
+
+    @Test
+    fun `voice transcript has usable height inside its card`() {
+        val activity = Robolectric.buildActivity(VoiceActivity::class.java).setup().get()
+        val decor = activity.window.decorView
+        val width = activity.dp(411)
+        val height = activity.dp(914)
+        decor.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+        decor.layout(0, 0, width, height)
+        val scroll = descendants(decor).filterIsInstance<ScrollView>().first()
+        assertTrue("voice transcript collapsed to zero height", scroll.height > activity.dp(120))
+    }
+
 }

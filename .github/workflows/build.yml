@@ -165,8 +165,8 @@ jobs:
           This is build **$GITHUB_RUN_NUMBER**; the app shows the same number behind
           **More** on its first screen, so you can tell at a glance whether the install took.
 
-          A preview is signed with the same debug key as every other build here, so it
-          upgrades over an existing install of the same flavour. It is a prerelease, so
+          Upgrades require the same signing key. This workflow does not persist a
+          keystore, so a preview may not upgrade an existing install. It is a prerelease, so
           \`/releases/latest\` still points at the build from main."
 
   release:

@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.AlertDialog
 import android.app.Activity
 import android.app.StatusBarManager
+import android.app.role.RoleManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
@@ -260,12 +261,30 @@ class MainActivity : Activity() {
                 if (!checked) mouth?.hush()
             }
         })
+        panel.addView(flatButton(getString(R.string.speech_language)) {
+            AlertDialog.Builder(this).setTitle(R.string.speech_language)
+                .setItems(arrayOf("System language", "English", "Svenska")) { _, which ->
+                    ears.cancel()
+                    listening = false
+                    setMicActive(false)
+                    updateSend()
+                    mouth?.hush()
+                    getSharedPreferences("surfacelab", MODE_PRIVATE).edit()
+                        .putString("speech_language", arrayOf<String?>(null, "en-US", "sv-SE")[which]).apply()
+                    status.text = getString(R.string.language_selected, ears.locale().displayLanguage)
+                }.show()
+        })
         panel.addView(flatButton(getString(R.string.voice_settings)) {
             runCatching { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                 .onFailure { status.text = getString(R.string.settings_unavailable) }
         })
         panel.addView(flatButton(getString(R.string.default_assistant)) {
-            runCatching { startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)) }
+            runCatching {
+                val roles = getSystemService(RoleManager::class.java)
+                if (roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && !roles.isRoleHeld(RoleManager.ROLE_ASSISTANT))
+                    startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT), 2)
+                else startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+            }
                 .onFailure { status.text = getString(R.string.settings_unavailable) }
         })
         panel.addView(flatButton(getString(R.string.open_voice)) {
@@ -442,13 +461,14 @@ class MainActivity : Activity() {
         }
         bar.addView(send)
         playback = flatButton(getString(R.string.read_last)) {
-            if (mouth?.speaking() == true) {
+            if (busy || mouth?.speaking() == true) {
                 mouth?.hush()
                 playback.text = getString(R.string.read_last)
             } else history.lastOrNull()?.let { readAloud(it.reply) }
         }
         playback.gravity = Gravity.CENTER
         playback.minHeight = dp(48)
+        playback.visibility = if (Chat.load(this).isEmpty()) View.GONE else View.VISIBLE
         updateSend()
 
         return LinearLayout(this).apply {
@@ -494,6 +514,7 @@ class MainActivity : Activity() {
 
         val token = ++requestId
         busy = true
+        playback.visibility = View.VISIBLE
         pendingQuestion = text
         input.setText("")
         Chat.saveDraft(this, "")
@@ -505,7 +526,10 @@ class MainActivity : Activity() {
         val answer = addBubble(getString(R.string.working), fromUser = false)
         pendingAnswer = answer
 
-        if (aloud) speaker().begin(ears.locale())
+        if (aloud) {
+            playback.text = getString(R.string.stop_speaking)
+            speaker().begin(ears.locale())
+        }
 
         val brain = Brains.get()
         brain.run(
@@ -585,6 +609,7 @@ class MainActivity : Activity() {
         Chat.clear(this)
         Chat.saveDraft(this, "")
         ResultStore.clear(this)
+        playback.visibility = View.GONE
         messages.removeAllViews()
         messages.addView(emptyState(), wide())
         showBlank(true)
@@ -636,6 +661,7 @@ class MainActivity : Activity() {
     }
 
     private fun readAloud(text: String) {
+        stopAnswer()
         ears.cancel()
         listening = false
         setMicActive(false)
@@ -645,7 +671,9 @@ class MainActivity : Activity() {
     }
 
     private fun answerActions(bubble: TextView, text: String) {
-        bubble.contentDescription = getString(R.string.answer_actions)
+        // Keep the answer itself readable by TalkBack; actions are a hint.
+        bubble.contentDescription = text + ". " + getString(R.string.answer_actions)
+        bubble.isFocusable = true
         bubble.setOnLongClickListener {
             mouth?.hush()
             AlertDialog.Builder(this).setItems(arrayOf(
@@ -768,7 +796,13 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (::messages.isInitialized && !busy && Chat.load(this) != history) restoreHistory()
+        if (::messages.isInitialized && !busy && Chat.load(this) != history) {
+            restoreHistory()
+            playback.visibility = if (history.isEmpty()) View.GONE else View.VISIBLE
+        }
+        if (::input.isInitialized && input.text.isBlank() && Chat.draft(this).isNotBlank()) {
+            input.setText(Chat.draft(this))
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

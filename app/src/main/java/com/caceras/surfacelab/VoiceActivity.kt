@@ -5,6 +5,9 @@ import android.app.Activity
 import android.content.pm.PackageManager
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.widget.Switch
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -62,6 +65,12 @@ class VoiceActivity : Activity() {
     private var generating = false
     private var lastQuestion = ""
     private var speechProblem: String? = null
+    private var continuous = false
+    private lateinit var continuousSwitch: Switch
+    private val main = Handler(Looper.getMainLooper())
+    private val nextListen = Runnable {
+        if (resumed && continuous && !generating && state == State.IDLE) requestListen()
+    }
 
     /**
      * A microphone that should start as soon as this screen is in front.
@@ -191,6 +200,16 @@ class VoiceActivity : Activity() {
             background = getDrawable(R.drawable.bubble_ai)
             padDp(22, 20, 22, 14)
             addView(head, wide())
+            continuousSwitch = Switch(this@VoiceActivity).apply {
+                text = getString(R.string.keep_talking)
+                minHeight = dp(48)
+                setTextColor(color(R.color.text_dim))
+                setOnCheckedChangeListener { _, checked ->
+                    continuous = checked
+                    if (!checked) main.removeCallbacks(nextListen)
+                }
+            }
+            addView(continuousSwitch, wide())
             addView(scroller, LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
             ))
@@ -259,10 +278,11 @@ class VoiceActivity : Activity() {
             // Saying nothing is the ordinary way a session ends, not an
             // error. Back to idle, showing nothing, unless the answer is
             // already on its way.
-            if (state == State.LISTENING) idle()
+            if (state == State.LISTENING) { continuousSwitch.isChecked = false; idle() }
             return
         }
 
+        continuousSwitch.isChecked = false
         state = State.IDLE
         dot.visibility = View.GONE
         status.text = problem.message
@@ -312,13 +332,32 @@ class VoiceActivity : Activity() {
         status.text = getString(R.string.working)
         dot.visibility = View.GONE
 
+        action.text = getString(R.string.stop_response)
+        action.visibility = View.VISIBLE
+        action.setOnClickListener {
+            requestId++
+            Brains.get().cancel()
+            generating = false
+            continuousSwitch.isChecked = false
+            mouth?.hush()
+            answer.append("\n\n" + getString(R.string.response_stopped))
+            idle()
+        }
         val voice = speaker()
-        voice.begin(ears.locale())
-        voice.onIdle = { if (!gone && !generating && state == State.SPEAKING) idleWith(speechProblem ?: getString(R.string.tap_to_talk)) }
+        voice.onIdle = {
+            if (!gone && !generating && state == State.SPEAKING) {
+                idleWith(speechProblem ?: getString(R.string.tap_to_talk))
+                if (continuous && speechProblem == null) {
+                    main.removeCallbacks(nextListen)
+                    main.postDelayed(nextListen, 500)
+                }
+            }
+        }
         voice.onProblem = { problem ->
             speechProblem = problem
             if (!gone) status.text = problem
         }
+        voice.begin(ears.locale())
 
         Brains.get().run(
             context = this,
@@ -404,6 +443,8 @@ class VoiceActivity : Activity() {
      */
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            main.removeCallbacks(nextListen)
+            if (state == State.SPEAKING || state == State.THINKING) continuousSwitch.isChecked = false
             mouth?.hush()
             if (!generating && state == State.SPEAKING) idle()
         }
@@ -447,6 +488,8 @@ class VoiceActivity : Activity() {
     override fun onPause() {
         super.onPause()
         resumed = false
+        main.removeCallbacks(nextListen)
+        continuousSwitch.isChecked = false
         requestId++
         if (generating) {
             Brains.get().cancel()

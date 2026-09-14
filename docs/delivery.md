@@ -44,8 +44,8 @@ publishes its own release as well:
 ```
 
 Same two APKs, same rolling-tag trick — the tag is replaced on every push to
-that branch, so the URL is stable for the life of the branch — and the same
-debug key, so it installs straight over whatever is on the phone.
+that branch, so the URL is stable for the life of the branch — but upgrading an existing install requires the same signing key. The workflow
+does not currently persist a keystore, so an upgrade is not guaranteed.
 
 It is created with `--prerelease`, and that flag is the whole reason this is
 safe to add: GitHub excludes prereleases from `/releases/latest`, so the

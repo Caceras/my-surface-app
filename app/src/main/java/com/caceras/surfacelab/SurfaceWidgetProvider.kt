@@ -7,21 +7,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
-/**
- * Home screen widget showing the most recent result. A widget has no process
- * of its own, so everything it displays has to come from storage -- see
- * ResultStore.
- *
- * Tapping it opens the hands-free screen, which is the third entry point to
- * voice alongside the tile and the app shortcut: ask from the home screen and
- * the answer is written back here, because every surface saves through
- * ResultStore. On a phone with no on-device recogniser the tap falls back to
- * the refresh broadcast this provider has always handled.
- */
+/** Last answer with explicit Type and Talk entry points into the shared conversation. */
 class SurfaceWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(

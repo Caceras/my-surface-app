@@ -19,18 +19,7 @@ import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice as TtsVoice
 import java.util.Locale
 
-/**
- * Speech in and speech out, with framework APIs only.
- *
- * Two small classes rather than an interface: unlike SurfaceBrain there is
- * only ever one implementation, and a seam with one side is just ceremony.
- *
- * The rule the rest of the app follows is that modality is inherited, not
- * configured. Ask by voice and the answer is spoken; type and it is not.
- * There is no setting, because there is nothing to set.
- *
- * See docs/voice.md for why each of the guards below exists.
- */
+/** Offline recognition and playback through Android framework APIs. */
 
 /**
  * Why a listening session ended badly.
@@ -62,7 +51,9 @@ class Ears(private val context: Context) {
             SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
 
     /** The locale the recogniser is asked for, and the one TTS answers in. */
-    fun locale(): Locale = Locale.getDefault()
+    fun locale(): Locale = context.getSharedPreferences("surfacelab", Context.MODE_PRIVATE)
+        .getString("speech_language", null)?.let { Locale.forLanguageTag(it) }
+        ?: Locale.getDefault()
 
     /**
      * Start listening. [onPartial] fires repeatedly as words are recognised,
