@@ -40,6 +40,7 @@ fun Context.pill(value: String, primary: Boolean = false, onClick: () -> Unit) =
     val shape = surface(if (primary) R.color.accent else R.color.chip_bg, 28)
     background = RippleDrawable(ColorStateList.valueOf(ink(R.color.outline)), shape, null)
     isFocusable = true
+    buttonSemantics()
     setOnClickListener {
         performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
         onClick()
@@ -56,6 +57,7 @@ fun View.arrive() {
 }
 
 fun Activity.readableSystemBars(target: android.view.Window = window) {
+    NativePrivacy.apply(this, target)
     val light = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_YES
     if (Build.VERSION.SDK_INT >= 30) {
         val mask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
@@ -63,5 +65,15 @@ fun Activity.readableSystemBars(target: android.view.Window = window) {
     } else {
         @Suppress("DEPRECATION")
         target.decorView.systemUiVisibility = if (light) View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR else 0
+    }
+}
+
+/** Custom-styled text controls still announce their native action role. */
+fun View.buttonSemantics() {
+    accessibilityDelegate = object : View.AccessibilityDelegate() {
+        override fun onInitializeAccessibilityNodeInfo(host: View, info: android.view.accessibility.AccessibilityNodeInfo) {
+            super.onInitializeAccessibilityNodeInfo(host, info)
+            info.className = android.widget.Button::class.java.name
+        }
     }
 }

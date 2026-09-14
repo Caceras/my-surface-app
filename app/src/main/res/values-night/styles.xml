@@ -1,6 +1,6 @@
 <resources>
     <style name="SurfaceDialog" parent="@android:style/Theme.DeviceDefault.Dialog.Alert">
-        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:colorAccent">@color/accent_text</item>
         <item name="android:colorBackground">@color/composer_bg</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_dim</item>

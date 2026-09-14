@@ -121,4 +121,20 @@ class SpeechOutputTest {
         assertTrue(chunks.all { it.length <= TextToSpeech.getMaxSpeechInputLength() })
         mouth.close()
     }
+    @Test fun `headset stop mutes the rest of a streamed answer`() {
+        ShadowTextToSpeech.addVoice(voice("local", Locale.US))
+        val mouth = Mouth(RuntimeEnvironment.getApplication())
+        val engine = ready(mouth)
+        var reason: String? = null
+        mouth.onProblem = { reason = it }
+        mouth.follow("First sentence.")
+        val controls = org.robolectric.util.ReflectionHelpers.getField<SpeechControls>(mouth, "controls")
+        controls.callback.onStop()
+        mouth.follow("First sentence. Unwanted second sentence.")
+        assertNotNull(reason)
+        assertFalse(mouth.speaking())
+        assertEquals(listOf("First sentence."), shadowOf(engine).spokenTextList)
+        mouth.close()
+    }
+
 }

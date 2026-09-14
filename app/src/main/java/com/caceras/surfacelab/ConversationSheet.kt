@@ -31,7 +31,7 @@ class ConversationSheet(private val activity: Activity, private val open: (Strin
             isFocusableInTouchMode = true
             addView(LinearLayout(context).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                addView(context.label("Conversations", 25f).apply { medium() }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(context.label("Conversations", 25f).apply { medium(); isAccessibilityHeading = true }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(context.pill("Done") { dismiss() })
             }, LinearLayout.LayoutParams(-1, -2))
             addView(context.label("Pick up where you left off.", 15f, true).apply { padDp(0, 10, 0, 20) })
@@ -62,13 +62,12 @@ class ConversationSheet(private val activity: Activity, private val open: (Strin
                     .setTitle("Clear saved conversations?")
                     .setMessage("Your current chat stays open. Saved conversations will be removed from this phone.")
                     .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Clear saved") { _, _ -> Chat.clearArchives(context); refresh() }.show()
+                    .setPositiveButton("Clear saved") { _, _ -> Chat.clearArchives(context); refresh() }.showProtected(context)
             }, LinearLayout.LayoutParams(-1, -2))
         }
-        setContentView(body)
+        setContentView(AdaptiveFrame(activity, body).apply { padForSystemBars() })
         window?.setBackgroundDrawableResource(R.color.chat_bg)
         window?.let { activity.readableSystemBars(it) }
-        body.padForSystemBars()
         body.requestFocus()
         refresh()
     }
@@ -106,7 +105,7 @@ class ConversationSheet(private val activity: Activity, private val open: (Strin
                     addView(context.pill("Delete") {
                         AlertDialog.Builder(context).setTitle("Delete conversation?")
                             .setMessage(saved.title).setNegativeButton("Cancel", null)
-                            .setPositiveButton("Delete") { _, _ -> Chat.deleteArchive(context, saved.id); refresh() }.show()
+                            .setPositiveButton("Delete") { _, _ -> Chat.deleteArchive(context, saved.id); refresh() }.showProtected(context)
                     }.apply { contentDescription = "Delete ${saved.title}" })
                 })
             }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = context.dp(12) })

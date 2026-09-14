@@ -61,7 +61,7 @@ class VoiceActivity : Activity() {
             if (::guidance.isInitialized) {
                 guidance.isClickable = value == State.SPEAKING
                 guidance.isFocusable = value == State.SPEAKING
-                guidance.setTextColor(color(if (value == State.SPEAKING) R.color.accent else R.color.text_dim))
+                guidance.setTextColor(color(if (value == State.SPEAKING) R.color.accent_text else R.color.text_dim))
                 guidance.background = if (value == State.SPEAKING) surface(R.color.chip_bg, 24) else null
             }
             if (::dot.isInitialized) dot.show(when (value) {
@@ -108,7 +108,7 @@ class VoiceActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(build())
+        setContentView(AdaptiveFrame(this, build()).apply { padForSystemBars() })
         readableSystemBars()
         setupMode = intent.getBooleanExtra("setup", false)
 
@@ -147,10 +147,20 @@ class VoiceActivity : Activity() {
         dot = presence(96).apply { visibility = View.INVISIBLE }
         heard = label("", 23f).apply { padDp(4, 20, 4, 4) }
         answer = label("", 17f, true).apply { padDp(4, 12, 4, 20); setLineSpacing(dp(3).toFloat(), 1.15f) }
+        guidance = label("Speak, pause, and hear a reply.", 14f, true).apply {
+            gravity = Gravity.CENTER; minHeight = dp(48)
+            setOnClickListener { if (state == State.SPEAKING) quietVoice() }
+            buttonSemantics(); padDp(0, 10, 0, 10)
+        }
         scroller = ReadingScrollView(this).apply {
             tag = "voice-transcript"
             addView(LinearLayout(this@VoiceActivity).apply {
                 orientation = LinearLayout.VERTICAL
+                addView(dot, LinearLayout.LayoutParams(dp(96), dp(96)).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(24); bottomMargin = dp(20)
+                })
+                addView(status, wide())
+                addView(guidance, wide())
                 addView(heard, wide())
                 addView(answer, wide())
                 setupTools = LinearLayout(this@VoiceActivity).apply {
@@ -186,22 +196,9 @@ class VoiceActivity : Activity() {
             padDp(24, 12, 24, 12)
             addView(LinearLayout(this@VoiceActivity).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                addView(label("Surface / voice", 18f).apply { medium() }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(label("Ægentica AI / voice", 18f).apply { medium(); isAccessibilityHeading = true }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(pill(getString(R.string.close)) { finish() })
             }, wide())
-            addView(dot, LinearLayout.LayoutParams(dp(96), dp(96)).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = dp(28)
-                bottomMargin = dp(24)
-            })
-            addView(status, wide())
-            guidance = label("Speak, pause, and hear a reply.", 14f, true).apply {
-                gravity = Gravity.CENTER
-                minHeight = dp(48)
-                setOnClickListener { if (state == State.SPEAKING) quietVoice() }
-                padDp(0, 10, 0, 10)
-            }
-            addView(guidance, wide())
             addView(android.widget.FrameLayout(this@VoiceActivity).apply {
                 addView(scroller, android.widget.FrameLayout.LayoutParams(-1, -1))
                 val latest = pill("Latest reply") { scroller.latest() }.apply {
@@ -226,7 +223,6 @@ class VoiceActivity : Activity() {
                 gravity = Gravity.CENTER
                 padDp(0, 14, 0, 4)
             }, wide())
-            padForSystemBars()
         }
         return card
     }
@@ -291,10 +287,10 @@ class VoiceActivity : Activity() {
                                     android.net.Uri.parse("package:$packageName"))
                             }
                             runCatching { startActivity(target) }.onFailure { answer.text = getString(R.string.settings_unavailable) }
-                        }.show()
+                        }.showProtected(this)
                     4 -> requestListen()
                 }
-            }.setNegativeButton("Done", null).show()
+            }.setNegativeButton("Done", null).showProtected(this)
     }
 
     private fun chooseLanguage() {
@@ -311,8 +307,8 @@ class VoiceActivity : Activity() {
                 AlertDialog.Builder(this).setTitle(names[which])
                     .setMessage("Prepare offline speech for this language? The initial download needs an internet connection.")
                     .setPositiveButton("Download") { _, _ -> downloadLanguage() }
-                    .setNegativeButton("Try talking") { _, _ -> requestListen() }.show()
-            }.setNegativeButton("Cancel", null).show()
+                    .setNegativeButton("Try talking") { _, _ -> requestListen() }.showProtected(this)
+            }.setNegativeButton("Cancel", null).showProtected(this)
     }
 
     private fun downloadLanguage() {
@@ -600,6 +596,7 @@ class VoiceActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        NativePrivacy.apply(this, window)
         resumed = true
         if (pendingListen) {
             pendingListen = false

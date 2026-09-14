@@ -85,6 +85,7 @@ class MainActivity : Activity() {
     private lateinit var playback: TextView
     private var settingsDialog: Dialog? = null
     private var conversationsDialog: Dialog? = null
+    private var actionsDialog: Dialog? = null
     private val streamed = StreamUpdates { text ->
         pendingAnswer?.text = Markdown.render(text, dp(18))
         scrollToEnd()
@@ -115,10 +116,9 @@ class MainActivity : Activity() {
         ))
         root.addView(composer(), wide())
 
-        setContentView(root)
+        setContentView(AdaptiveFrame(this, root).apply { padForSystemBars() })
         root.isFocusableInTouchMode = true
         root.requestFocus()
-        root.padForSystemBars()
         readableSystemBars()
 
         brain.status(this) { if (!gone && !busy) status.text = it.label }
@@ -155,6 +155,10 @@ class MainActivity : Activity() {
     }
 
     private fun acceptIntent(intent: Intent?) {
+        when (intent?.action) {
+            NativeShortcuts.HISTORY -> input.post { if (!gone) showConversations() }
+            NativeShortcuts.ACTIONS -> input.post { if (!gone) showActions() }
+        }
         if (intent?.action == Intent.ACTION_SEND) {
             val shared = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty().trim()
             if (shared.isNotEmpty()) {
@@ -169,23 +173,28 @@ class MainActivity : Activity() {
     // ------------------------------------------------------------- chrome
 
     private fun header(brain: SurfaceBrain): View {
+        val compact = resources.configuration.screenWidthDp < 380 || resources.configuration.fontScale > 1.2f
         val titles = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(label("Surface", 24f).apply { medium(); letterSpacing = -0.035f })
+            addView(label(getString(R.string.app_name), 23f).apply {
+                tag = "brand-title"; medium(); letterSpacing = -0.035f; isAccessibilityHeading = true
+            })
             status = label("Your on-device assistant", 11f, true).apply {
-                maxLines = 2
-                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+                maxLines = 2; accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
             }
             addView(status)
         }
-        return LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            padDp(20, 12, 20, 12)
-            addView(titles, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(pill(getString(R.string.new_chat)) { newChat() }.apply {
-                tooltipText = "Save this conversation and start a new one"
-            })
+        val actions = LinearLayout(this).apply {
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            addView(pill(getString(R.string.new_chat)) { newChat() }.apply { tooltipText = "Save this conversation and start a new one" })
             addView(flatButton(getString(R.string.more)) { showSettings(brain) }.apply { padDp(12, 14, 0, 14) })
+        }
+        return LinearLayout(this).apply {
+            orientation = if (compact) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            padDp(20, 12, 20, 8)
+            addView(titles, if (compact) wide() else LinearLayout.LayoutParams(0, -2, 1f))
+            addView(actions, if (compact) wide() else LinearLayout.LayoutParams(-2, -2))
         }
     }
 
@@ -210,12 +219,11 @@ class MainActivity : Activity() {
                 addView(morePanel(brain), wide())
             }, LinearLayout.LayoutParams(-1, 0, 1f))
         }
-        dialog.setContentView(body)
+        dialog.setContentView(AdaptiveFrame(this, body).apply { padForSystemBars() })
         dialog.window?.setBackgroundDrawableResource(R.color.chat_bg)
         dialog.show()
         dialog.window?.setLayout(-1, -1)
         dialog.window?.let { readableSystemBars(it) }
-        body.padForSystemBars()
     }
 
     /**
@@ -293,8 +301,26 @@ class MainActivity : Activity() {
         panel.addView(flatButton(getString(R.string.open_voice)) {
             startActivity(Intent(this, VoiceActivity::class.java))
         })
+        panel.addView(pill("On your phone · Actions") { settingsDialog?.dismiss(); showActions() })
+        panel.addView(label("PRIVACY", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 8); isAccessibilityHeading = true })
+        panel.addView(Switch(this).apply {
+            text = "Show last answer on widget"; minHeight = dp(52)
+            isChecked = NativePrivacy.widgetPreview(this@MainActivity)
+            setOnCheckedChangeListener { _, checked -> NativePrivacy.setWidgetPreview(this@MainActivity, checked) }
+        })
+        panel.addView(label("Off by default. People who can see your home screen can read an enabled preview.", 13f, true))
+        panel.addView(Switch(this).apply {
+            text = "Private screen"; minHeight = dp(52)
+            isChecked = NativePrivacy.privateScreen(this@MainActivity)
+            setOnCheckedChangeListener { _, checked ->
+                NativePrivacy.setPrivateScreen(this@MainActivity, checked)
+                NativePrivacy.apply(this@MainActivity, window)
+                NativePrivacy.apply(this@MainActivity, settingsDialog?.window)
+            }
+        })
+        panel.addView(label("Hide app previews and block screenshots or screen sharing. Widgets have their own setting above.", 13f, true))
         panel.addView(label("EVERYWHERE YOU NEED IT", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 4) })
-        line("Digital assistant", "Choose Surface Preview in Android settings to use the assistant gesture. Availability depends on your device settings.")
+        line("Digital assistant", "Choose Ægentica AI in Android settings to use the assistant gesture. Availability depends on your device settings.")
         line("Text selection", "Select text anywhere: " +
             brain.tasks.joinToString(", ") { it.alias })
         line("Quick Settings tile", "Shade, Edit tiles, or the button below.")
@@ -305,7 +331,9 @@ class MainActivity : Activity() {
                 ComponentName(this, SurfaceWidgetProvider::class.java), null, null)
             else Toast.makeText(this, "Long-press your home screen, then choose Widgets.", Toast.LENGTH_LONG).show()
         })
-        line("App shortcuts", "Long-press the app icon in the launcher.")
+        line("App shortcuts", "Long-press the app icon for Chat, Voice, History and Actions.")
+        panel.addView(flatButton("Pin chat shortcut") { NativeShortcuts.pin(this, false) })
+        if (ears.available()) panel.addView(flatButton("Pin voice shortcut") { NativeShortcuts.pin(this, true) })
         line("Share sheet", "Share any text into this app.")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -316,7 +344,15 @@ class MainActivity : Activity() {
                         getString(R.string.app_name),
                         Icon.createWithResource(this, R.drawable.ic_surface),
                         mainExecutor
-                    ) { /* result code, ignored for a prototype */ }
+                    ) { result ->
+                        val message = when (result) {
+                            StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> "Voice tile added"
+                            StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> "Voice tile is already available"
+                            StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_NOT_ADDED -> "Tile was not added. You can try again or use Android’s tile editor."
+                            else -> "Could not add the tile. Try Android’s tile editor."
+                        }
+                        if (!gone) Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                    }
             })
         }
 
@@ -324,7 +360,7 @@ class MainActivity : Activity() {
         panel.addView(label("Saved on this phone. Export before reinstalling to keep your conversation.", 14f, true))
         panel.addView(flatButton("Export conversation") {
             startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
-                .setType("application/json").putExtra(Intent.EXTRA_TITLE, "surface-conversation.json"), EXPORT_CHAT)
+                .setType("application/json").putExtra(Intent.EXTRA_TITLE, "aegentica-conversation.json"), EXPORT_CHAT)
         })
         panel.addView(flatButton("Restore conversation") {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
@@ -378,7 +414,7 @@ class MainActivity : Activity() {
                                 playback.visibility = View.GONE
                                 turns.lastOrNull()?.let { ResultStore.save(this, Task.ASK, it.reply) }
                                 settingsDialog?.dismiss()
-                            }.setNegativeButton("Cancel", null).show()
+                            }.setNegativeButton("Cancel", null).showProtected(this)
                     }
                 }
             } catch (e: Exception) {
@@ -533,7 +569,7 @@ class MainActivity : Activity() {
                 InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
                 InputType.TYPE_TEXT_FLAG_MULTI_LINE
             maxLines = 5
-            imeOptions = EditorInfo.IME_ACTION_SEND
+            imeOptions = EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
             setOnEditorActionListener { _, actionId, event ->
                 val submit = actionId == EditorInfo.IME_ACTION_SEND ||
                     (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.isCtrlPressed &&
@@ -609,8 +645,9 @@ class MainActivity : Activity() {
                 gravity = Gravity.CENTER_VERTICAL
                 addView(flatButton("Voice") {
                     startActivity(Intent(this@MainActivity, VoiceActivity::class.java))
-                }.apply { tag = "voice-entry"; padDp(16, 12, 16, 12) })
-                addView(flatButton("Conversations") { showConversations() }.apply { padDp(12, 12, 12, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
+                }.apply { tag = "voice-entry"; gravity = Gravity.CENTER; padDp(4, 12, 4, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(flatButton("Conversations") { showConversations() }.apply { textSize = 13f; gravity = Gravity.CENTER; padDp(2, 12, 2, 12) }, LinearLayout.LayoutParams(0, -2, 1.45f))
+                addView(flatButton("Actions") { showActions() }.apply { gravity = Gravity.CENTER; padDp(4, 12, 4, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
             }, wide())
             addView(playback, wide())
         }
@@ -619,6 +656,34 @@ class MainActivity : Activity() {
     private fun hushPlayback() {
         mouth?.hush()
         playback.visibility = View.GONE
+    }
+
+    private fun showActions() {
+        if (actionsDialog?.isShowing == true) return
+        stopAnswer(); ears.cancel(); listening = false; setMicActive(false); hushPlayback(); updateSend()
+        getSystemService(android.view.inputmethod.InputMethodManager::class.java).hideSoftInputFromWindow(input.windowToken, 0)
+        actionsDialog = NativeActions.show(this, input.text.toString())
+    }
+
+    override fun onKeyShortcut(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (event.isCtrlPressed) when (keyCode) {
+            android.view.KeyEvent.KEYCODE_ENTER -> { submitDraft(); return true }
+            android.view.KeyEvent.KEYCODE_N -> { newChat(); return true }
+            android.view.KeyEvent.KEYCODE_L -> { input.requestFocus(); getSystemService(android.view.inputmethod.InputMethodManager::class.java).showSoftInput(input, 0); return true }
+            android.view.KeyEvent.KEYCODE_V -> if (event.isShiftPressed) { startActivity(Intent(this, VoiceActivity::class.java)); return true }
+        }
+        return super.onKeyShortcut(keyCode, event)
+    }
+
+    override fun onProvideKeyboardShortcuts(data: MutableList<android.view.KeyboardShortcutGroup>, menu: android.view.Menu?, deviceId: Int) {
+        super.onProvideKeyboardShortcuts(data, menu, deviceId)
+        val ctrl = android.view.KeyEvent.META_CTRL_ON
+        data.add(android.view.KeyboardShortcutGroup(getString(R.string.app_name), listOf(
+            android.view.KeyboardShortcutInfo("Send draft", android.view.KeyEvent.KEYCODE_ENTER, ctrl),
+            android.view.KeyboardShortcutInfo("New conversation", android.view.KeyEvent.KEYCODE_N, ctrl),
+            android.view.KeyboardShortcutInfo("Focus composer", android.view.KeyEvent.KEYCODE_L, ctrl),
+            android.view.KeyboardShortcutInfo("Open voice", android.view.KeyEvent.KEYCODE_V, ctrl or android.view.KeyEvent.META_SHIFT_ON)
+        )))
     }
 
     private fun showConversations() {
@@ -874,7 +939,7 @@ class MainActivity : Activity() {
                 tag = bubble
                 addView(flatButton("Listen") { readAloud(text) }.apply { padDp(4, 10, 18, 10) })
                 addView(flatButton("Copy") {
-                    getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Answer", text))
+                    NativePrivacy.copy(this@MainActivity, "Answer", text)
                     Toast.makeText(this@MainActivity, "Copied", Toast.LENGTH_SHORT).show()
                 }.apply { padDp(12, 10, 18, 10) })
                 addView(flatButton("Share") {
@@ -889,13 +954,12 @@ class MainActivity : Activity() {
                 getString(R.string.copy), getString(R.string.read_aloud), getString(R.string.share_answer)
             )) { _, which ->
                 when (which) {
-                    0 -> getSystemService(ClipboardManager::class.java)
-                        .setPrimaryClip(ClipData.newPlainText("Answer", text))
+                    0 -> NativePrivacy.copy(this@MainActivity, "Answer", text)
                     1 -> readAloud(text)
                     2 -> startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND)
                         .setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), getString(R.string.share_answer)))
                 }
-            }.show()
+            }.showProtected(this)
             true
         }
     }
@@ -964,7 +1028,7 @@ class MainActivity : Activity() {
             .setMessage(problem.message + " Your draft is safe. Open voice setup to choose a language, download speech or test the speaker.")
             .setPositiveButton("Voice setup") { _, _ ->
                 startActivity(Intent(this, VoiceActivity::class.java).putExtra("setup", true))
-            }.setNegativeButton("Keep typing", null).show()
+            }.setNegativeButton("Keep typing", null).showProtected(this)
     }
 
     private fun setMicActive(active: Boolean) {
@@ -1003,6 +1067,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        NativePrivacy.apply(this, window)
         if (::messages.isInitialized && !busy && Chat.load(this) != history) {
             restoreHistory()
             playback.visibility = View.GONE
@@ -1036,6 +1101,7 @@ class MainActivity : Activity() {
         gone = true
         settingsDialog?.dismiss()
         conversationsDialog?.dismiss()
+        actionsDialog?.dismiss()
         streamed.cancel()
         ears.cancel()
         mouth?.close()
@@ -1074,9 +1140,11 @@ class MainActivity : Activity() {
             this.text = text
             minHeight = dp(48)
             isFocusable = true
+            buttonSemantics()
+            background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(color(R.color.outline)), null, surface(R.color.chip_bg, 16))
             textSize = 15f
             medium()
-            setTextColor(color(R.color.accent))
+            setTextColor(color(R.color.accent_text))
             padDp(0, 12, 0, 4)
             setOnClickListener { onTap() }
         }

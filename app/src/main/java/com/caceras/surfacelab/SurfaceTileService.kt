@@ -60,7 +60,7 @@ class SurfaceTileService : TileService() {
     private fun render(status: BrainStatus) {
         val tile = qsTile ?: return
         tile.state = if (status.ready) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tile.label = getString(R.string.brain_name)
+        tile.label = getString(R.string.app_name)
         // Voice status belongs on the same line as the model status: both
         // answer "will a tap do anything", and there is only one line.
         // Tile.setSubtitle landed in API 29, which is this app's minSdk.

@@ -1,18 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="chat_bg">#141B18</color>
-    <color name="bubble_you">#2B3A31</color>
-    <color name="bubble_you_text">#F2F3EC</color>
-    <color name="bubble_ai">#141B18</color>
-    <color name="bubble_ai_text">#F2F3EC</color>
-    <color name="composer_bg">#202B24</color>
-    <color name="chip_bg">#27322B</color>
-    <color name="text_primary">#F2F3EC</color>
-    <color name="text_dim">#A7B4A9</color>
-    <color name="accent">#CEE5AD</color>
-    <color name="on_accent">#203525</color>
-    <color name="outline">#3A473D</color>
-    <color name="presence_bg">#34462E</color>
-    <color name="scrim">#F2141B18</color>
-    <color name="listening">#CEE5AD</color>
+    <color name="chat_bg">#0C1720</color>
+    <color name="bubble_you">#18384C</color>
+    <color name="bubble_you_text">#ECF7FF</color>
+    <color name="bubble_ai">#0C1720</color>
+    <color name="bubble_ai_text">#ECF7FF</color>
+    <color name="composer_bg">#142430</color>
+    <color name="chip_bg">#1C303E</color>
+    <color name="text_primary">#ECF7FF</color>
+    <color name="text_dim">#A6BFCE</color>
+    <color name="accent">#70CEFA</color>
+    <color name="accent_text">#91DAFF</color>
+    <color name="on_accent">#072E44</color>
+    <color name="outline">#344F60</color>
+    <color name="presence_bg">#173E55</color>
+    <color name="scrim">#F20C1720</color>
+    <color name="listening">#91DAFF</color>
 </resources>

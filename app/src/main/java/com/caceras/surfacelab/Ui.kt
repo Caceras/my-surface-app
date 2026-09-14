@@ -37,7 +37,7 @@ fun View.padForSystemBars(extraTop: Int = 0, extraBottom: Int = 0) {
         val left: Int
         val right: Int
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
+            val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime() or WindowInsets.Type.displayCutout())
             top = bars.top
             bottom = bars.bottom
             left = bars.left

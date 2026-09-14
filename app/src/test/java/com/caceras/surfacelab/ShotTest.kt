@@ -197,4 +197,72 @@ class ShotTest {
     }
 
 
+    @Test
+    fun `native phone actions are readable and branded`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val dialog = NativeActions.show(activity)
+        shoot("aegentica-actions", dialog.window!!.decorView)
+    }
+
+    @Test
+    @Config(qualifiers = "w914dp-h411dp-land-xxhdpi")
+    fun `landscape voice keeps the transcript and controls reachable`() {
+        val activity = Robolectric.buildActivity(VoiceActivity::class.java,
+            android.content.Intent().putExtra("setup", true)).setup().get()
+        shoot("aegentica-voice-landscape", activity.window.decorView, shotWidth = 2742, shotHeight = 1233)
+        val scroll = activity.window.decorView.findViewWithTag<ReadingScrollView>("voice-transcript")
+        assertTrue("voice text has no viewport", scroll.height >= activity.dp(72))
+        val rect = android.graphics.Rect()
+        assertTrue(scroll.getGlobalVisibleRect(rect))
+    }
+
+    @Test
+    @Config(qualifiers = "w1000dp-h800dp-xxhdpi")
+    fun `wide chat bounds the reading column`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        shoot("aegentica-wide", activity.window.decorView, shotWidth = 3000, shotHeight = 2400)
+        val frame = activity.findViewById<android.view.ViewGroup>(android.R.id.content).getChildAt(0) as AdaptiveFrame
+        assertTrue("reading column stretches across a desktop", frame.getChildAt(0).width <= activity.dp(720))
+    }
+
+    @Test
+    fun `large font chat keeps navigation visible`() {
+        val context = RuntimeEnvironment.getApplication()
+        val config = android.content.res.Configuration(context.resources.configuration).apply { fontScale = 2f }
+        @Suppress("DEPRECATION")
+        context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        shoot("aegentica-large-font", activity.window.decorView)
+        fun children(v: View): List<View> = listOf(v) + if (v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
+        listOf("Voice", "Conversations", "Actions").forEach { name ->
+            val button = children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == name }
+            val rect = android.graphics.Rect()
+            assertTrue("$name missing at large text", button.getGlobalVisibleRect(rect))
+            assertTrue("$name clipped at large text", rect.height() >= activity.dp(48))
+        }
+    }
+
+    @Test
+    fun `compact widget draws both touch targets without answer exposure`() {
+        val context = RuntimeEnvironment.getApplication()
+        val view = SurfaceWidgetProvider().views(context, true).apply(context, android.widget.FrameLayout(context))
+        shoot("aegentica-widget", view, shotWidth = context.dp(240), shotHeight = context.dp(110))
+        listOf(R.id.widget_type, R.id.widget_talk).forEach { id ->
+            val button = view.findViewById<View>(id)
+            assertTrue("widget target clipped", button.height >= context.dp(48))
+        }
+    }
+
+    @Test
+    fun `the adaptive icon renders the AE signum`() {
+        val context = RuntimeEnvironment.getApplication()
+        val view = android.widget.ImageView(context).apply {
+            setBackgroundColor(context.getColor(R.color.chat_bg))
+            setImageResource(R.mipmap.ic_launcher)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            padDp(24, 24, 24, 24)
+        }
+        shoot("aegentica-icon", view, shotWidth = context.dp(180), shotHeight = context.dp(180))
+    }
+
 }

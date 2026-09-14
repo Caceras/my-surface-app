@@ -63,6 +63,7 @@ class ProcessTextActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NativePrivacy.apply(this, window)
 
         selection = intent
             .getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
@@ -159,6 +160,7 @@ class ProcessTextActivity : Activity() {
             .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
             .setOnDismissListener { if (dialog != null) finish() }
             .show()
+        NativePrivacy.apply(this, dialog?.window)
     }
 
     private fun send(instruction: String) {
@@ -199,6 +201,7 @@ class ProcessTextActivity : Activity() {
             .setNegativeButton(R.string.close) { d, _ -> d.dismiss() }
             .setOnDismissListener { finish() }
             .show()
+        NativePrivacy.apply(this, dialog?.window)
 
         streamed = StreamUpdates { text ->
             stream.text = Markdown.render(text, dp(18))
@@ -267,8 +270,7 @@ class ProcessTextActivity : Activity() {
 
         if (result.ok) {
             builder.setPositiveButton(R.string.copy) { d, _ ->
-                getSystemService(ClipboardManager::class.java)
-                    .setPrimaryClip(ClipData.newPlainText(task.alias, result.text))
+                NativePrivacy.copy(this, task.alias, result.text)
                 d.dismiss()
             }
             if (!readOnly) {
@@ -283,6 +285,7 @@ class ProcessTextActivity : Activity() {
         }
 
         dialog = builder.show()
+        NativePrivacy.apply(this, dialog?.window)
     }
 
     // ----------------------------------------------------------- speaking

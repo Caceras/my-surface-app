@@ -314,6 +314,7 @@ class Mouth(context: Context) {
             if (change < 0) fail("Playback paused because another app needs audio. Your answer stays on screen.")
         }.build()
     private var hasFocus = false
+    private val controls = SpeechControls(context) { fail(it) }
 
     var onIdle: (() -> Unit)? = null
     var onProblem: ((String) -> Unit)? = null
@@ -400,6 +401,7 @@ class Mouth(context: Context) {
         pending.clear()
         active.clear()
         engine?.stop()
+        controls.stopped()
         releaseFocus()
         // Do not signal conversation completion between streamed sentences.
     }
@@ -409,6 +411,7 @@ class Mouth(context: Context) {
         onIdle = null
         onProblem = null
         hush()
+        controls.close()
         engine?.shutdown()
         engine = null
         ready = false
@@ -438,6 +441,7 @@ class Mouth(context: Context) {
         }
         val id = "sl-$generation-${utterance++}"
         active.add(id)
+        controls.playing()
         val accepted = engine?.speak(chunk, TextToSpeech.QUEUE_ADD, null, id)
         if (accepted != TextToSpeech.SUCCESS) {
             active.remove(id)
@@ -447,6 +451,7 @@ class Mouth(context: Context) {
 
     private fun idleIfFinished() {
         if (finished && !speaking()) {
+            controls.stopped()
             releaseFocus()
             onIdle?.invoke()
         }

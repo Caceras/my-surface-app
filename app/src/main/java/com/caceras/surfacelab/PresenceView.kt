@@ -17,9 +17,9 @@ class PresenceView(context: Context, size: Int = 88) : ImageView(context) {
     init {
         tag = "presence"
         setImageResource(R.drawable.ic_surface)
-        setColorFilter(context.ink(R.color.accent))
+        setColorFilter(context.ink(R.color.accent_text))
         background = context.surface(R.color.presence_bg, size / 2)
-        padDp(size / 4, size / 4, size / 4, size / 4)
+        padDp(size / 6, size / 6, size / 6, size / 6)
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
