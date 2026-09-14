@@ -2,6 +2,9 @@ package com.caceras.surfacelab
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -43,6 +46,7 @@ class Ears(private val context: Context) {
 
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
+    private var session = 0
 
     /**
      * True when speech can be recognised entirely on this phone.
@@ -79,29 +83,39 @@ class Ears(private val context: Context) {
         // activity is gone -- which breaks recognition in other apps too.
         cancel()
 
-        val client = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+        val token = session
+        val client = try {
+            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+        } catch (e: Exception) {
+            onStop(VoiceProblem("Offline speech could not start. Try typing instead."))
+            return
+        }
         recognizer = client
         listening = true
 
         client.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {}
             override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) = onLevel(rmsdB)
+            override fun onRmsChanged(rmsdB: Float) {
+                if (token == session && listening) onLevel(rmsdB)
+            }
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
 
             override fun onPartialResults(partialResults: Bundle?) {
-                first(partialResults)?.let(onPartial)
+                if (token == session && listening) first(partialResults)?.let(onPartial)
             }
 
             override fun onResults(results: Bundle?) {
+                if (token != session || !listening) return
                 listening = false
                 first(results)?.takeIf { it.isNotBlank() }?.let(onFinal)
                 onStop(null)
             }
 
             override fun onError(error: Int) {
+                if (token != session || !listening) return
                 listening = false
                 // Saying nothing is the normal way a session ends, not a
                 // failure. Reporting it produces a toast storm.
@@ -111,7 +125,12 @@ class Ears(private val context: Context) {
             }
         })
 
-        client.startListening(intent())
+        try {
+            client.startListening(intent())
+        } catch (e: Exception) {
+            cancel()
+            onStop(VoiceProblem("Offline speech could not start. Check microphone permission."))
+        }
     }
 
     /** Stop listening but keep whatever was recognised so far. */
@@ -121,6 +140,7 @@ class Ears(private val context: Context) {
 
     /** Release the microphone. Mandatory; see the note in listen(). */
     fun cancel() {
+        session++
         listening = false
         recognizer?.destroy()
         recognizer = null
@@ -242,186 +262,191 @@ class Ears(private val context: Context) {
  * the answer, which is the single thing that makes this feel immediate.
  */
 class Mouth(context: Context) {
-
     private var engine: TextToSpeech? = null
+    private var initialized = false
     private var ready = false
+    private var closed = false
     private var muted = false
+    private var finished = false
     private var spoken = 0
     private var utterance = 0
-
-    /** Utterances handed to the engine, and how many it has finished with. */
-    private var queued = 0
-    private var settled = 0
-
-    /** Chunks that arrived before the engine finished starting up. */
+    private var generation = 0
+    private val active = mutableSetOf<String>()
     private val pending = ArrayDeque<String>()
-
     private val main = Handler(Looper.getMainLooper())
+    private var locale = Locale.getDefault()
+    private val audio = context.getSystemService(AudioManager::class.java)
+    private val attributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_ASSISTANT)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
+    private val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+        .setAudioAttributes(attributes)
+        .setOnAudioFocusChangeListener { change ->
+            if (change < 0) hush()
+        }.build()
+    private var hasFocus = false
 
-    /** The language to answer in, remembered until the engine can take it. */
-    private var voice: Locale? = null
-
-    /**
-     * Called on the main thread once the engine has nothing left to say.
-     *
-     * This is the only way back out of the SPEAKING state, which is why
-     * every utterance below is given an id: with a null id the engine still
-     * makes noise but dispatches no progress callbacks at all, so this never
-     * fires and a hands-free session never ends.
-     */
     var onIdle: (() -> Unit)? = null
+    var onProblem: ((String) -> Unit)? = null
 
-    /**
-     * True while something is queued, waiting for the engine to start, or
-     * being spoken. The pending queue counts: an answer that arrives before
-     * onInit is still going to be read out.
-     */
-    fun speaking(): Boolean = settled < queued || pending.isNotEmpty()
+    fun speaking(): Boolean = active.isNotEmpty() || pending.isNotEmpty()
 
     init {
         engine = TextToSpeech(context.applicationContext) { status ->
-            // An engine is entitled to call this back from inside its own
-            // constructor, and then the assignment above has not happened
-            // yet -- so every line of the real work is posted, by which time
-            // the field is set. Silently losing the whole answer to that is
-            // a five-minute debugging session at best.
             main.post { started(status == TextToSpeech.SUCCESS) }
         }
     }
 
     private fun started(ok: Boolean) {
-        ready = ok
+        if (closed) return
+        initialized = true
         if (!ok) {
-            pending.clear()
+            fail("Speech output could not start. The answer is still available as text.")
             return
         }
-        val engine = engine ?: return
-        engine.setOnUtteranceProgressListener(progress)
-        pickVoice()
-        voice?.let { engine.setLanguage(it) }
-        // A queue, not one slot: several sentences can complete before onInit
-        // lands, and dropping the earlier ones starts the answer from the
-        // middle. Order matters as much as arrival.
-        while (pending.isNotEmpty()) enqueue(pending.removeFirst())
+        engine?.setAudioAttributes(attributes)
+        engine?.setOnUtteranceProgressListener(progress)
+        ready = pickVoice()
+        if (!ready) {
+            fail("No installed offline voice for ${locale.displayLanguage}. Add one in Text-to-speech settings.")
+            return
+        }
+        while (pending.isNotEmpty() && !muted) enqueue(pending.removeFirst())
+        idleIfFinished()
     }
 
-    /**
-     * UtteranceProgressListener callbacks do not arrive on the main thread,
-     * unlike the recogniser's -- so everything here is posted back before it
-     * touches a view, exactly as the nano brain does with DownloadCallback.
-     */
     private val progress = object : UtteranceProgressListener() {
         override fun onStart(utteranceId: String?) = Unit
-        override fun onDone(utteranceId: String?) = settle()
+        override fun onDone(utteranceId: String?) = settle(utteranceId, false)
+        override fun onStop(utteranceId: String?, interrupted: Boolean) = settle(utteranceId, false)
+        @Deprecated("Required by the framework")
+        override fun onError(utteranceId: String?) = settle(utteranceId, true)
+        override fun onError(utteranceId: String?, errorCode: Int) = settle(utteranceId, true)
 
-        @Deprecated("Kept because the engine may still call the old overload.")
-        override fun onError(utteranceId: String?) = settle()
-        override fun onError(utteranceId: String?, errorCode: Int) = settle()
-
-        private fun settle() {
+        private fun settle(id: String?, error: Boolean) {
             main.post {
-                settled++
-                if (settled >= queued) onIdle?.invoke()
+                // An old utterance must never finish a newer answer.
+                if (closed || !active.remove(id)) return@post
+                if (error) fail("Could not read aloud. The answer is still available as text.")
+                else idleIfFinished()
             }
         }
     }
 
-    /**
-     * Start a fresh spoken answer, in the language that was actually asked
-     * for -- not the device default, or Swedish comes back in an English
-     * accent.
-     */
     fun begin(locale: Locale) {
+        hush()
+        generation++
         muted = false
+        finished = false
         spoken = 0
-        queued = 0
-        settled = 0
-        pending.clear()
-        voice = locale
-        if (ready) engine?.setLanguage(locale)
+        this.locale = locale
+        if (initialized) {
+            ready = pickVoice()
+            if (!ready) fail("No installed offline voice for ${locale.displayLanguage}. Add one in Text-to-speech settings.")
+        }
     }
 
-    /**
-     * Speak whatever complete sentences [text] has gained since last time.
-     * Safe to call on every streamed update.
-     */
     fun follow(text: String) {
-        if (muted) return
+        if (muted || closed) return
         val (chunk, cursor) = Speech.nextChunk(text, spoken)
         if (chunk.isEmpty()) return
         spoken = cursor
         say(chunk)
     }
 
-    /**
-     * Speak the tail that never got a full stop. Without this, "Sure" and
-     * every answer whose last sentence lacks punctuation is printed and
-     * never spoken.
-     */
     fun finish(text: String) {
-        if (muted) return
-        val tail = text.substring(minOf(spoken, text.length)).trim()
-        spoken = text.length
-        if (tail.isNotEmpty()) say(tail)
+        if (closed) return
+        if (!muted) {
+            val tail = text.substring(minOf(spoken, text.length)).trim()
+            spoken = text.length
+            if (tail.isNotEmpty()) say(tail)
+        }
+        finished = true
+        idleIfFinished()
     }
 
-    /**
-     * Stop talking, and stay stopped for this answer.
-     *
-     * stop() alone only clears what is already queued. The brain is very
-     * likely still streaming, so without the flag the next sentence boundary
-     * starts it talking again half a second later.
-     */
     fun hush() {
-        val wasSpeaking = speaking() || pending.isNotEmpty()
+        generation++
         muted = true
         pending.clear()
+        active.clear()
         engine?.stop()
-        // stop() dispatches no callbacks for what it dropped, so the state
-        // machine would sit in SPEAKING forever waiting for an onDone that
-        // is never coming.
-        settled = queued
-        if (wasSpeaking) main.post { onIdle?.invoke() }
+        releaseFocus()
+        // Do not signal conversation completion between streamed sentences.
     }
 
     fun close() {
+        closed = true
         onIdle = null
-        muted = true
-        pending.clear()
-        engine?.stop()
+        onProblem = null
+        hush()
         engine?.shutdown()
         engine = null
         ready = false
     }
 
-    private fun say(chunk: String) {
-        if (ready) enqueue(chunk) else pending.addLast(chunk)
+    private fun say(text: String) {
+        // TTS rejects requests longer than getMaxSpeechInputLength().
+        val limit = TextToSpeech.getMaxSpeechInputLength().coerceAtLeast(1)
+        var rest = text
+        while (rest.isNotEmpty() && !muted) {
+            var end = minOf(limit, rest.length)
+            if (end < rest.length && end > 1 && rest[end - 1].isHighSurrogate()) end--
+            val chunk = rest.take(end)
+            rest = rest.drop(end)
+            if (ready) enqueue(chunk) else if (!initialized) pending.addLast(chunk)
+        }
     }
 
     private fun enqueue(chunk: String) {
-        // A null utterance id means the engine dispatches no progress
-        // callbacks at all, so anything watching for the end never hears it.
-        queued++
-        engine?.speak(chunk, TextToSpeech.QUEUE_ADD, null, "sl-" + (utterance++))
+        if (!ready || muted || closed) return
+        if (!hasFocus) {
+            hasFocus = audio?.requestAudioFocus(focus) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+            if (!hasFocus) {
+                fail("Audio is in use. Try Read aloud again when it is free.")
+                return
+            }
+        }
+        val id = "sl-$generation-${utterance++}"
+        active.add(id)
+        val accepted = engine?.speak(chunk, TextToSpeech.QUEUE_ADD, null, id)
+        if (accepted != TextToSpeech.SUCCESS) {
+            active.remove(id)
+            fail("Could not read aloud. The answer is still available as text.")
+        }
     }
 
-    /**
-     * Prefer a voice that can speak with the radios off. isNetworkConnection
-     * Required is not enough on its own: a voice can be local and still not
-     * downloaded, which fails at synthesis time rather than here.
-     */
-    private fun pickVoice() {
-        val tts = engine ?: return
-        val usable = try {
-            tts.voices?.firstOrNull { candidate: TtsVoice ->
-                !candidate.isNetworkConnectionRequired &&
-                    TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in
-                    (candidate.features ?: emptySet())
-            }
-        } catch (e: Exception) {
-            null  // some engines throw here rather than returning null
+    private fun idleIfFinished() {
+        if (finished && !speaking()) {
+            releaseFocus()
+            onIdle?.invoke()
         }
-        if (usable != null) tts.setVoice(usable)
+    }
+
+    private fun fail(message: String) {
+        hush()
+        onProblem?.invoke(message)
+        idleIfFinished()
+    }
+
+    private fun releaseFocus() {
+        if (hasFocus) audio?.abandonAudioFocusRequest(focus)
+        hasFocus = false
+    }
+
+    private fun pickVoice(): Boolean {
+        val tts = engine ?: return false
+        // setLanguage AFTER setVoice silently replaces our checked voice.
+        // Select by locale and install state, then use only that exact voice.
+        return try {
+            val usable = tts.voices.orEmpty().filter { candidate ->
+                candidate.locale.language == locale.language &&
+                    !candidate.isNetworkConnectionRequired &&
+                    TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in candidate.features.orEmpty()
+            }.sortedWith(compareByDescending<TtsVoice> { it.locale == locale }
+                .thenByDescending { it.quality }.thenBy { it.name }).firstOrNull()
+            usable != null && tts.setVoice(usable) == TextToSpeech.SUCCESS
+        } catch (e: Exception) { false }
     }
 }
 

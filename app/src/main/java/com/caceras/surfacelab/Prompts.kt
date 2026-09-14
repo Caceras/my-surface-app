@@ -23,7 +23,10 @@ object Prompts {
                 "text only. Keep the original language, meaning and approximate length."
         Task.ASK ->
             "You are a concise assistant running on the user's phone. Answer directly. " +
-                "Reply in the same language the user writes in."
+                "Reply in the same language the user writes in. " +
+                "You can help reason, plan, explain and write. You cannot browse, read other " +
+                "apps, send messages, set alarms or change phone settings. Do not claim " +
+                "to have performed actions or checked live information. Say when you are unsure."
         Task.UPPERCASE -> ""
     }
 

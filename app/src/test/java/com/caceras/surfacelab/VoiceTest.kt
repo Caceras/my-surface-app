@@ -50,7 +50,12 @@ class VoiceTest {
     @Before
     fun setUp() {
         assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        Chat.clear(app())
+        ResultStore.clear(app())
         Brains.useForTest(brain)
+        ShadowTextToSpeech.addVoice(android.speech.tts.Voice(
+            "offline", java.util.Locale.getDefault(), 300, 300, false, emptySet()
+        ))
         ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
         shadowOf(app()).grantPermissions(Manifest.permission.RECORD_AUDIO)
     }
@@ -271,7 +276,7 @@ class VoiceTest {
         drain()
 
         val engine = ShadowTextToSpeech.getLastTextToSpeechInstance()
-        assertEquals(Ears(app()).locale(), shadowOf(engine).currentLanguage)
+        assertEquals(Ears(app()).locale(), shadowOf(engine).currentVoice.locale)
     }
 
     @Test
@@ -327,6 +332,39 @@ class VoiceTest {
         assertNull("a discarded answer reached the widget",
             ResultStore.lastText(app()))
     }
+    @Test
+    fun `voice continues typed history and saves its reply for chat`() {
+        Chat.append(app(), Turn("Plan my day", "Start with your hardest task."))
+        open()
+        say("What next?")
+        assertTrue(brain.instruction.contains("Plan my day"))
+        assertTrue(brain.instruction.contains("Start with your hardest task."))
+        brain.complete("Take a break.")
+        assertEquals("Take a break.", Chat.load(app()).last().reply)
+    }
+
+    @Test
+    fun `a pause discards late inference and restores the spoken question as a draft`() {
+        val controller = open()
+        say("Keep this question")
+        controller.pause()
+        brain.complete("Late answer.")
+        assertTrue(Chat.load(app()).isEmpty())
+        assertEquals("Keep this question", Chat.draft(app()))
+        assertNull(ResultStore.lastText(app()))
+    }
+
+    @Test
+    fun `typing is available when offline recognition is missing`() {
+        ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(false)
+        val activity = open().get()
+        val type = descendants(activity.findViewById(android.R.id.content))
+            .filterIsInstance<TextView>().first { it.text == activity.getString(R.string.type_instead) }
+        type.performClick()
+        assertEquals(MainActivity::class.java.name,
+            shadowOf(activity).nextStartedActivity.component?.className)
+    }
+
 }
 
 /**

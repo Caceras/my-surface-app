@@ -55,6 +55,8 @@ class ProcessTextActivity : Activity() {
 
     /** Set on the way out; see the same flag in MainActivity and docs/voice.md. */
     private var gone = false
+    private var active = false
+    private var requestId = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -155,6 +157,8 @@ class ProcessTextActivity : Activity() {
     }
 
     private fun send(instruction: String) {
+        val token = ++requestId
+        active = true
         // Modality is inherited: this answer is spoken only because the
         // question was. The flag is consumed here.
         val aloud = askedAloud
@@ -198,15 +202,24 @@ class ProcessTextActivity : Activity() {
             input = selection,
             instruction = instruction,
             onPartial = { partial ->
-                if (gone) return@run
-                stream.text = partial
-                if (aloud) mouth?.follow(partial)
+                if (gone || token != requestId) return@run
+                if (Prompts.isEcho(partial, task)) return@run
+                stream.text = Markdown.render(Prompts.reply(partial), dp(18))
+                if (aloud) mouth?.follow(Markdown.strip(Prompts.reply(partial)))
                 scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
             }
-        ) { result ->
-            if (gone) return@run
+        ) { raw ->
+            if (gone || token != requestId) return@run
+            active = false
+            val result = if (raw.ok && Prompts.isEcho(raw.text, task))
+                BrainResult.failure(getString(R.string.echoed))
+                else raw.copy(text = Prompts.reply(raw.text))
+            if (!result.ok) mouth?.hush()
+            if (result.ok && task == Task.ASK) {
+                Chat.append(this, Turn(Prompts.user(task, selection, instruction), result.text))
+            }
             if (result.ok) ResultStore.save(this, task, result.text)
-            if (aloud && result.ok) mouth?.finish(result.text)
+            if (aloud && result.ok) mouth?.finish(Markdown.strip(result.text))
             val note = result.note ?: Lang.caveat(task, selection)
 
             // Replacing the selection is the better outcome, but only when
@@ -238,7 +251,7 @@ class ProcessTextActivity : Activity() {
 
         val builder = AlertDialog.Builder(this, DIALOG_THEME)
             .setTitle(task.alias)
-            .setMessage(body)
+            .setMessage(Markdown.render(body, dp(18)))
             .setOnDismissListener { finish() }
             .setNegativeButton(R.string.close) { d, _ -> d.dismiss() }
 
@@ -264,7 +277,10 @@ class ProcessTextActivity : Activity() {
 
     // ----------------------------------------------------------- speaking
 
-    private fun speaker(): Mouth = mouth ?: Mouth(this).also { mouth = it }
+    private fun speaker(): Mouth = mouth ?: Mouth(this).also { voice ->
+        mouth = voice
+        voice.onProblem = { if (!gone) Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
+    }
 
     private fun toggleListening() {
         if (listening) {
@@ -339,8 +355,24 @@ class ProcessTextActivity : Activity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        ears.cancel()
+        listening = false
+        setMicActive(false)
+        mouth?.hush()
+        if (active) {
+            requestId++
+            active = false
+            Brains.get().cancel()
+            finish()
+        }
+    }
+
     override fun onDestroy() {
         gone = true
+        requestId++
+        if (active) Brains.get().cancel()
         // The microphone is not left held, and the engine is shut down rather
         // than merely stopped -- stop() is barge-in, not teardown.
         ears.cancel()

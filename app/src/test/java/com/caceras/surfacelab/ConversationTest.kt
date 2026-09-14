@@ -226,4 +226,64 @@ class ConversationTest {
         send(activity)
         assertEquals("a failure was sent back as context", "again", brain.instruction)
     }
+    @Test
+    fun `New during streaming cannot resurrect cleared history`() {
+        val activity = launch().get()
+        composer(activity).setText("old question")
+        send(activity)
+        descendants(content(activity)).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.new_chat) }.performClick()
+        brain.emit("late partial")
+        brain.complete("late answer")
+        assertTrue(bubbles(activity).isEmpty())
+        assertTrue(Chat.load(activity).isEmpty())
+        assertEquals(null, ResultStore.lastText(activity))
+        composer(activity).setText("new question")
+        send(activity)
+        assertEquals("new question", brain.instruction)
+    }
+
+    @Test
+    fun `stopping restores a question and ignores later callbacks`() {
+        val activity = launch().get()
+        composer(activity).setText("please explain")
+        send(activity)
+        brain.emit("Partial")
+        descendants(content(activity)).filterIsInstance<android.widget.ImageButton>()
+            .first { it.contentDescription == activity.getString(R.string.stop_response) }
+            .performClick()
+        brain.complete("Should not be saved")
+        assertEquals("please explain", composer(activity).text.toString())
+        assertTrue(Chat.load(activity).isEmpty())
+        assertFalse(bubbles(activity).contains("Should not be saved"))
+    }
+
+    @Test
+    fun `failed request restores the prompt without destroying a newer draft`() {
+        val activity = launch().get()
+        composer(activity).setText("first prompt")
+        send(activity)
+        composer(activity).setText("next draft")
+        brain.fail("Unavailable")
+        assertEquals("next draft", composer(activity).text.toString())
+    }
+
+    @Test
+    fun `draft survives leaving the app`() {
+        val controller = launch()
+        composer(controller.get()).setText("unfinished thought")
+        controller.pause().stop().destroy()
+        assertEquals("unfinished thought", composer(launch().get()).text.toString())
+    }
+
+    @Test
+    fun `shared text is staged and does not send or replace a draft`() {
+        val activity = launch().get()
+        composer(activity).setText("my draft")
+        activity.onNewIntent(android.content.Intent(android.content.Intent.ACTION_SEND)
+            .putExtra(android.content.Intent.EXTRA_TEXT, "selected material"))
+        assertEquals("my draft\n\nselected material", composer(activity).text.toString())
+        assertEquals(0, brain.runs)
+    }
+
 }

@@ -3,6 +3,7 @@ package com.caceras.surfacelab
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
 import android.view.MotionEvent
@@ -57,6 +58,10 @@ class VoiceActivity : Activity() {
     private var gone = false
 
     private var resumed = false
+    private var requestId = 0
+    private var generating = false
+    private var lastQuestion = ""
+    private var speechProblem: String? = null
 
     /**
      * A microphone that should start as soon as this screen is in front.
@@ -83,7 +88,7 @@ class VoiceActivity : Activity() {
                 dot.visibility = View.GONE
                 action.visibility = View.GONE
             }
-            granted() -> listen()
+            granted() -> pendingListen = true
             else -> {
                 status.text = getString(R.string.mic_rationale)
                 requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
@@ -146,7 +151,9 @@ class VoiceActivity : Activity() {
             setTextColor(color(R.color.accent))
             padDp(0, 16, 24, 4)
             visibility = View.GONE
-            setOnClickListener { listen() }
+            minHeight = dp(48)
+            isFocusable = true
+            setOnClickListener { requestListen() }
         }
 
         val close = TextView(this).apply {
@@ -154,17 +161,33 @@ class VoiceActivity : Activity() {
             textSize = 15f
             setTextColor(color(R.color.text_dim))
             padDp(0, 16, 0, 4)
+            minHeight = dp(48)
+            isFocusable = true
             setOnClickListener { finish() }
         }
 
         val feet = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             addView(action)
+            addView(TextView(this@VoiceActivity).apply {
+                text = getString(R.string.type_instead)
+                textSize = 15f
+                minHeight = dp(48)
+                isFocusable = true
+                padDp(12, 16, 24, 4)
+                setTextColor(color(R.color.accent))
+                setOnClickListener {
+                    startActivity(Intent(this@VoiceActivity, MainActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+                    finish()
+                }
+            })
             addView(close)
         }
 
         card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            isClickable = true
             background = getDrawable(R.drawable.bubble_ai)
             padDp(22, 20, 22, 14)
             addView(head, wide())
@@ -181,7 +204,7 @@ class VoiceActivity : Activity() {
             padDp(18, 18, 18, 18)
             addView(card, LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                (resources.displayMetrics.heightPixels * 0.7f).toInt()
             ))
             // Tapping the scrim, rather than the card, closes the session.
             setOnClickListener { finish() }
@@ -195,8 +218,15 @@ class VoiceActivity : Activity() {
         checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
 
+    private fun requestListen() {
+        if (!granted()) {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
+        } else if (resumed) listen() else pendingListen = true
+    }
+
     private fun listen() {
-        if (gone || !ears.available()) return
+        if (gone || !resumed || !granted() || !ears.available() || generating) return
+        ears.cancel()
         mouth?.hush()
 
         state = State.LISTENING
@@ -265,13 +295,17 @@ class VoiceActivity : Activity() {
     private fun idleAction() {
         action.text = getString(R.string.talk_again)
         action.visibility = if (ears.available()) View.VISIBLE else View.GONE
-        action.setOnClickListener { listen() }
+        action.setOnClickListener { requestListen() }
     }
 
     // ------------------------------------------------------------- asking
 
     private fun ask(spoken: String) {
-        if (gone) return
+        if (gone || !resumed || generating || spoken.isBlank()) return
+        val token = ++requestId
+        generating = true
+        lastQuestion = spoken
+        speechProblem = null
 
         heard.text = spoken
         state = State.THINKING
@@ -280,19 +314,23 @@ class VoiceActivity : Activity() {
 
         val voice = speaker()
         voice.begin(ears.locale())
-        voice.onIdle = { if (!gone && state == State.SPEAKING) idle() }
+        voice.onIdle = { if (!gone && !generating && state == State.SPEAKING) idleWith(speechProblem ?: getString(R.string.tap_to_talk)) }
+        voice.onProblem = { problem ->
+            speechProblem = problem
+            if (!gone) status.text = problem
+        }
 
         Brains.get().run(
             context = this,
             task = Task.ASK,
             input = "",
-            instruction = spoken,
+            instruction = Prompts.conversation(Chat.load(this), spoken),
             onPartial = { partial ->
-                if (!gone && !Prompts.isEcho(partial, Task.ASK)) {
+                if (!gone && resumed && token == requestId && !Prompts.isEcho(partial, Task.ASK)) {
                     answer.text = Markdown.render(partial, dp(18))
                     if (state == State.THINKING) {
                         state = State.SPEAKING
-                        status.text = getString(R.string.answering)
+                        status.text = speechProblem ?: getString(R.string.answering)
                     }
                     // Speech starts at the first finished sentence, not at
                     // the end of the answer. This is the whole difference
@@ -302,7 +340,10 @@ class VoiceActivity : Activity() {
                 }
             }
         ) { result ->
-            if (!gone) finished(spoken, result, voice)
+            if (!gone && resumed && token == requestId) {
+                generating = false
+                finished(spoken, result, voice)
+            }
         }
     }
 
@@ -310,6 +351,7 @@ class VoiceActivity : Activity() {
         state = State.SPEAKING
 
         if (!result.ok) {
+            voice.hush()
             answer.text = result.note ?: getString(R.string.failed)
             idle()
             return
@@ -320,6 +362,7 @@ class VoiceActivity : Activity() {
         // The instruction is not an answer, and it is certainly not something
         // to read out loud to someone who is not looking at the screen.
         if (Prompts.isEcho(said, Task.ASK)) {
+            voice.hush()
             answer.text = getString(R.string.echoed)
             idle()
             return
@@ -330,9 +373,10 @@ class VoiceActivity : Activity() {
         answer.text = Markdown.render(
             if (note == null) said else said + "\n\n" + note, dp(18)
         )
-        status.text = getString(R.string.answering)
+        status.text = speechProblem ?: getString(R.string.answering)
 
         // What you asked in the kitchen is on the home screen afterwards.
+        Chat.append(this, Turn(spoken, said))
         ResultStore.save(this, Task.ASK, said)
 
         // The tail that never got a full stop. Without this, "Sure" and every
@@ -342,7 +386,7 @@ class VoiceActivity : Activity() {
 
         // Nothing was queued -- no engine, muted by a barge-in, or an answer
         // already spoken in full -- so no onIdle is coming to end the turn.
-        if (!voice.speaking()) idle()
+        if (!voice.speaking()) idleWith(speechProblem ?: getString(R.string.tap_to_talk))
     }
 
     private fun speaker(): Mouth = mouth ?: Mouth(this).also { mouth = it }
@@ -359,7 +403,10 @@ class VoiceActivity : Activity() {
      * very likely still streaming and stop() alone only clears the queue.
      */
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_DOWN) mouth?.hush()
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            mouth?.hush()
+            if (!generating && state == State.SPEAKING) idle()
+        }
         return super.dispatchTouchEvent(event)
     }
 
@@ -378,23 +425,40 @@ class VoiceActivity : Activity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        requestId++
+        if (generating) Brains.get().cancel()
+        generating = false
+        pendingListen = true
+        if (resumed) { pendingListen = false; requestListen() }
+    }
+
     override fun onResume() {
         super.onResume()
         resumed = true
         if (pendingListen) {
             pendingListen = false
             listen()
-        }
+        } else if (state == State.IDLE && ears.available()) idleAction()
     }
 
     override fun onPause() {
         super.onPause()
         resumed = false
+        requestId++
+        if (generating) {
+            Brains.get().cancel()
+            if (Chat.draft(this).isBlank()) Chat.saveDraft(this, lastQuestion)
+            answer.text = getString(R.string.response_stopped)
+        }
+        generating = false
         // The microphone is not held while this is off screen, and the phone
         // does not keep talking to an empty room.
         ears.cancel()
         mouth?.hush()
-        if (state == State.LISTENING) state = State.IDLE
+        state = State.IDLE
     }
 
     override fun onDestroy() {

@@ -1,8 +1,11 @@
 package com.caceras.surfacelab
 
 import android.Manifest
+import android.app.AlertDialog
 import android.app.Activity
 import android.app.StatusBarManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +13,13 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.text.InputType
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.provider.Settings
+import android.widget.Switch
+import android.widget.Toast
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -59,6 +69,12 @@ class MainActivity : Activity() {
     private var askedAloud = false
     private var listening = false
     private var busy = false
+    private var requestId = 0
+    private var pendingQuestion = ""
+    private var pendingAnswer: TextView? = null
+    private var listenDraft = ""
+    private var speakReplies = false
+    private lateinit var playback: TextView
 
     /**
      * Set on the way out, and checked by every brain callback.
@@ -88,26 +104,44 @@ class MainActivity : Activity() {
         setContentView(root)
         root.padForSystemBars()
 
-        brain.status(this) { status.text = it.label }
+        brain.status(this) { if (!gone && !busy) status.text = it.label }
 
+        restoreHistory()
+        input.setText(savedInstanceState?.getString("draft") ?: Chat.draft(this))
+        askedAloud = savedInstanceState?.getBoolean("aloud") ?: false
+        if (savedInstanceState == null) acceptIntent(intent)
+    }
+
+    private fun restoreHistory() {
+        history.clear()
         history.addAll(Chat.load(this))
+        messages.removeAllViews()
+        messages.addView(emptyState(), wide())
         history.forEach { turn ->
             addBubble(turn.you, fromUser = true)
-            addBubble(turn.reply, fromUser = false).text = Markdown.render(turn.reply, dp(18))
+            addBubble(turn.reply, fromUser = false).also {
+                it.text = Markdown.render(turn.reply, dp(18))
+                answerActions(it, turn.reply)
+            }
         }
         showBlank(history.isEmpty())
-        if (history.isNotEmpty()) {
-            openers.visibility = View.GONE
-            scrollToEnd()
-        }
+        openers.visibility = if (history.isEmpty()) View.VISIBLE else View.GONE
+    }
 
-        // Anything shared into the app becomes the next thing you send,
-        // rather than a read-only block of text to look at.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        acceptIntent(intent)
+    }
+
+    private fun acceptIntent(intent: Intent?) {
         if (intent?.action == Intent.ACTION_SEND) {
-            val shared = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty().trim()
+            val shared = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty().trim()
             if (shared.isNotEmpty()) {
-                input.setText(shared)
-                input.setSelection(shared.length)
+                // Sharing stages a draft, never sends material without review.
+                val current = input.text.toString()
+                input.setText(if (current.isBlank()) shared else "$current\n\n$shared")
+                input.setSelection(input.length())
             }
         }
     }
@@ -137,6 +171,9 @@ class MainActivity : Activity() {
             text = getString(R.string.more)
             textSize = 14f
             setTextColor(color(R.color.text_dim))
+            minHeight = dp(48)
+            gravity = Gravity.CENTER
+            isFocusable = true
             padDp(12, 8, 4, 8)
         }
 
@@ -152,6 +189,9 @@ class MainActivity : Activity() {
             text = getString(R.string.new_chat)
             textSize = 14f
             setTextColor(color(R.color.text_dim))
+            minHeight = dp(48)
+            gravity = Gravity.CENTER
+            isFocusable = true
             padDp(4, 8, 4, 8)
             setOnClickListener { newChat() }
         }
@@ -206,9 +246,32 @@ class MainActivity : Activity() {
 
         panel.addView(flatButton(getString(R.string.prepare_model)) {
             status.text = getString(R.string.working)
-            brain.prepare(this) { status.text = it.label }
+            brain.prepare(this) { if (!gone) status.text = it.label }
         })
 
+        speakReplies = Chat.speakReplies(this)
+        panel.addView(Switch(this).apply {
+            text = getString(R.string.speak_replies)
+            isChecked = speakReplies
+            minHeight = dp(48)
+            setOnCheckedChangeListener { _, checked ->
+                speakReplies = checked
+                Chat.setSpeakReplies(this@MainActivity, checked)
+                if (!checked) mouth?.hush()
+            }
+        })
+        panel.addView(flatButton(getString(R.string.voice_settings)) {
+            runCatching { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
+                .onFailure { status.text = getString(R.string.settings_unavailable) }
+        })
+        panel.addView(flatButton(getString(R.string.default_assistant)) {
+            runCatching { startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)) }
+                .onFailure { status.text = getString(R.string.settings_unavailable) }
+        })
+        panel.addView(flatButton(getString(R.string.open_voice)) {
+            startActivity(Intent(this, VoiceActivity::class.java))
+        })
+        line("Digital assistant", "Choose Pixel Surface Lab in Android settings to use the assistant gesture. Availability depends on your device settings.")
         line("Text selection", "Select text anywhere: " +
             brain.tasks.joinToString(", ") { it.alias })
         line("Quick Settings tile", "Shade, Edit tiles, or the button below.")
@@ -324,6 +387,21 @@ class MainActivity : Activity() {
                 InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
                 InputType.TYPE_TEXT_FLAG_MULTI_LINE
             maxLines = 5
+            imeOptions = EditorInfo.IME_ACTION_SEND
+            setOnEditorActionListener { _, actionId, event ->
+                val submit = actionId == EditorInfo.IME_ACTION_SEND ||
+                    (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.isCtrlPressed &&
+                        event.action == KeyEvent.ACTION_DOWN)
+                if (submit) submitDraft()
+                submit
+            }
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    if (::send.isInitialized) updateSend()
+                }
+                override fun afterTextChanged(s: Editable?) {}
+            })
             padDp(16, 12, 8, 12)
         }
 
@@ -333,14 +411,9 @@ class MainActivity : Activity() {
             contentDescription = getString(R.string.send)
             val pad = dp(10)
             setPadding(pad, pad, pad, pad)
-            setOnClickListener {
-                // Modality is inherited: this answer is spoken only because
-                // the question was. The flag is consumed here, so the next
-                // typed question comes back quiet again.
-                val aloud = askedAloud
-                askedAloud = false
-                ask(input.text.toString(), aloud)
-            }
+            minimumWidth = dp(48)
+            minimumHeight = dp(48)
+            setOnClickListener { if (busy) stopAnswer() else submitDraft() }
         }
 
         val bar = LinearLayout(this).apply {
@@ -357,6 +430,8 @@ class MainActivity : Activity() {
             val button = ImageButton(this).apply {
                 setImageResource(R.drawable.ic_mic)
                 background = null
+                minimumWidth = dp(48)
+                minimumHeight = dp(48)
                 contentDescription = getString(R.string.mic)
                 val pad = dp(10)
                 setPadding(pad, pad, pad, pad)
@@ -366,27 +441,69 @@ class MainActivity : Activity() {
             bar.addView(button)
         }
         bar.addView(send)
+        playback = flatButton(getString(R.string.read_last)) {
+            if (mouth?.speaking() == true) {
+                mouth?.hush()
+                playback.text = getString(R.string.read_last)
+            } else history.lastOrNull()?.let { readAloud(it.reply) }
+        }
+        playback.gravity = Gravity.CENTER
+        playback.minHeight = dp(48)
+        updateSend()
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             padDp(12, 0, 12, 12)
             addView(bar, wide())
+            addView(playback, wide())
         }
     }
 
     // ------------------------------------------------------------ asking
 
+    private fun submitDraft() {
+        if (listening || busy) return
+        val aloud = askedAloud || speakReplies
+        askedAloud = false
+        ask(input.text.toString(), aloud)
+    }
+
+    private fun updateSend() {
+        send.setImageResource(if (busy) R.drawable.ic_stop else R.drawable.ic_send)
+        send.contentDescription = getString(if (busy) R.string.stop_response else R.string.send)
+        send.isEnabled = busy || (!listening && input.text.toString().isNotBlank())
+        send.alpha = if (send.isEnabled) 1f else 0.4f
+    }
+
+    private fun stopAnswer() {
+        if (!busy) return
+        requestId++
+        Brains.get().cancel()
+        busy = false
+        mouth?.hush()
+        pendingAnswer?.append("\n\n" + getString(R.string.response_stopped))
+        pendingAnswer = null
+        if (input.text.isBlank()) input.setText(pendingQuestion)
+        pendingQuestion = ""
+        updateSend()
+    }
+
     private fun ask(question: String, aloud: Boolean) {
         val text = question.trim()
         if (text.isEmpty() || busy) return
 
+        val token = ++requestId
         busy = true
+        pendingQuestion = text
         input.setText("")
+        Chat.saveDraft(this, "")
+        updateSend()
         openers.visibility = View.GONE
         mouth?.hush()
 
         addBubble(text, fromUser = true)
         val answer = addBubble(getString(R.string.working), fromUser = false)
+        pendingAnswer = answer
 
         if (aloud) speaker().begin(ears.locale())
 
@@ -397,18 +514,22 @@ class MainActivity : Activity() {
             input = "",
             instruction = Prompts.conversation(history, text),
             onPartial = { partial ->
-                if (gone) return@run
+                if (gone || token != requestId) return@run
                 // Never paint the instruction. On a device that cannot take a
                 // separate system prompt it is pasted above the question as
                 // ordinary text, and a small model asked "??" recites it back.
                 if (Prompts.isEcho(partial, Task.ASK)) return@run
-                answer.text = Markdown.render(partial, dp(18))
+                val atBottom = !transcript.canScrollVertically(1)
+                answer.text = Markdown.render(Prompts.reply(partial), dp(18))
                 if (aloud) mouth?.follow(Markdown.strip(partial))
-                scrollToEnd()
+                if (atBottom) scrollToEnd()
             }
         ) { result ->
-            if (gone) return@run
+            if (gone || token != requestId) return@run
             busy = false
+            pendingQuestion = ""
+            pendingAnswer = null
+            updateSend()
             val said = Prompts.reply(result.text)
             val echoed = result.ok && Prompts.isEcho(said, Task.ASK)
             val note = when {
@@ -428,24 +549,42 @@ class MainActivity : Activity() {
                 else -> Markdown.render(result.note ?: getString(R.string.failed))
             }
             if (result.ok && !echoed) {
+                answerActions(answer, said)
                 remember(Turn(text, said))
                 ResultStore.save(this, Task.ASK, said)
                 if (aloud) mouth?.finish(Markdown.strip(said))
+            } else {
+                mouth?.hush()
+                if (input.text.isBlank()) input.setText(text)
+                answer.setOnClickListener {
+                    input.setText(text)
+                    input.setSelection(input.length())
+                    input.requestFocus()
+                }
             }
             scrollToEnd()
         }
     }
 
     private fun remember(turn: Turn) {
-        history.add(turn)
-        Chat.save(this, history)
+        Chat.append(this, turn)
+        history.clear()
+        history.addAll(Chat.load(this))
     }
 
     /** Forget the conversation and start over, on screen and on disk. */
     private fun newChat() {
+        stopAnswer()
+        ears.cancel()
+        listening = false
+        askedAloud = false
+        setMicActive(false)
+        input.hint = getString(R.string.chat_hint)
         mouth?.hush()
         history.clear()
         Chat.clear(this)
+        Chat.saveDraft(this, "")
+        ResultStore.clear(this)
         messages.removeAllViews()
         messages.addView(emptyState(), wide())
         showBlank(true)
@@ -490,7 +629,39 @@ class MainActivity : Activity() {
 
     // ----------------------------------------------------------- speaking
 
-    private fun speaker(): Mouth = mouth ?: Mouth(this).also { mouth = it }
+    private fun speaker(): Mouth = mouth ?: Mouth(this).also { voice ->
+        mouth = voice
+        voice.onProblem = { if (!gone) { status.text = it; playback.text = getString(R.string.read_last) } }
+        voice.onIdle = { if (!gone) playback.text = getString(R.string.read_last) }
+    }
+
+    private fun readAloud(text: String) {
+        ears.cancel()
+        listening = false
+        setMicActive(false)
+        updateSend()
+        playback.text = getString(R.string.stop_speaking)
+        speaker().apply { begin(ears.locale()); finish(Markdown.strip(text)) }
+    }
+
+    private fun answerActions(bubble: TextView, text: String) {
+        bubble.contentDescription = getString(R.string.answer_actions)
+        bubble.setOnLongClickListener {
+            mouth?.hush()
+            AlertDialog.Builder(this).setItems(arrayOf(
+                getString(R.string.copy), getString(R.string.read_aloud), getString(R.string.share_answer)
+            )) { _, which ->
+                when (which) {
+                    0 -> getSystemService(ClipboardManager::class.java)
+                        .setPrimaryClip(ClipData.newPlainText("Answer", text))
+                    1 -> readAloud(text)
+                    2 -> startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND)
+                        .setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), getString(R.string.share_answer)))
+                }
+            }.show()
+            true
+        }
+    }
 
     private fun toggleListening() {
         if (listening) {
@@ -507,8 +678,12 @@ class MainActivity : Activity() {
     }
 
     private fun startListening() {
+        stopAnswer()
         mouth?.hush()
+        listenDraft = input.text.toString().trim()
+        askedAloud = false
         listening = true
+        updateSend()
         setMicActive(true)
         input.hint = getString(R.string.listening)
 
@@ -517,11 +692,11 @@ class MainActivity : Activity() {
             onPartial = { partial ->
                 // Words appear as they are recognised, so the screen is
                 // never blank while you are talking.
-                input.setText(partial)
+                input.setText(listOf(listenDraft, partial).filter { it.isNotBlank() }.joinToString(" "))
                 input.setSelection(input.text.length)
             },
             onFinal = { text ->
-                input.setText(text)
+                input.setText(listOf(listenDraft, text).filter { it.isNotBlank() }.joinToString(" "))
                 input.setSelection(input.text.length)
                 // The transcript stays editable: a misheard word is a fix,
                 // not a redo. Send speaks the answer back, because this
@@ -530,6 +705,7 @@ class MainActivity : Activity() {
             },
             onStop = { problem ->
                 listening = false
+                updateSend()
                 setMicActive(false)
                 input.hint = getString(R.string.chat_hint)
                 if (problem != null) report(problem)
@@ -561,6 +737,7 @@ class MainActivity : Activity() {
         mic?.setColorFilter(
             color(if (active) R.color.listening else R.color.text_dim)
         )
+        mic?.contentDescription = getString(if (active) R.string.finish_dictation else R.string.mic)
         if (!active) level(0f)
     }
 
@@ -589,14 +766,29 @@ class MainActivity : Activity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::messages.isInitialized && !busy && Chat.load(this) != history) restoreHistory()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("draft", input.text.toString().ifBlank { pendingQuestion })
+        outState.putBoolean("aloud", askedAloud)
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onPause() {
         super.onPause()
         // The microphone is not held across a trip to another app, and the
         // phone does not keep talking to an empty room.
         ears.cancel()
         listening = false
+        input.hint = getString(R.string.chat_hint)
         setMicActive(false)
+        stopAnswer()
+        Chat.saveDraft(this, input.text.toString())
         mouth?.hush()
+        updateSend()
     }
 
     override fun onDestroy() {
@@ -636,6 +828,8 @@ class MainActivity : Activity() {
     private fun flatButton(text: String, onTap: () -> Unit) =
         TextView(this).apply {
             this.text = text
+            minHeight = dp(48)
+            isFocusable = true
             textSize = 14f
             setTextColor(color(R.color.accent))
             padDp(0, 12, 0, 4)

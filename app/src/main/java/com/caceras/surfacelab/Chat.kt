@@ -56,6 +56,20 @@ object Chat {
         prefs(context).edit().remove(KEY).apply()
     }
 
+    fun append(context: Context, turn: Turn) {
+        save(context, load(context) + turn)
+    }
+
+    fun draft(context: Context): String = prefs(context).getString("draft", "").orEmpty()
+    fun saveDraft(context: Context, text: String) {
+        prefs(context).edit().putString("draft", text).apply()
+    }
+
+    fun speakReplies(context: Context): Boolean = prefs(context).getBoolean("speak_replies", false)
+    fun setSpeakReplies(context: Context, value: Boolean) {
+        prefs(context).edit().putBoolean("speak_replies", value).apply()
+    }
+
     private fun prefs(context: Context) = context.applicationContext
         .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }

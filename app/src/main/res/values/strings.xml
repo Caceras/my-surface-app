@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Pixel Surface Lab</string>
-    <string name="shortcut_alpha">First shortcut</string>
-    <string name="shortcut_beta">Second shortcut</string>
+    <string name="shortcut_alpha">Open chat</string>
+    <string name="shortcut_beta">Continue chat</string>
 
     <!-- Labels shown in the text-selection popup. Keep them short: the
          popup truncates hard and the overflow is already crowded. -->
@@ -50,4 +50,19 @@
     <string name="voice_off">No offline speech</string>
     <string name="get_offline_speech">Get offline speech</string>
     <string name="shortcut_voice">Talk</string>
+    <string name="speak_replies">Read every reply aloud</string>
+    <string name="voice_settings">Text-to-speech settings</string>
+    <string name="default_assistant">Set as digital assistant</string>
+    <string name="settings_unavailable">Open Android Settings to change this option.</string>
+    <string name="open_voice">Start voice conversation</string>
+    <string name="read_last">Read last answer aloud</string>
+    <string name="read_aloud">Read aloud</string>
+    <string name="stop_speaking">Stop speaking</string>
+    <string name="stop_response">Stop response</string>
+    <string name="response_stopped">Response stopped. Your question is ready to edit or resend.</string>
+    <string name="answer_actions">Answer. Long press to copy, read aloud, or share.</string>
+    <string name="share_answer">Share answer</string>
+    <string name="finish_dictation">Finish dictation</string>
+    <string name="type_instead">Type</string>
+    <string name="widget_empty">Ask by text or voice. Your last answer appears here.</string>
 </resources>

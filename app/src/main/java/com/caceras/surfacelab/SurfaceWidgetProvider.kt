@@ -44,39 +44,28 @@ class SurfaceWidgetProvider : AppWidgetProvider() {
     }
 
     private fun push(context: Context, manager: AppWidgetManager, id: Int) {
-        val last = ResultStore.lastText(context)
+        val last = ResultStore.lastText(context)?.let { Markdown.strip(it) }
         val title = ResultStore.lastTask(context) ?: context.getString(R.string.app_name)
         val value = last?.let { if (it.length > 160) it.take(157) + "..." else it }
-            ?: SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+            ?: context.getString(R.string.widget_empty)
 
         // A mutability flag is mandatory on API 31+; omitting both
         // FLAG_IMMUTABLE and FLAG_MUTABLE throws here.
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
-        val pending = if (Ears(context).available()) {
-            // A widget is not an activity either, so the same NEW_TASK rule
-            // as the tile applies.
-            PendingIntent.getActivity(
-                context,
-                0,
-                Intent(context, VoiceActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                flags
-            )
-        } else {
-            PendingIntent.getBroadcast(
-                context,
-                0,
-                Intent(context, SurfaceWidgetProvider::class.java)
-                    .setAction(ACTION_REFRESH),
-                flags
-            )
-        }
+        val pending = PendingIntent.getActivity(context, 0,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), flags)
+        val talk = PendingIntent.getActivity(context, 1,
+            Intent(context, if (Ears(context).available()) VoiceActivity::class.java else MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), flags)
 
         val views = RemoteViews(context.packageName, R.layout.widget).apply {
             setTextViewText(R.id.widget_title, title)
             setTextViewText(R.id.widget_value, value)
             setOnClickPendingIntent(R.id.widget_root, pending)
+            setOnClickPendingIntent(R.id.widget_type, pending)
+            setOnClickPendingIntent(R.id.widget_talk, talk)
         }
 
         manager.updateAppWidget(id, views)

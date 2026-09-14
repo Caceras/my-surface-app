@@ -32,25 +32,7 @@ class SurfaceTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
-        val brain = Brains.get()
-        brain.status(this) { status ->
-            when {
-                status.preparable -> {
-                    render(BrainStatus("Preparing", ready = false))
-                    brain.prepare(this) { render(it) }
-                }
-                status.ready && Ears(this).available() -> talk()
-                status.ready -> {
-                    val last = ResultStore.lastText(this)
-                    Toast.makeText(
-                        this,
-                        last ?: getString(R.string.voice_unavailable),
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-                else -> Toast.makeText(this, status.label, Toast.LENGTH_LONG).show()
-            }
-        }
+        if (isSecure) unlockAndRun { launch() } else launch()
     }
 
     /**
@@ -67,7 +49,7 @@ class SurfaceTileService : TileService() {
     private fun launch() {
         // A service is not an activity, so the intent inside needs
         // FLAG_ACTIVITY_NEW_TASK or the launch is refused outright.
-        val intent = Intent(this, VoiceActivity::class.java)
+        val intent = Intent(this, if (Ears(this).available()) VoiceActivity::class.java else MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -76,7 +58,7 @@ class SurfaceTileService : TileService() {
             // which is the same trap the widget already stepped in.
             startActivityAndCollapse(
                 PendingIntent.getActivity(
-                    this, 0, intent, PendingIntent.FLAG_IMMUTABLE
+                    this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
             )
         } else {

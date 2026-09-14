@@ -42,6 +42,14 @@ private fun model(): GenerativeModelFutures =
     GenerativeModelFutures.from(Generation.getClient())
 
 private object NanoBrain : SurfaceBrain {
+    private var generation = 0
+    private var pending: ListenableFuture<*>? = null
+
+    override fun cancel() {
+        generation++
+        pending?.cancel(true)
+        pending = null
+    }
 
     override val tasks = listOf(Task.ASK, Task.SUMMARIZE, Task.PROOFREAD, Task.REWRITE)
 
@@ -86,6 +94,9 @@ private object NanoBrain : SurfaceBrain {
         onPartial: (String) -> Unit,
         onResult: (BrainResult) -> Unit
     ) {
+        cancel()
+        val token = generation
+        val active = { token == generation }
         val client = model()
         val prompt = Prompts.user(task, input, instruction)
 
@@ -94,10 +105,11 @@ private object NanoBrain : SurfaceBrain {
             return
         }
 
-        client.checkStatus().whenDone { checked ->
+        pending = client.checkStatus().also { future -> future.whenDone checked@ { checked ->
+            if (!active()) return@checked
             when (checked.getOrNull()) {
                 FeatureStatus.AVAILABLE ->
-                    generate(client, task, prompt, onPartial, onResult)
+                    generate(client, task, prompt, active, { pending = it }, onPartial, onResult)
 
                 FeatureStatus.DOWNLOADABLE ->
                     client.download(object : DownloadCallback {
@@ -105,12 +117,12 @@ private object NanoBrain : SurfaceBrain {
                         override fun onDownloadProgress(bytes: Long) {}
 
                         override fun onDownloadCompleted() {
-                            main.post { generate(client, task, prompt, onPartial, onResult) }
+                            main.post { if (active()) generate(client, task, prompt, active, { pending = it }, onPartial, onResult) }
                         }
 
                         override fun onDownloadFailed(e: GenAiException) {
                             main.post {
-                                onResult(BrainResult.failure(
+                                if (active()) onResult(BrainResult.failure(
                                     "The model could not be downloaded: " + e.message
                                 ))
                             }
@@ -122,9 +134,12 @@ private object NanoBrain : SurfaceBrain {
                         "The model is still downloading. Try again shortly."
                     ))
 
-                else -> onResult(BrainResult.failure(unavailableMessage()))
+                else -> onResult(BrainResult.failure(
+                    checked.exceptionOrNull()?.let { "Could not reach AICore: ${it.cause?.message ?: it.message}" }
+                        ?: unavailableMessage()
+                ))
             }
-        }
+        } }
     }
 }
 
@@ -137,12 +152,18 @@ private fun generate(
     client: GenerativeModelFutures,
     task: Task,
     prompt: String,
+    active: () -> Boolean,
+    track: (ListenableFuture<*>) -> Unit,
     onPartial: (String) -> Unit,
     onResult: (BrainResult) -> Unit
 ) {
     val instruction = Prompts.system(task)
 
-    client.isSystemPromptAvailable().whenDone { supported ->
+    if (!active()) return
+    val support = client.isSystemPromptAvailable()
+    track(support)
+    support.whenDone { supported ->
+        if (!active()) return@whenDone
         val useSystem = supported.getOrNull() == true && instruction.isNotEmpty()
 
         val text = if (useSystem || instruction.isEmpty()) prompt
@@ -154,16 +175,26 @@ private fun generate(
         // Low temperature: these are transformations of the user's own text,
         // not creative writing. Raise it for the Ask preset if you disagree.
         builder.temperature = if (task == Task.ASK) 0.7f else 0.2f
-        builder.maxOutputTokens = 512
+        builder.maxOutputTokens = 1024
         if (useSystem) builder.systemInstruction = SystemInstruction(instruction)
 
         val collected = StringBuilder()
         val streaming = StreamingCallback { chunk ->
-            collected.append(chunk)
-            main.post { onPartial(collected.toString()) }
+            synchronized(collected) { collected.append(chunk) }
+            val snapshot = synchronized(collected) { collected.toString() }
+            main.post { if (active()) onPartial(snapshot) }
         }
 
-        client.generateContent(builder.build(), streaming).whenDone { response ->
+        val request = client.generateContent(builder.build(), streaming)
+        track(request)
+        request.whenDone response@ { response ->
+            if (!active()) return@response
+            // A failed stream is not a successful answer just because some
+            // tokens arrived before the error. Never persist a partial failure.
+            if (response.isFailure) {
+                onResult(BrainResult.failure(reason(response)))
+                return@response
+            }
             val answer = response.getOrNull()
                 ?.candidates
                 ?.firstOrNull()
