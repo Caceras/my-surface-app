@@ -284,7 +284,7 @@ class MainActivity : Activity() {
             startActivity(Intent(this, VoiceActivity::class.java))
         })
         panel.addView(label("EVERYWHERE YOU NEED IT", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 4) })
-        line("Digital assistant", "Choose Pixel Surface Lab in Android settings to use the assistant gesture. Availability depends on your device settings.")
+        line("Digital assistant", "Choose Surface Preview in Android settings to use the assistant gesture. Availability depends on your device settings.")
         line("Text selection", "Select text anywhere: " +
             brain.tasks.joinToString(", ") { it.alias })
         line("Quick Settings tile", "Shade, Edit tiles, or the button below.")
@@ -310,7 +310,63 @@ class MainActivity : Activity() {
             })
         }
 
+        panel.addView(label("YOUR CONVERSATION", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
+        panel.addView(label("Saved on this phone. Export before reinstalling to keep your conversation.", 14f, true))
+        panel.addView(flatButton("Export conversation") {
+            startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/json").putExtra(Intent.EXTRA_TITLE, "surface-conversation.json"), EXPORT_CHAT)
+        })
+        panel.addView(flatButton("Restore conversation") {
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/json"), IMPORT_CHAT)
+        })
         return panel
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != RESULT_OK || requestCode !in listOf(EXPORT_CHAT, IMPORT_CHAT)) return
+        val uri = data?.data ?: return
+        val snapshot = if (requestCode == EXPORT_CHAT) Chat.backup(this) else null
+        Thread {
+            try {
+                if (snapshot != null) {
+                    val stream = contentResolver.openOutputStream(uri, "wt") ?: error("Could not open the file.")
+                    stream.bufferedWriter().use { it.write(snapshot) }
+                    runOnUiThread { if (!gone) Toast.makeText(this, "Conversation exported", Toast.LENGTH_SHORT).show() }
+                } else {
+                    val stream = contentResolver.openInputStream(uri) ?: error("Could not open the file.")
+                    val bytes = stream.use { source ->
+                        val out = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(8192)
+                        while (out.size() <= 512_000) {
+                            val count = source.read(buffer, 0, minOf(buffer.size, 512_001 - out.size()))
+                            if (count < 0) break
+                            out.write(buffer, 0, count)
+                        }
+                        out.toByteArray()
+                    }
+                    require(bytes.size <= 512_000) { "This backup is too large." }
+                    val (turns, draft) = Chat.readBackup(bytes.toString(Charsets.UTF_8))
+                    runOnUiThread {
+                        if (!gone) AlertDialog.Builder(this).setTitle("Restore conversation?")
+                            .setMessage("Replace this conversation with " + turns.size + " saved exchanges? Export your current conversation first if you want to keep it.")
+                            .setPositiveButton("Restore") { _, _ ->
+                                newChat()
+                                Chat.save(this, turns)
+                                Chat.saveDraft(this, draft)
+                                restoreHistory()
+                                input.setText(draft)
+                                playback.visibility = if (turns.isEmpty()) View.GONE else View.VISIBLE
+                                turns.lastOrNull()?.let { ResultStore.save(this, Task.ASK, it.reply) }
+                                settingsDialog?.dismiss()
+                            }.setNegativeButton("Cancel", null).show()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread { if (!gone) Toast.makeText(this, e.message ?: "Could not read this backup.", Toast.LENGTH_LONG).show() }
+            }
+        }.start()
     }
 
     // ---------------------------------------------------------- the chat
@@ -924,5 +980,7 @@ class MainActivity : Activity() {
 
     private companion object {
         const val MIC_REQUEST = 1
+        const val EXPORT_CHAT = 10
+        const val IMPORT_CHAT = 11
     }
 }

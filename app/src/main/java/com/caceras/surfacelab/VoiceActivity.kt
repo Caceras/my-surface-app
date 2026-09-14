@@ -100,9 +100,11 @@ class VoiceActivity : Activity() {
             // with no on-device recogniser is worse than no shortcut.
             !ears.available() -> {
                 state = State.IDLE
-                status.text = getString(R.string.voice_unavailable)
+                status.text = "Voice needs setup"
+                answer.text = getString(R.string.voice_unavailable)
+                setupTools.visibility = View.VISIBLE
                 dot.visibility = View.VISIBLE
-        dot.alpha = 0.45f
+                dot.alpha = 0.45f
                 action.visibility = View.GONE
             }
             granted() -> pendingListen = true
@@ -132,7 +134,8 @@ class VoiceActivity : Activity() {
                 setupTools = LinearLayout(this@VoiceActivity).apply {
                     orientation = LinearLayout.VERTICAL
                     visibility = View.GONE
-                    addView(pill("Choose speaking language") { chooseLanguage() }, wide().apply { bottomMargin = dp(8) })
+                    language = pill("Choose speaking language") { chooseLanguage() }
+                    addView(language, wide().apply { bottomMargin = dp(8) })
                     addView(pill("Download offline speech") { downloadLanguage() }, wide().apply { bottomMargin = dp(8) })
                     addView(pill("Test speaker & settings") { voiceOptions() }, wide())
                 }
@@ -140,7 +143,6 @@ class VoiceActivity : Activity() {
             }, wide())
         }
         action = pill(getString(R.string.talk_again), true) { requestListen() }
-        language = pill(ears.locale().displayName) { chooseLanguage() }
         continuousSwitch = Switch(this).apply {
             text = getString(R.string.keep_talking)
             minHeight = dp(52)
@@ -517,7 +519,9 @@ class VoiceActivity : Activity() {
         if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
             if (resumed) listen() else pendingListen = true
         } else {
-            status.text = getString(R.string.mic_denied)
+            status.text = "Microphone is off"
+            answer.text = getString(R.string.mic_denied)
+            setupTools.visibility = View.VISIBLE
             idleAction()
         }
     }

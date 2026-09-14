@@ -36,7 +36,22 @@ android {
         }
     }
 
+    // A private, persistent key makes future personal-preview updates keep data.
+    // CI supplies this only when the owner has configured signing secrets.
+    val personalKey = System.getenv("SURFACE_KEYSTORE_FILE")
+    if (!personalKey.isNullOrBlank()) {
+        signingConfigs.create("personal") {
+            storeFile = file(personalKey)
+            storePassword = System.getenv("SURFACE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("SURFACE_KEY_ALIAS")
+            keyPassword = System.getenv("SURFACE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
+        debug {
+            if (!personalKey.isNullOrBlank()) signingConfig = signingConfigs.getByName("personal")
+        }
         release {
             isMinifyEnabled = false
         }

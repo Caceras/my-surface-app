@@ -112,7 +112,23 @@ jobs:
         with:
           gradle-version: "9.7.1"
 
+      - name: Restore personal preview signing key
+        env:
+          SURFACE_KEYSTORE_BASE64: ${{ secrets.SURFACE_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          if [ -n "$SURFACE_KEYSTORE_BASE64" ]; then
+            umask 077
+            key_path="$RUNNER_TEMP/surface-personal.jks"
+            printf '%s' "$SURFACE_KEYSTORE_BASE64" | base64 --decode > "$key_path"
+            echo "SURFACE_KEYSTORE_FILE=$key_path" >> "$GITHUB_ENV"
+          fi
+
       - name: Build
+        env:
+          SURFACE_KEYSTORE_PASSWORD: ${{ secrets.SURFACE_KEYSTORE_PASSWORD }}
+          SURFACE_KEY_ALIAS: ${{ secrets.SURFACE_KEY_ALIAS }}
+          SURFACE_KEY_PASSWORD: ${{ secrets.SURFACE_KEY_PASSWORD }}
         run: gradle ${{ matrix.task }} -PbuildNumber=${{ github.run_number }} --no-daemon --stacktrace
 
       # Naming the APK after the flavour stops downloads from piling up as
@@ -167,8 +183,8 @@ jobs:
 
           Surface Preview 3 installs alongside the old Pixel Surface Lab app. Open the new Surface Preview icon after installing.
 
-          Upgrades between preview builds require the same signing key. This workflow does not persist a
-          keystore, so a preview may not upgrade an existing install. It is a prerelease, so
+          Upgrades between preview builds require the same signing key. Configure the private signing secrets described in docs/delivery.md for consistent upgrades.
+          Without them, a new debug key is generated and a preview may not upgrade an existing install. It is a prerelease, so
           \`/releases/latest\` still points at the build from main."
 
   release:

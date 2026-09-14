@@ -8,6 +8,7 @@
         the platform gives us, including day/night.
     -->
     <style name="Chat" parent="@android:style/Theme.DeviceDefault.DayNight">
+        <item name="android:alertDialogTheme">@style/SurfaceDialog</item>
         <item name="android:fontFamily">sans-serif</item>
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:windowLightStatusBar">true</item>
@@ -21,5 +22,12 @@
         <item name="android:colorBackgroundCacheHint">@null</item>
         <item name="android:windowIsFloating">false</item>
         <item name="android:backgroundDimEnabled">false</item>
+    </style>
+    <style name="SurfaceDialog" parent="@android:style/Theme.DeviceDefault.Light.Dialog.Alert">
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:colorBackground">@color/composer_bg</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_dim</item>
+        <item name="android:fontFamily">sans-serif</item>
     </style>
 </resources>

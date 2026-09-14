@@ -287,4 +287,16 @@ class ConversationTest {
         assertEquals(0, brain.runs)
     }
 
+    @Test
+    fun `backups round trip conversation and draft and reject unrelated JSON`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        Chat.save(context, listOf(Turn("Hello", "Hi there")))
+        Chat.saveDraft(context, "Next thought")
+        val restored = Chat.readBackup(Chat.backup(context))
+        assertEquals(listOf(Turn("Hello", "Hi there")), restored.first)
+        assertEquals("Next thought", restored.second)
+        org.junit.Assert.assertThrows(Exception::class.java) { Chat.readBackup("{}") }
+        assertEquals(listOf(Turn("Hello", "Hi there")), Chat.load(context))
+    }
+
 }

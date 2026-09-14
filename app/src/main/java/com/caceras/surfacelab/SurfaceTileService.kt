@@ -38,7 +38,7 @@ class SurfaceTileService : TileService() {
     private fun launch() {
         // A service is not an activity, so the intent inside needs
         // FLAG_ACTIVITY_NEW_TASK or the launch is refused outright.
-        val intent = Intent(this, if (Ears(this).available()) VoiceActivity::class.java else MainActivity::class.java)
+        val intent = Intent(this, VoiceActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

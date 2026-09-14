@@ -16,13 +16,15 @@
 
 ---
 
-## Assistant improvements
+## Surface Preview 3
 
-The current assistant work is documented in [the Pixel audit and device checklist](docs/pixel-assistant-audit.md).
-It adds shared text/voice history, draft recovery, stop-generation and read-aloud controls,
-English/Swedish speech selection, an opt-in continuous voice session, Type/Talk widget
-buttons, and Android assistant-role entry. See that document for current behavior;
-older design rationale below describes the original prototype.
+The app has a new native chat and voice experience: warm light/dark styling, a welcoming start screen, readable streaming answers, visible Listen/Copy/Share controls, guided offline speech setup, and conversation backup/restore.
+
+**[Download the new Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/pixel-surface-lab-nano.apk)** · **[Phone setup and complete audit](docs/surface-overhaul.md)**
+
+Install it alongside the old app, then open **Surface Preview**. Settings show **3.0** and the build number. Start with **Set up voice & test playback**. First-time model and language downloads require a connection. This branch is a preview; the latest main-branch release is the older experience.
+
+The original prototype documentation follows. The [overhaul audit](docs/surface-overhaul.md) describes current behavior and device-testing limits.
 
 ## What this is
 
@@ -34,7 +36,7 @@ mobile data and it still works.
 Speech goes the same way. The recogniser is the on-device one or there is no
 microphone at all, and the answer is read back by an installed offline voice.
 Ask out loud to hear the answer; typed replies are quiet by default. Read them
-aloud on demand, or enable **Read every reply aloud** under More.
+aloud on demand, or enable **Read every reply aloud** under Settings.
 
 It is a prompt box, not a fixed menu. Summarise, Proofread and Make professional
 are there too, but they are ordinary prompts with a system instruction, defined

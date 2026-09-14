@@ -70,6 +70,26 @@ object Chat {
         prefs(context).edit().putBoolean("speak_replies", value).apply()
     }
 
+    /** Portable backup chosen through Android's file picker; no storage permission. */
+    fun backup(context: Context): String = JSONObject()
+        .put("format", "surface-chat-v1")
+        .put("turns", JSONArray().apply { load(context).forEach { put(JSONObject().put("q", it.you).put("a", it.reply)) } })
+        .put("draft", draft(context)).toString(2)
+
+    fun readBackup(raw: String): Pair<List<Turn>, String> {
+        require(raw.length <= 512_000) { "This backup is too large." }
+        val objectValue = JSONObject(raw)
+        require(objectValue.getString("format") == "surface-chat-v1") { "Choose a Surface conversation backup." }
+        val array = objectValue.getJSONArray("turns")
+        require(array.length() <= KEEP) { "This backup contains too many turns." }
+        val turns = (0 until array.length()).map { i ->
+            val turn = array.getJSONObject(i)
+            Turn(turn.getString("q"), turn.getString("a"))
+        }
+        val draft = objectValue.optString("draft", "")
+        return turns to draft
+    }
+
     private fun prefs(context: Context) = context.applicationContext
         .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 }

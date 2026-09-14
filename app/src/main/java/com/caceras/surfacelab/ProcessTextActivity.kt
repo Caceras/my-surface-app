@@ -104,7 +104,7 @@ class ProcessTextActivity : Activity() {
         val preview = TextView(this).apply {
             text = if (selection.length > 220) selection.take(217) + "..." else selection
             textSize = 13f
-            alpha = 0.6f
+            setTextColor(ink(R.color.text_dim))
             padDp(0, 8, 0, 0)
         }
 
@@ -122,7 +122,9 @@ class ProcessTextActivity : Activity() {
                     setImageResource(R.drawable.ic_mic)
                     background = null
                     contentDescription = getString(R.string.mic)
-                    val pad = dp(8)
+                    minimumWidth = dp(48)
+                    minimumHeight = dp(48)
+                    val pad = dp(10)
                     setPadding(pad, pad, pad, pad)
                     setOnClickListener { toggleListening() }
                 }
@@ -386,7 +388,7 @@ class ProcessTextActivity : Activity() {
     }
 
     private companion object {
-        const val DIALOG_THEME = android.R.style.Theme_DeviceDefault_Dialog_Alert
+        const val DIALOG_THEME = R.style.SurfaceDialog
         const val MIC_REQUEST = 1
     }
 }

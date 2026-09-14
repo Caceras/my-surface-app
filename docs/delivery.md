@@ -1,5 +1,20 @@
 # Getting the APK onto the phone
 
+## Surface Preview 3
+
+Use the [branch APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/pixel-surface-lab-nano.apk) and open **Surface Preview**. It installs alongside Pixel Surface Lab. Confirm version 3.0 and the build number in Settings. Existing conversations remain in the old app; the new identity does not migrate private data automatically.
+
+New builds include **Settings → Export conversation / Restore conversation**. Export before uninstalling a preview. A stable download URL does not guarantee a compatible signing key.
+
+For consistent future updates, the build already supports these **private GitHub Actions repository secrets**:
+
+- `SURFACE_KEYSTORE_BASE64`: your personal keystore encoded as base64.
+- `SURFACE_KEYSTORE_PASSWORD`: its store password.
+- `SURFACE_KEY_ALIAS`: its signing alias.
+- `SURFACE_KEY_PASSWORD`: the alias password.
+
+The workflow decodes the key only into the runner's temporary directory and passes the passwords through environment variables. It does not publish the key or include it in an artifact. Both flavors use that key when configured. Missing secrets preserve the automatic debug-build path. Changing from a generated debug key to the personal key requires one reinstall: export first, install, then restore. Keep the personal key backed up privately. No persistent key was created or added to repository secrets as part of this overhaul.
+
 ## The iteration loop
 
 The point of all of this is a short loop: say what should change, and try it on

@@ -54,8 +54,8 @@ fun suggestionButton(context: Context, text: String, onTap: () -> Unit) =
         this.text = text
         textSize = 13f
         isAllCaps = false
-        minHeight = context.dp(36)
-        minimumHeight = context.dp(36)
+        minHeight = context.dp(48)
+        minimumHeight = context.dp(48)
         setPadding(context.dp(14), 0, context.dp(14), 0)
         setOnClickListener { onTap() }
         (layoutParams as? ViewGroup.MarginLayoutParams)?.rightMargin = context.dp(8)

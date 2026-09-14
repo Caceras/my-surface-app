@@ -44,7 +44,7 @@ class SurfaceWidgetProvider : AppWidgetProvider() {
             Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), flags)
         val talk = PendingIntent.getActivity(context, 1,
-            Intent(context, if (Ears(context).available()) VoiceActivity::class.java else MainActivity::class.java)
+            Intent(context, VoiceActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), flags)
 
         val views = RemoteViews(context.packageName, R.layout.widget).apply {
