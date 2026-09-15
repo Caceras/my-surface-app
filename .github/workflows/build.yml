@@ -102,7 +102,7 @@ jobs:
           path: dist/evidence/
           retention-days: 30
           if-no-files-found: error
-          compression-level: 0
+          compression-level: 1
       - name: Remove temporary signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/aegentica-personal.jks"

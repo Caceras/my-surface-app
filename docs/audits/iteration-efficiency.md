@@ -19,13 +19,17 @@ Baseline measured from GitHub job timestamps: preflight 7 s, Android quality 127
 | F05 | Status test passes when any text except an obsolete loading string appears | Require the provider's known status in a visible status view | A missing callback or wrong/hidden status fails |
 | F06 | Direct-child message selectors confuse controls with answer text; exact switch count blocks additions | Shared role-based message selector and nonempty semantic switch checks | Existing chat assertions stay intact; added controls/nesting do not masquerade as answers |
 | F07 | Gradle task caching is not enabled; screenshot files are untracked task side effects | Enable build cache and declare native renders as test outputs | Android build succeeds with evidence present; cache benefit depends on inputs/runner, not guaranteed each build |
-| F08 | Successful runs upload diagnostics twice; APK/PNG artifact compression wastes CPU | Success keeps the complete evidence bundle; failure/cancellation keeps diagnostics; upload already-compressed evidence without outer compression | Successful evidence verified, diagnostics retained on failure path |
+| F08 | Successful runs upload diagnostics twice; APK/PNG artifact compression wastes CPU | Success keeps the complete evidence bundle; failure/cancellation keeps diagnostics; use measured fast compression for evidence upload | Successful evidence verified, diagnostics retained on failure path |
 | F09 | Release verifier starts seven download commands per release | One CLI batch per unique/rolling release, still compare every downloaded file hash | Corrupted second asset regression plus live publication verification |
 | F10 | Owner sees signing caveat only after install failure | Each release states actual signing mode, package, version code and Nano checksum before changes; evidence records public certificate fingerprints | Parse/compare both flavor certificates; signature continuity still needs owner key/device |
 | F11 | Timing and test necessity must be rediscovered every iteration | Generate recomputable per-suite/top-ten test timings in evidence; this document records necessity decisions | Report recomputed from original XML; timing is advisory, never a flaky hard gate |
 | F12 | Agent repeats broad audits, all screenshots, giant PR histories and unnecessary pushes | Scope by requested behavior; review changed states; bounded diagnostics; short current PR acceptance linking historical releases | Contributor/agent workflow updated; source, gate and install evidence remain explicit |
 
 Implementation is tracked in the source change. Final CI, visual acceptance, installation identity and publication evidence are recorded in the PR and exact build release. Documentation-only changes do not manufacture a new APK or assert that existing installed bits changed.
+
+## Compression measurement
+
+A proposed no-compression shortcut was rejected after measurement on the actual build 112 bundle. Local Python ZIP level 0 took 0.050 s / 34,887,729 bytes; level 6 took 1.302 s / 13,864,931 bytes; level 1 took 0.484 s / 15,010,343 bytes. APK contents still benefit substantially from compression. Artifact upload uses level 1; these local timings are not a GitHub transfer-speed guarantee. The downloadable release ZIP retains its deterministic compression.
 
 ## Test-by-test decisions
 
