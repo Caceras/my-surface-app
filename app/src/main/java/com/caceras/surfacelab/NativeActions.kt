@@ -51,7 +51,7 @@ object NativeActions {
     fun show(activity: Activity, draft: String = ""): Dialog {
         val dialog = Dialog(activity)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        fun form(title: String, hint: String, type: Int, initial: String = "", confirm: String = "Open", make: (String) -> Intent) {
+        fun form(title: String, hint: String, type: Int, initial: String = "", confirm: String = "Open", limit: Int = 500, guidance: String? = null, make: (String) -> Intent) {
             val field = EditText(activity).apply {
                 this.hint = hint; inputType = type; setText(initial); maxLines = 3
                 styleField()
@@ -60,13 +60,15 @@ object NativeActions {
                 filters = arrayOf(android.text.InputFilter.LengthFilter(when {
                     type == InputType.TYPE_CLASS_PHONE -> 40
                     type == InputType.TYPE_CLASS_NUMBER -> 4
-                    else -> 500
+                    else -> limit
                 }))
                 setSelection(text.length)
             }
-            val fieldContainer = android.widget.FrameLayout(activity).apply {
+            val fieldContainer = LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
                 padDp(24, 12, 24, 8)
-                addView(field, android.widget.FrameLayout.LayoutParams(-1, -2))
+                addView(field, LinearLayout.LayoutParams(-1, -2))
+                guidance?.let { addView(activity.label(it, 13f, true).apply { padDp(0, 8, 0, 0) }) }
             }
             val form = AlertDialog.Builder(activity).setTitle(title).setView(fieldContainer)
                 .setNegativeButton("Cancel", null).setPositiveButton(confirm, null).create()
@@ -96,7 +98,7 @@ object NativeActions {
                 addView(activity.label(hint, 13f, true).apply { padDp(12, 8, 12, 20) })
             }
             action("Set a timer", "Choose minutes, then open your Clock app.") {
-                form("Set a timer", "Minutes", InputType.TYPE_CLASS_NUMBER, confirm = "Set timer") { timer(it.toIntOrNull() ?: 0) }
+                form("Set a timer", "Minutes", InputType.TYPE_CLASS_NUMBER, confirm = "Set timer", guidance = "1–1,440 whole minutes") { timer(it.toIntOrNull() ?: 0) }
             }
             action("Set an alarm", "Choose a time in your phone’s local time zone.") {
                 val now = Calendar.getInstance()
@@ -106,7 +108,7 @@ object NativeActions {
                 picker.show(); NativePrivacy.apply(activity, picker.window)
             }
             action("Draft a calendar event", "Review the date and details in Calendar before saving.") {
-                form("Calendar event", "Event title", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, draft.take(200), confirm = "Review in Calendar") { calendar(it) }
+                form("Calendar event", "Event title", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, draft.take(200), confirm = "Review in Calendar", limit = 200, guidance = "Title · up to 200 characters") { calendar(it) }
             }
             action("Find a place", "Search in Maps. Your search is shared with that app.") {
                 form("Find a place", "Place or address", InputType.TYPE_CLASS_TEXT, confirm = "Search") { maps(it) }

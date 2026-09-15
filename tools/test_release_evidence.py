@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from release_evidence import digest
-from release_evidence import REQUIRED_SHOTS, junit_summary, lint_summary, validate_identity, verify
+from release_evidence import REQUIRED_SHOTS, junit_summary, lint_summary, lint_inventory, validate_identity, verify
 
 
 class EvidenceTests(unittest.TestCase):
@@ -39,6 +39,11 @@ class EvidenceTests(unittest.TestCase):
         bad = self.xml("nano.xml", '<issues><issue severity="Error"/></issues>')
         with self.assertRaises(ValueError): lint_summary([good])
         with self.assertRaises(ValueError): lint_summary([good, bad])
+
+    def test_lint_inventory_keeps_flavors_separate_and_counts_duplicates(self):
+        core = self.xml("core.xml", '<issues><issue id="SetTextI18n"/><issue id="SetTextI18n"/><issue id="UnusedResources"/></issues>')
+        nano = self.xml("nano.xml", '<issues><issue id="UseKtx"/></issues>')
+        self.assertEqual(lint_inventory([core, nano]), {"core.xml": {"SetTextI18n": 2, "UnusedResources": 1}, "nano.xml": {"UseKtx": 1}})
 
     def test_wrong_variant_or_version_blocks_release(self):
         valid = dict(package="com.caceras.surface.nano", versionName="3.0.102-nano", versionCode=102)

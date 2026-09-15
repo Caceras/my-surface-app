@@ -37,4 +37,4 @@ See [testing](testing.md) for native compact, landscape, wide, large-font, widge
 
 ## Shared controls
 
-Use `sheetHeader` for Settings, History and Actions. The Done control has explicit wrap-content dimensions beside a weighted title. Use `preferenceSwitch` for native settings/voice toggles; it keeps semantic text colors, 56 dp minimum height and explicit state tints. Use `styleField` for private search/action inputs, with matching outline, 52 dp minimum height, readable hint/text colors and IME learning suppression. These helpers retain Android selection, focus, switch semantics and input behavior.
+Use `sheetHeader` for Settings, History and Actions. The Done control has explicit wrap-content dimensions beside a weighted title. Use `preferenceSwitch` for native settings/voice toggles; it keeps semantic text colors, 56 dp minimum height and explicit state tints. Use `styleField` for private search/action/selection inputs, with matching outline, 52 dp minimum height, readable hint/text colors and IME learning suppression. These helpers retain Android selection, focus, switch semantics and input behavior.

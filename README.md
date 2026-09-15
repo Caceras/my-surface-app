@@ -7,7 +7,7 @@ A native Android assistant for typing, talking, thinking things through, and ope
 [![Android checks](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg?branch=improve-pixel-assistant)](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-70CEFA.svg)](LICENSE)
 
-**[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [What changed](docs/preview-notes.md) · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Quality audit](docs/cohesion-audit.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribute](CONTRIBUTING.md)
+**[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [What changed](docs/preview-notes.md) · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Deep audit](docs/audits/2026-09-15.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribute](CONTRIBUTING.md)
 
 > This is the **Ægentica AI** app on `improve-pixel-assistant`. The main branch and `/releases/latest` may contain an older experience. This preview is not a Play Store release. Export your conversations before any reinstall.
 
@@ -88,6 +88,7 @@ APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots
 | Guide | Covers |
 |---|---|
 | [Iteration workflow](docs/iteration-workflow.md) | Pipeline audit, automated evidence, verified releases and feedback loop |
+| [Deep audit and fixes](docs/audits/2026-09-15.md) | Prioritized repair register, current flow evidence and open acceptance gates |
 | [Cohesion audit](docs/cohesion-audit.md) | Current cross-flow fixes, fresh baseline and remaining device gates |
 | [Android capability plan](docs/android-native-plan.md) | 40+ capability areas, delivery contracts, follow-on priorities and gates |
 | [Native actions](docs/native-actions.md) | Clock, Calendar, Maps, Dialer and keyboard/shortcut behavior |

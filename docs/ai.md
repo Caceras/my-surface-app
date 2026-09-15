@@ -20,7 +20,7 @@ The Prompt API is beta. SDK behavior and compatibility can change; update the de
 
 On-device output can be wrong, incomplete or repetitive. Neither fluent speech nor fluent text establishes factual accuracy. The app has no live search, retrieval service, citation verification, tool execution, or access to private information beyond the supplied context.
 
-Speech locale controls recognition/playback, not a guarantee of model competence. Evaluate representative English and Swedish tasks on the target Pixel, including short follow-ups, long selections, interruption, refusals and malformed output. The current Nordic-language caveat in `Lang.kt` is a heuristic, not an automatic language-quality evaluation.
+Speech locale controls recognition/playback, not a guarantee of model competence. Evaluate representative English and Swedish tasks on the target Pixel, including short follow-ups, long selections, interruption, refusals and malformed output. The app no longer infers language quality from Nordic characters or appends unsupported training claims. A neutral accuracy reminder appears in Settings; actual provider notes and truncation notices remain visible.
 
 ## Changes worth testing
 

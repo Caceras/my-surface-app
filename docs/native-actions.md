@@ -1,6 +1,6 @@
 # Native actions and access
 
-Ægentica AI uses Android's established app handoffs for everyday actions. Open **Actions** below the composer, or use its launcher shortcut. Settings also includes **On your phone · Actions**. None of these actions is inferred or executed automatically from an AI response.
+Ægentica AI uses Android's established app handoffs for everyday actions. Open **Actions** below the composer, or use its launcher shortcut. Chat keeps the direct Actions entry alongside Voice and History. None of these actions is inferred or executed automatically from an AI response.
 
 ## What each action does
 
@@ -48,4 +48,4 @@ Headset/media Pause or Stop ends active foreground speech. Headphone disconnect 
 
 All navigation sheets use the same pause-and-preserve-draft behavior. Action forms share the private editor styling used by History search and bound their field length before validated handoff.
 
-Single-field action forms support keyboard **Done** and hardware Enter. Invalid input remains visible with an inline error and focus for correction. A successful handoff closes the form and sheet; repeated editor callbacks do not relaunch it. Timer input is bounded to four digits, within the documented minute range.
+Single-field action forms support keyboard **Done** and hardware Enter. Invalid input remains visible with an inline error and focus for correction. A successful handoff closes the form and sheet; repeated editor callbacks do not relaunch it. Timer input is bounded to four digits and states the minute range before entry. Calendar states and enforces the same 200-character title limit that its handoff uses.

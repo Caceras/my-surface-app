@@ -5,7 +5,7 @@ Read `README.md`, `docs/architecture.md`, and `docs/iteration-workflow.md` befor
 ## Iteration contract
 
 1. Inspect branch HEAD and local changes. Preserve unrelated edits and continue the existing branch/PR when that is the current task. Do not merge main or change external distribution scope without authorization.
-2. Identify a concrete user-flow defect or acceptance gap. For visual findings, capture fresh native renders and inspect them; distinguish code inspection, layout fixtures and real-device evidence.
+2. Use `docs/audits/2026-09-15.md` as the current repair register. Identify a concrete user-flow defect or acceptance gap. For visual findings, capture fresh native renders and inspect them; distinguish code inspection, layout fixtures and real-device evidence.
 3. Reuse `Design.kt` controls and navigation pause behavior. Keep Settings, History, Actions, chat and Voice consistent. Never let hidden capture/generation continue after an explicit navigation pause.
 4. Keep main/core framework-only. Nano SDK code belongs in the Nano source set. Runtime dependencies and test dependencies have different boundaries.
 5. Add focused regressions for meaningful behavior changes. Preserve draft recovery, cancellation tokens, speech muting, private defaults and export compatibility. Do not weaken failing assertions merely to make a build green.

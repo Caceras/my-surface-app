@@ -114,3 +114,10 @@ fun android.widget.EditText.styleField() {
     minHeight = context.dp(52)
     imeOptions = imeOptions or android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
 }
+
+/** Dictation feedback respects Android's remove-animation setting. */
+fun View.speechLevel(rms: Float) {
+    val value = if (android.animation.ValueAnimator.areAnimatorsEnabled()) 1f + rms.coerceIn(0f, 10f) / 70f else 1f
+    scaleX = value
+    scaleY = value
+}

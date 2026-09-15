@@ -58,20 +58,6 @@ class LogicTest {
     }
 
     @Test
-    fun `Swedish is recognised well enough to warn`() {
-        assertTrue(Lang.looksNordic("Det här är en text på svenska"))
-        assertTrue(Lang.looksNordic("vi kan inte se det som har hänt"))
-        assertFalse(Lang.looksNordic("This is an ordinary English sentence."))
-    }
-
-    @Test
-    fun `the caveat fires for the model tasks and not for uppercase`() {
-        assertNotNull(Lang.caveat(Task.ASK, "Det här är svenska"))
-        assertNull(Lang.caveat(Task.UPPERCASE, "Det här är svenska"))
-        assertNull(Lang.caveat(Task.ASK, "Plain English here."))
-    }
-
-    @Test
     fun `there are suggestions and they are short enough to be tappable`() {
         listOf(Prompts.ABOUT_SELECTION, Prompts.OPENERS).forEach { set ->
             assertTrue(set.isNotEmpty())

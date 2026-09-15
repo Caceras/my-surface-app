@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 root = Path(sys.argv[1] if len(sys.argv) > 1 else ".").resolve()
-files = [root / "README.md", root / "CONTRIBUTING.md", *sorted((root / "docs").glob("*.md"))]
+files = [root / "README.md", root / "CONTRIBUTING.md", root / "AGENTS.md", *sorted((root / "docs").rglob("*.md"))]
 errors = []
 for path in files:
     source = re.sub(r"```.*?```", "", path.read_text(), flags=re.S)

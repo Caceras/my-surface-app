@@ -45,3 +45,7 @@ No wake word, background microphone service, background inference, guaranteed Bl
 These links describe platform contracts. The JVM tests cover the app's handling of those contracts; real recognition and playback need the physical-device checklist.
 
 Opening chat navigation sheets stops capture/playback just as leaving the chat does. Quiet voice remains quiet through the final result; the UI does not restore an active mute control for an already muted response. Real headset/engine validation remains in the device checklist.
+
+## Recreation and failure
+
+Rotating/recreating Voice pauses capture and preserves displayed text; tap Talk to continue. A failed or echoed response turns off Keep talking and saves the question to an empty typed draft. An existing different draft is preserved. Main and selection dictation level feedback follows Android’s disabled-animation preference. Selection prompts retain text/cursor during recreation and need an explicit Send after reviewing dictation.

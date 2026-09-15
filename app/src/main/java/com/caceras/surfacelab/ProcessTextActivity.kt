@@ -80,17 +80,23 @@ class ProcessTextActivity : Activity() {
             return
         }
 
-        if (task == Task.ASK) ask() else send("")
+        if (task == Task.ASK) {
+            askedAloud = savedInstanceState?.getBoolean("selection-aloud") ?: false
+            ask(savedInstanceState?.getString("selection-prompt").orEmpty(), savedInstanceState?.getInt("selection-cursor", -1) ?: -1)
+        } else send("")
     }
 
     /** Free-form: the user writes the prompt, the selection is the material. */
-    private fun ask() {
+    private fun ask(draft: String = "", cursor: Int = -1) {
         val input = EditText(this).apply {
             hint = getString(R.string.ask_hint)
             inputType = InputType.TYPE_CLASS_TEXT or
                 InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
                 InputType.TYPE_TEXT_FLAG_MULTI_LINE
             maxLines = 4
+            styleField()
+            setText(draft)
+            setSelection(if (cursor < 0) length() else cursor.coerceIn(0, length()))
         }
 
         // A blank box is a worse prompt than a bad suggestion.
@@ -153,14 +159,26 @@ class ProcessTextActivity : Activity() {
 
         dialog = AlertDialog.Builder(this, DIALOG_THEME)
             .setTitle(R.string.ask_title)
-            .setView(body)
-            .setPositiveButton(R.string.send) { _, _ ->
-                send(input.text.toString())
-            }
+            .setView(ScrollView(this).apply { addView(body) })
+            .setPositiveButton(R.string.send, null)
             .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
             .setOnDismissListener { if (dialog != null) finish() }
             .show()
         NativePrivacy.apply(this, dialog?.window)
+        dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+            when {
+                listening -> { ears.stop(); input.error = "Finish dictation, review your words, then send." }
+                input.text.isBlank() -> { input.error = "What would you like to know about this text?"; input.requestFocus() }
+                !active -> send(input.text.toString())
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("selection-prompt", prompt?.text?.toString().orEmpty())
+        outState.putInt("selection-cursor", prompt?.selectionStart ?: -1)
+        outState.putBoolean("selection-aloud", askedAloud)
+        super.onSaveInstanceState(outState)
     }
 
     private fun send(instruction: String) {
@@ -233,7 +251,7 @@ class ProcessTextActivity : Activity() {
             }
             if (result.ok) ResultStore.save(this, task, result.text)
             if (aloud && result.ok) mouth?.finish(Markdown.strip(result.text))
-            val note = result.note ?: Lang.caveat(task, selection)
+            val note = result.note
 
             // Replacing the selection is the better outcome, but only when
             // there is nothing the user needs to read first.
@@ -319,9 +337,7 @@ class ProcessTextActivity : Activity() {
 
         ears.listen(
             onLevel = { rms ->
-                val scale = 1f + (rms.coerceIn(0f, 10f) / 70f)
-                mic?.scaleX = scale
-                mic?.scaleY = scale
+                mic?.speechLevel(rms)
             },
             onPartial = { partial ->
                 input.setText(listenDraft + (if (listenDraft.isBlank()) "" else " ") + partial)
@@ -348,6 +364,7 @@ class ProcessTextActivity : Activity() {
     }
 
     private fun setMicActive(active: Boolean) {
+        mic?.contentDescription = getString(if (active) R.string.finish_dictation else R.string.mic)
         mic?.setColorFilter(
             resources.getColor(
                 if (active) R.color.listening else R.color.text_dim, theme

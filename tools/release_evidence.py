@@ -6,6 +6,7 @@ Collection requires successful JUnit + lint XML, both APKs, and native renders.
 It proves artifact identity and checks, not visual approval or physical AI quality.
 """
 import argparse
+from collections import Counter
 import hashlib
 import html
 import json
@@ -93,10 +94,39 @@ def lint_summary(paths):
     return counts
 
 
+def lint_inventory(paths):
+    """Stable category counts per report, without leaking runner paths."""
+    return {path.name: dict(sorted(Counter(
+        issue.get("id", "Unknown") for issue in ET.parse(path).getroot().iter("issue")
+    ).items())) for path in paths}
+
+
 def validate_identity(identity, flavor, number):
     expected = "com.caceras.surface" + (".nano" if flavor == "nano" else "")
     if identity != dict(package=expected, versionName=f"3.0.{number}-{flavor}", versionCode=int(number)):
         raise ValueError(f"Unexpected {flavor} APK: {identity}")
+
+
+def audit_report(destination, root, sha):
+    register = root / "docs/audits/2026-09-15.md"
+    if not register.is_file():
+        return
+    shutil.copy2(register, destination / "audit.md")
+    flows = [
+        ("Enter and type", "chat-empty", "Native layout checked. Keyboard, TalkBack and display scaling still need Pixel acceptance."),
+        ("Read and recover", "audit-answer-large-font", "Actions adapt to large type; Edit question protects a different draft. Lifecycle regressions accompany the render."),
+        ("Talk and recover", "audit-voice-recovery", "Failed questions have typed recovery; recreation stays paused. This fixture does not exercise real Nano or speech."),
+        ("Save and resume", "conversations", "History controls and previews are visible; import identity regressions preserve distinct entries."),
+        ("Configure", "chat-settings", "Settings is shorter; close controls require visual review in both themes. See review.html for dark/feedback states."),
+        ("Select text", "audit-selection", "Shared private prompt and validation. This is native dialog content on a test host, not a source-app overlay."),
+        ("Android handoff", "aegentica-actions", "Explicit validated handoffs. Installed destination apps, launcher and assistant gestures need physical-device acceptance.")
+    ]
+    figures = []
+    for step, (title, shot, note) in enumerate(flows, 1):
+        if not (destination / f"screenshots/{shot}.png").is_file():
+            raise ValueError(f"Missing audit flow screenshot: {shot}")
+        figures.append(f'<section><h2>{step}. {html.escape(title)}</h2><p>{html.escape(note)}</p><img src="screenshots/{shot}.png" alt="{html.escape(title)}" loading="lazy"></section>')
+    (destination / "audit.html").write_text(f'<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Ægentica AI audit</title><style>body{{font:16px/1.6 system-ui;color:#142d3d;background:#f6fafd;max-width:960px;margin:24px auto;padding:0 20px}}section{{border-top:1px solid #cddde8;padding:20px 0}}img{{max-width:100%;width:360px;height:auto}}code{{overflow-wrap:anywhere}}</style><h1>Ægentica AI · audit evidence</h1><p>Source <code>{sha}</code>. Native core fixtures; human review and physical Pixel checks remain separate.</p><p><a href="audit.md">Full repair register and open gates</a> · <a href="review.html">All native states</a> · <a href="reports/lint-inventory.json">Lint inventory</a></p>'+"".join(figures)+"</html>")
 
 
 def collect(destination, root=Path(".")):
@@ -136,6 +166,7 @@ def collect(destination, root=Path(".")):
         folder = destination / "reports"
         folder.mkdir(exist_ok=True)
         shutil.copy2(src, folder / src.name)
+    (destination / "reports/lint-inventory.json").write_text(json.dumps(lint_inventory(lint), indent=2) + "\n")
     for src in shots:
         data = src.read_bytes()
         if data[:8] != b"\x89PNG\r\n\x1a\n":
@@ -149,6 +180,7 @@ def collect(destination, root=Path(".")):
         meta["screenshots"].append(dict(file=f"screenshots/{src.name}", width=width, height=height))
     figures = "\n".join(f'<figure><img src="{html.escape(s["file"])}" loading="lazy"><figcaption>{html.escape(Path(s["file"]).stem)} · {s["width"]} × {s["height"]}</figcaption></figure>' for s in meta["screenshots"])
     (destination / "review.html").write_text(f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Ægentica AI · build {number}</title><style>body{{font:16px system-ui;background:#f6fafd;color:#142d3d;margin:32px}}main{{display:flex;flex-wrap:wrap;gap:24px}}figure{{margin:0;width:320px}}img{{width:100%;height:auto;border-radius:16px}}figcaption{{padding:12px 0}}code{{overflow-wrap:anywhere}}</style><h1>Ægentica AI · build {number}</h1><p>Source <code>{sha}</code> · {results['tests']} tests. Native core fixtures; visual review and physical Pixel validation remain required.</p><main>{figures}</main></html>''')
+    audit_report(destination, root, sha)
     meta["files"] = {str(p.relative_to(destination)): digest(p) for p in sorted(destination.rglob("*")) if p.is_file()}
     (destination / "release-evidence.json").write_text(json.dumps(meta, indent=2) + "\n")
     checks = dict(meta["files"])
@@ -196,6 +228,9 @@ def verify(folder):
         raise ValueError("JUnit summary mismatch")
     if lint_summary(sorted((folder / "reports").glob("lint-results-*.xml"))) != meta["lint"]:
         raise ValueError("Lint summary mismatch")
+    inventory = folder / "reports/lint-inventory.json"
+    if inventory.exists() and json.loads(inventory.read_text()) != lint_inventory(sorted((folder / "reports").glob("lint-results-*.xml"))):
+        raise ValueError("Lint inventory mismatch")
     return meta
 
 

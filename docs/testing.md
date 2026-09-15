@@ -86,3 +86,7 @@ Screenshot capture drains immediate dialog layout work, remeasures the frame and
 ## Iteration regression checks
 
 `python tools/check.py` also exercises publication decisions without networking: stale source, wrong provenance, upload mismatch, draft repair, immutable public builds and rerun tags. Evidence rejects unlisted files and symlinks. Native regressions cover keyboard Done validation/correction, duplicate submission and the metadata-only app-info clipboard. The `settings-feedback` render checks that the feedback control remains reachable at the bottom of Settings. On Pixel, confirm Gboard Done and hardware Enter dispatch once, preserve an invalid timer for correction, and copy app info without losing the chat draft.
+
+## Deep audit acceptance
+
+Use the [current register](audits/2026-09-15.md) as the canonical list. New regression cases cover selection prompt privacy/recreation/validation, paused Voice recreation, failed question recovery, explicit chat retry replacement, conflicting archive IDs, calendar limits and reduced motion. Fresh captures add selection/error, failed-voice and narrow large-answer states. Capture remeasures the full tree, dispatches pre-draw, settles rendering and requires close bounds inside the PNG viewport. Inspect the image: bounds alone are insufficient. The release bundle includes `audit.html`, `audit.md` and `reports/lint-inventory.json`.

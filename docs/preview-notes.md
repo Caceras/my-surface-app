@@ -1,8 +1,11 @@
 # Current preview changes
 
-- Android action forms support keyboard **Done** and hardware Enter. Invalid values stay editable; repeated submission cannot open the destination twice after a successful handoff.
-- Settings → **Help & feedback → Copy app info** prepares build, package, phone, Android and app-language details for a bug report. It copies locally and excludes chats, drafts, recordings and identifiers such as serial numbers.
-- Release publication now finishes active uploads while newer candidates wait. It checks branch HEAD again before promoting the rolling preview and verifies every uploaded asset, including the evidence ZIP.
-- Evidence verification rejects extra unlisted files and symbolic links. Publication regressions cover stale builds, failed downloads, draft repair, immutable releases and reruns.
+- Text-selection Ask now has the shared private editor, useful empty-input validation, preserved prompt/cursor after recreation and a microphone stop label.
+- Recreated Voice stays paused. Failed or echoed spoken questions are recoverable in Type without replacing an existing draft; continuous mode stops after failure.
+- Failed chat requests offer **Edit question** with a choice before replacing a newer draft.
+- Imported history validates archive identities and preserves separate conversations when IDs collide.
+- Calendar and timer forms state their limits; dictation respects reduced-motion preferences; reply actions adapt to large text and narrow screens.
+- Settings removes repeated entry points and groups Android setup more concisely. Language heuristics no longer append unsupported training claims to replies; a neutral accuracy reminder lives in Settings.
+- The deep audit lists all findings and remaining device/signing/performance gates. Each release includes `audit.html`, `audit.md`, current native captures and a lint category inventory.
 
-Pixel validation still matters: check Gboard Done, real offline recognition/playback, headset interruption, assistant gestures and a data-preserving update with your signing key. Native core fixtures do not certify these behaviors.
+This is a personal Nano preview. Real speech, model quality, accessibility and performance still need Pixel acceptance. Export conversations before any required uninstall; in-place updates depend on compatible signing.

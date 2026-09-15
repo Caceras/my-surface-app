@@ -59,20 +59,34 @@ class ShotTest {
         // Drain immediate layout work posted by Dialog.show / setLayout before
         // accepting a frame. A first measure alone can miss a header control.
         org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-        decor.forceLayout()
+        fun relayout(view: View) {
+            view.forceLayout()
+            if (view is android.view.ViewGroup) (0 until view.childCount).forEach { relayout(view.getChildAt(it)) }
+        }
+        relayout(decor)
         decor.measure(View.MeasureSpec.makeMeasureSpec(shotWidth, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(shotHeight, View.MeasureSpec.EXACTLY))
         decor.layout(0, 0, shotWidth, shotHeight)
+        decor.viewTreeObserver.dispatchOnPreDraw()
         decor.findViewWithTag<android.view.ViewGroup>("sheet-header")?.let { header ->
             val done = header.getChildAt(1)
             val rect = android.graphics.Rect()
             assertTrue("$name close action is missing", done.getGlobalVisibleRect(rect))
             assertTrue("$name close action is clipped", rect.width() >= done.context.dp(48) && rect.height() >= done.context.dp(48))
+            val origin = IntArray(2); decor.getLocationOnScreen(origin)
+            rect.offset(-origin[0], -origin[1])
+            assertTrue("$name close action is outside the capture", android.graphics.Rect(0, 0, shotWidth, shotHeight).contains(rect))
         }
 
         afterLayout()
         val bitmap = Bitmap.createBitmap(shotWidth, shotHeight, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.MAGENTA)   // so "drew nothing" is unmistakable
+        decor.draw(Canvas(bitmap))
+        // A real frame traversal can schedule drawable/text invalidation. Draw
+        // the settled tree again rather than accepting a half-painted first frame.
+        decor.viewTreeObserver.dispatchOnPreDraw()
+        decor.invalidate()
+        bitmap.eraseColor(Color.MAGENTA)
         decor.draw(Canvas(bitmap))
 
         val dir = File("build/screenshots").apply { mkdirs() }
@@ -323,6 +337,55 @@ class ShotTest {
             assertTrue(copy.getGlobalVisibleRect(rect))
             assertTrue(rect.height() >= activity.dp(48))
         }
+    }
+
+    private fun selectionPrompt(): android.app.AlertDialog {
+        Robolectric.buildActivity(ProcessTextActivity::class.java, android.content.Intent().apply {
+            component = android.content.ComponentName("com.caceras.surface", "com.caceras.surfacelab.Ask")
+            putExtra(android.content.Intent.EXTRA_PROCESS_TEXT, "A short piece of selected text, ready to discuss.")
+            putExtra(android.content.Intent.EXTRA_PROCESS_TEXT_READONLY, true)
+        }).setup()
+        return org.robolectric.shadows.ShadowDialog.getLatestDialog() as android.app.AlertDialog
+    }
+
+    private fun dialogShot(name: String, form: android.app.Dialog, context: android.content.Context) {
+        val content = form.findViewById<android.view.ViewGroup>(android.R.id.content)
+        (content.parent as android.view.ViewGroup).removeView(content)
+        val host = android.widget.FrameLayout(context).apply {
+            setBackgroundColor(context.getColor(R.color.chat_bg))
+            addView(content, android.widget.FrameLayout.LayoutParams(-1, -2, android.view.Gravity.CENTER))
+        }
+        shoot(name, host, shotHeight = 1600)
+    }
+
+    @Test fun `selection ask has shared styling and clear validation`() {
+        val form = selectionPrompt()
+        form.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick()
+        dialogShot("audit-selection", form, form.context)
+    }
+
+    @Test @Config(qualifiers = "w320dp-h914dp-xxhdpi")
+    fun `answer actions stay usable with large type in a narrow window`() {
+        RuntimeEnvironment.setFontScale(1.8f)
+        val context = RuntimeEnvironment.getApplication()
+        Chat.save(context, listOf(Turn("A small next step?", "Take a short walk. Then choose one thing to finish.")))
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        shoot("audit-answer-large-font", activity.window.decorView, shotWidth = 960)
+    }
+
+    @Test fun `failed voice has an explicit typed recovery`() {
+        val brain = StreamingBrain(); Brains.useForTest(brain)
+        try {
+            val app = RuntimeEnvironment.getApplication()
+            org.robolectric.Shadows.shadowOf(app).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+            org.robolectric.shadows.ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+            val activity = Robolectric.buildActivity(VoiceActivity::class.java).setup().get()
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            org.robolectric.Shadows.shadowOf(org.robolectric.shadows.ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+                .triggerOnResults(android.os.Bundle().apply { putStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION, arrayListOf("Help me plan tomorrow")) })
+            brain.fail("The model is still downloading. Try again shortly.")
+            shoot("audit-voice-recovery", activity.window.decorView)
+        } finally { Brains.useForTest(null) }
     }
 
 }

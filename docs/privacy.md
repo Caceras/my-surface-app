@@ -50,3 +50,5 @@ Use redacted screenshots, dummy conversations, and the build number when reporti
 Search and native action fields request the same no-personalized-learning IME flag as the composer. Settings, History and Actions stop hidden microphone/generation work before opening. CI evidence uses deterministic fixture text and never captures your live conversations.
 
 **Copy app info** is an explicit local clipboard action. Its allowlist contains version, version code, package, manufacturer/model, Android release/API and app-language tags. It does not read chat storage, record audio, collect unique device identifiers or upload anything. Clipboard handling uses the same sensitive-preview metadata as answer copies.
+
+Selection Ask uses the same IME learning-suppression request as chat/history/action fields. Configuration recreation does not automatically reopen Voice capture. Archive restore validates identities before mutation and separates colliding imported/existing entries. These changes preserve package IDs, private defaults and the existing backup format.

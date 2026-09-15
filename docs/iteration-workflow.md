@@ -79,3 +79,7 @@ Preflight and Android quality each cancel superseded jobs for the same ref. Publ
 Every rolling asset is downloaded and checked, including metadata and the ZIP. Bundle verification also rejects unlisted files and symlinks before publishing. SDK-free publication tests exercise stale candidates, provenance mismatch, failed download, draft repair, public-release immutability and rerun suffixes. They model the orchestration; the real push job provides live upload evidence.
 
 Concurrency follows [GitHub's job concurrency contract](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency). Form submission uses [Android's editor action callback](https://developer.android.com/reference/android/widget/TextView.OnEditorActionListener).
+
+## Audit-driven iterations
+
+Start with the [deep audit register](audits/2026-09-15.md): stable IDs, source or capture evidence, acceptance checks and explicit open gates. Fix in priority order, add a focused regression, and update its row. Each verified bundle includes an annotated seven-flow `audit.html`, the register in `audit.md`, and recomputable `reports/lint-inventory.json`; reports identify what still requires device review. Reruns can retain artifacts with identical names: select the artifact by ID and creation time, then verify source/build/attempt. Never use an older artifact simply because its name matches.

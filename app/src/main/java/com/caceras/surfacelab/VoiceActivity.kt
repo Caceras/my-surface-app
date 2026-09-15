@@ -113,6 +113,15 @@ class VoiceActivity : Activity() {
         readableSystemBars()
         setupMode = intent.getBooleanExtra("setup", false)
 
+        if (savedInstanceState != null) {
+            setupMode = savedInstanceState.getBoolean("voice-setup", setupMode)
+            if (setupMode) showSetup() else {
+                heard.text = savedInstanceState.getString("voice-heard").orEmpty()
+                answer.text = Markdown.render(savedInstanceState.getString("voice-answer").orEmpty(), dp(18))
+                idleWith("Voice paused")
+            }
+            return
+        }
         when {
             setupMode -> showSetup()
             // Opening on an honest status beats opening on a microphone that
@@ -242,6 +251,8 @@ class VoiceActivity : Activity() {
     }
 
     private fun showSetup() {
+        state = State.IDLE
+        language.text = "Language · ${ears.locale().displayName}"
         setupMode = true
         dot.visibility = View.VISIBLE
         status.text = "Make yourself heard"
@@ -499,9 +510,7 @@ class VoiceActivity : Activity() {
         state = State.SPEAKING
 
         if (!result.ok) {
-            voice.hush()
-            answer.text = result.note ?: getString(R.string.failed)
-            idle()
+            recoverFailedQuestion(spoken, result.note ?: getString(R.string.failed), voice)
             return
         }
 
@@ -510,13 +519,11 @@ class VoiceActivity : Activity() {
         // The instruction is not an answer, and it is certainly not something
         // to read out loud to someone who is not looking at the screen.
         if (Prompts.isEcho(said, Task.ASK)) {
-            voice.hush()
-            answer.text = getString(R.string.echoed)
-            idle()
+            recoverFailedQuestion(spoken, getString(R.string.echoed), voice)
             return
         }
 
-        val note = Lang.caveat(Task.ASK, spoken)
+        val note = result.note
             ?: getString(R.string.truncated).takeIf { Prompts.looksTruncated(said) }
         answer.text = Markdown.render(
             if (note == null) said else said + "\n\n" + note, dp(18)
@@ -540,6 +547,24 @@ class VoiceActivity : Activity() {
             action.text = getString(R.string.stop_speaking)
             action.setOnClickListener { quietVoice() }
         }
+    }
+
+    private fun recoverFailedQuestion(spoken: String, message: String, voice: Mouth) {
+        continuousSwitch.isChecked = false
+        main.removeCallbacks(nextListen)
+        if (Chat.draft(this).isBlank()) Chat.saveDraft(this, spoken)
+        voice.hush()
+        answer.text = message
+        idleWith("Let’s try that again")
+        guidance.text = if (Chat.draft(this) == spoken) "Your question is saved. Choose Type to edit it, or Talk to try again."
+            else "Your typed draft is safe. Choose Type, or Talk to ask again."
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("voice-setup", setupMode)
+        outState.putString("voice-heard", heard.text.toString())
+        outState.putString("voice-answer", answer.text.toString())
+        super.onSaveInstanceState(outState)
     }
 
     private fun speaker(): Mouth = mouth ?: Mouth(this).also { mouth = it }

@@ -90,3 +90,7 @@ For a useful bug report, include the build, Android version, speech language, ob
 ## Reporting a problem
 
 In **Settings → Help & feedback**, tap **Copy app info**. Paste it with the exact steps and message. It includes app version/package, phone model, Android and app language, with no chats, drafts, recordings or device serial. Add selected speech language, AICore version and speaker/headset manually for voice issues. Nothing is sent automatically.
+
+## Recover a request
+
+A failed chat answer offers **Edit question**. If you have already typed a different draft, choose whether to keep it or use the earlier question. A failed Voice question is saved for Type when the draft is empty. Rotation pauses Voice; tap Talk when ready. Selection Ask preserves its prompt and cursor after recreation and keeps empty requests editable.

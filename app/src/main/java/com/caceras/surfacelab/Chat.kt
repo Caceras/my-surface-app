@@ -85,13 +85,17 @@ object Chat {
     }
 
     fun archives(context: Context): List<SavedConversation> = runCatching {
-        parseArchives(JSONArray(prefs(context).getString("conversations", "[]")))
+        val parsed = parseArchives(JSONArray(prefs(context).getString("conversations", "[]")), validateIds = false)
+        uniqueIds(parsed).also { if (it != parsed) writeArchives(context, it) }
     }.getOrDefault(emptyList())
 
-    private fun parseArchives(rows: JSONArray): List<SavedConversation> {
+    private fun parseArchives(rows: JSONArray, validateIds: Boolean = true): List<SavedConversation> {
         require(rows.length() <= 12) { "Too many saved conversations." }
+        val ids = mutableSetOf<String>()
         return (0 until rows.length()).map { i ->
             val row = rows.getJSONObject(i)
+            val id = row.getString("id")
+            require(!validateIds || (id.isNotBlank() && ids.add(id))) { "Saved conversation IDs must be non-empty and unique." }
             val turns = row.getJSONArray("turns")
             require(turns.length() <= KEEP) { "Too many saved exchanges." }
             SavedConversation(row.getString("id"), row.getString("title"), row.getLong("savedAt"),
@@ -161,7 +165,17 @@ object Chat {
 
     fun restoreArchives(context: Context, raw: String) {
         val imported = parseArchives(JSONObject(raw).optJSONArray("conversations") ?: JSONArray())
-        writeArchives(context, (imported + archives(context)).distinctBy { it.turns to it.draft })
+        val merged = uniqueIds((imported + archives(context)).distinctBy { it.turns to it.draft })
+        writeArchives(context, merged)
+    }
+
+    private fun uniqueIds(saved: List<SavedConversation>): List<SavedConversation> {
+        val ids = mutableSetOf<String>()
+        return saved.map { chat ->
+            var id = chat.id
+            while (id.isBlank() || !ids.add(id)) id = java.util.UUID.randomUUID().toString()
+            if (id == chat.id) chat else chat.copy(id = id)
+        }
     }
 
     private fun prefs(context: Context) = context.applicationContext

@@ -73,3 +73,7 @@ Add a task to `Task`, its prompt definitions, and the relevant flavor aliases. K
 The source-to-release boundary is described in [the iteration workflow](iteration-workflow.md). `release_evidence.py` reads actual JUnit/lint/APK outputs; `publish_preview.py` verifies provenance and downloaded bytes before updating aliases.
 
 `AppInfo.kt` owns the explicit support-metadata allowlist. Settings copies it locally through `NativePrivacy.copy`; it never reads conversation preferences or sends telemetry. Native action form buttons and editor callbacks share one guarded validation/handoff path.
+
+## Recovery guarantees
+
+Selection Ask stores prompt/cursor/modality for configuration recreation; blank Send keeps the private editor open. Voice recreation restores visible content and stays paused until an explicit Talk. Failed/echoed spoken questions fill an empty typed draft and disable continuous mode, while existing drafts remain intact. Chat recovery uses an explicit Edit question action and a replacement choice for a different draft. Imported archives reject empty/duplicate IDs within a backup; merges reassign conflicting IDs for distinct content. The JSON backup format remains `surface-chat-v1`.

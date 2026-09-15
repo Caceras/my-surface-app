@@ -238,7 +238,7 @@ class MainActivity : Activity() {
                 textSize = 17f
                 medium()
                 setTextColor(color(R.color.text_primary))
-                padDp(0, 24, 0, 4)
+                padDp(0, 16, 0, 4)
             })
             panel.addView(TextView(this).apply {
                 text = hint
@@ -259,6 +259,7 @@ class MainActivity : Activity() {
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         panel.addView(modelState, wide())
+        panel.addView(label("AI can make mistakes. Check important answers.", 13f, true).apply { padDp(0, 8, 0, 0) })
         panel.addView(flatButton(getString(R.string.prepare_model)) {
             status.text = getString(R.string.working)
             modelState.text = status.text
@@ -288,10 +289,6 @@ class MainActivity : Activity() {
             }
                 .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
         })
-        panel.addView(flatButton(getString(R.string.open_voice)) {
-            startActivity(Intent(this, VoiceActivity::class.java))
-        })
-        panel.addView(pill("On your phone · Actions") { settingsDialog?.dismiss(); showActions() })
         panel.addView(label("PRIVACY", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 8); isAccessibilityHeading = true })
         panel.addView(preferenceSwitch("Show last answer on widget", NativePrivacy.widgetPreview(this)) { checked ->
             NativePrivacy.setWidgetPreview(this, checked)
@@ -304,11 +301,7 @@ class MainActivity : Activity() {
         })
         panel.addView(label("Hide app previews and block screenshots or screen sharing. Widgets have their own setting above.", 13f, true))
         panel.addView(label("EVERYWHERE YOU NEED IT", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 4) })
-        line("Digital assistant", "Choose Ægentica AI in Android settings to use the assistant gesture. Availability depends on your device settings.")
-        line("Text selection", "Select text anywhere: " +
-            brain.tasks.joinToString(", ") { it.alias })
-        line("Quick Settings tile", "Shade, Edit tiles, or the button below.")
-        line("Home screen widget", "Continue the conversation or talk from your home screen.")
+        line("Home screen widget", "Type or Talk from your home screen.")
         panel.addView(flatButton("Add home screen widget") {
             val widgets = getSystemService(android.appwidget.AppWidgetManager::class.java)
             if (widgets.isRequestPinAppWidgetSupported) widgets.requestPinAppWidget(
@@ -318,7 +311,7 @@ class MainActivity : Activity() {
         line("App shortcuts", "Long-press the app icon for Chat, Voice, History and Actions.")
         panel.addView(flatButton("Pin chat shortcut") { NativeShortcuts.pin(this, false) })
         if (ears.available()) panel.addView(flatButton("Pin voice shortcut") { NativeShortcuts.pin(this, true) })
-        line("Share sheet", "Share any text into this app.")
+        line("Quick Settings tile", "Add Voice to the shade, or use Android’s tile editor.")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             panel.addView(flatButton(getString(R.string.add_tile)) {
@@ -339,6 +332,8 @@ class MainActivity : Activity() {
                     }
             })
         }
+
+        line("Share sheet & Text selection", "Choose Ægentica AI when sharing text, or select text in a supporting app for " + brain.tasks.joinToString(", ") { it.alias } + ".")
 
         panel.addView(label("YOUR CONVERSATION", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
         panel.addView(label("Saved on this phone. Export before reinstalling to keep your conversation.", 14f, true))
@@ -806,7 +801,7 @@ class MainActivity : Activity() {
             val echoed = result.ok && Prompts.isEcho(said, Task.ASK)
             val note = when {
                 !result.ok || echoed -> null
-                else -> Lang.caveat(Task.ASK, text)
+                else -> result.note
                     ?: getString(R.string.truncated).takeIf { Prompts.looksTruncated(said) }
             }
 
@@ -828,14 +823,21 @@ class MainActivity : Activity() {
             } else {
                 hushPlayback()
                 if (input.text.isBlank()) input.setText(text)
-                answer.setOnClickListener {
-                    input.setText(text)
-                    input.setSelection(input.length())
-                    input.requestFocus()
-                }
+                answer.setOnClickListener(null)
+                messages.addView(pill("Edit question") { editQuestion(text) },
+                    messages.indexOfChild(answer) + 1, LinearLayout.LayoutParams(-2, -2))
             }
             scrollToEnd()
         }
+    }
+
+    private fun editQuestion(question: String) {
+        val current = input.text.toString()
+        if (current.isBlank() || current == question) stagePrompt(question)
+        else AlertDialog.Builder(this).setTitle("Replace your draft?")
+            .setMessage("You have a different message in the composer. Keep it, or replace it with this question.")
+            .setNegativeButton("Keep draft", null)
+            .setPositiveButton("Use question") { _, _ -> stagePrompt(question) }.showProtected(this)
     }
 
     private fun remember(turn: Turn) {
@@ -941,6 +943,8 @@ class MainActivity : Activity() {
         if (parent != null && parent.findViewWithTag<View>(bubble) == null) {
             parent.addView(LinearLayout(this).apply {
                 tag = bubble
+                orientation = if (resources.configuration.fontScale > 1.3f || resources.configuration.screenWidthDp < 360)
+                    LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
                 addView(flatButton("Listen") { readAloud(text) }.apply { padDp(4, 10, 18, 10) })
                 addView(flatButton("Copy") {
                     NativePrivacy.copy(this@MainActivity, "Answer", text)
@@ -1050,9 +1054,7 @@ class MainActivity : Activity() {
      * that the screen is never blank while you are talking.
      */
     private fun level(rms: Float) {
-        val scale = 1f + (rms.coerceIn(0f, 10f) / 70f)
-        mic?.scaleX = scale
-        mic?.scaleY = scale
+        mic?.speechLevel(rms)
     }
 
     override fun onRequestPermissionsResult(

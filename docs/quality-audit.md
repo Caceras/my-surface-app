@@ -95,3 +95,5 @@ The wide reading column is capped at 720 dp; the app still fills its window. Lar
 Source/resource and documentation checks, checker regressions, JVM activity/logic tests and both APK builds are required. New tests cover Actions handoff/input validation, keyboard and shortcut routing, widget privacy, screen/clipboard protection, media stop/disconnect, and adaptive native layouts. [Testing guide](testing.md) gives the full reproducible commands and physical Pixel checklist.
 
 The final handoff must match the release commit and APK package/version/checksum. A passing core test suite does not establish Nano accuracy, real speech quality, 120 Hz performance, or accessibility certification.
+
+The [15 September deep audit and repair register](audits/2026-09-15.md) is the current prioritized follow-up, including source findings, fresh capture limits and acceptance gates.
