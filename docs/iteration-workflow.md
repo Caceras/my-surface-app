@@ -53,7 +53,7 @@ The bundle contains both branded APKs and compatibility aliases, actual JUnit/li
 
 The package tool rejects incomplete evidence and stale non-empty destinations. Publication checks the source/run/repository and skips a branch that has advanced. Build releases use `preview-<branch>-build-<number>`; repeated attempts append `-r<attempt>`. Already published build assets are never silently replaced. A partially uploaded draft can be retried. The unique release is published before the rolling alias changes, so a failed alias refresh does not destroy the verified build download.
 
-`workflow_dispatch` validates and captures without publishing. PR runs validate the merge checkout with no private key and never publish. Push runs validate branch HEAD and publish. Both events are retained intentionally: they check different commits; eliminating PR checks would lose merge-result coverage. Preflight uses hosted Python; Android versions remain pinned in [versions](versions.md).
+`workflow_dispatch` always validates and captures without publishing. Eligible PR runs validate the merge checkout with no private key and never publish. App/tooling pushes to main/improve-pixel-assistant validate branch HEAD and publish. Known documentation-only pushes run preflight and keep the installed build unchanged. Full merge-result validation runs when a PR is ready for review. A same-repository draft PR on main/improve-pixel-assistant uses its canonical push candidate gate; other branches and forks retain full PR validation. Preflight uses hosted Python; Android versions remain pinned in [versions](versions.md).
 
 ## Next improvements
 
@@ -83,3 +83,11 @@ Concurrency follows [GitHub's job concurrency contract](https://docs.github.com/
 ## Audit-driven iterations
 
 Start with the [deep audit register](audits/2026-09-15.md): stable IDs, source or capture evidence, acceptance checks and explicit open gates. Fix in priority order, add a focused regression, and update its row. Each verified bundle includes an annotated seven-flow `audit.html`, the register in `audit.md`, and recomputable `reports/lint-inventory.json`; reports identify what still requires device review. Reruns can retain artifacts with identical names: select the artifact by ID and creation time, then verify source/build/attempt. Never use an older artifact simply because its name matches.
+
+## Efficient scope and stopping rules
+
+Use the [request-to-install audit](audits/iteration-efficiency.md) for measured costs and test retention decisions. Preflight always runs, then `ci_scope.py` chooses Android work from the real Git diff. Unknown/mixed paths, unavailable history and manual runs require Android. No top-level documentation path filter hides the workflow status. Canonical draft PRs defer merge checks until ready-for-review; edits and base changes are observed. Ready PRs, forks and other branches keep the full gate when app/tooling changes exist. Only main/improve-pixel-assistant push events publish; open a PR for other branches.
+
+Gradle task caching is enabled with screenshots declared as test outputs. Do not claim a cache hit without task evidence. Successful runs upload one complete evidence bundle with outer compression disabled for existing APK/PNG compression; failed/cancelled runs upload diagnostics. Publication fetches each release's assets in one CLI call and still compares every hash. Evidence includes `reports/test-cost.json`, actual signing mode/public fingerprints and `process-audit.md`.
+
+While editing, run a focused test for the reproduced behavior when useful. Before publishing, run the full gate once per final candidate. Inspect changed captures and adjacent affected states, not every historical image. Use specific failed XML/logs before a retry; record source/run/acceptance in a short current PR summary with links to historical releases. Stop when the scoped behavior, affected visual review and published artifact are verified. Do not trigger another full release for a documentation-only acceptance note, append giant PR histories, or retest unchanged hardware-independent behavior merely to raise test count.

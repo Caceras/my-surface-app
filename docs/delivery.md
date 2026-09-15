@@ -39,7 +39,7 @@ The branded assets are `aegentica-ai-nano.apk` and `aegentica-ai-core.apk`. Lega
 
 ## CI
 
-The [iteration workflow](iteration-workflow.md) is the operational reference. Preflight runs source/resource, documentation and tool regressions. One Android job performs JVM tests, lint and both flavor builds. Errors block publication; diagnostics are kept even on failure. PR runs validate merge results without signing secrets and never publish. Manual dispatch validates without publishing. Pushes publish previews after all gates pass.
+The [iteration workflow](iteration-workflow.md) is the operational reference. Preflight runs source/resource, documentation and tool regressions. One Android job performs JVM tests, lint and both flavor builds. Errors block publication; diagnostics are kept even on failure. PR runs validate merge results without signing secrets and never publish. Manual dispatch validates without publishing. App/tooling pushes to main/improve-pixel-assistant publish after all gates pass. Known documentation-only changes run preflight and leave APKs alone; canonical draft PRs defer duplicate merge validation until ready-for-review.
 
 Successful builds carry `release-evidence.json`, `SHA256SUMS`, reports, native screenshots and `review.html` in **aegentica-evidence.zip**. CI validates package IDs/version codes, checks source/run provenance, downloads release assets and compares hashes. Screenshot generation is not visual approval or physical Pixel certification.
 
@@ -56,3 +56,14 @@ These are debug/personal preview APKs. Publishing to Google Play requires a deli
 Both APKs also pass Android `apksigner verify`; certificate fingerprints are retained in the evidence bundle. This proves signature integrity, not continuity with a previously installed preview key.
 
 Release descriptions include the tracked [preview changes](preview-notes.md). Superseded validation can be cancelled, while active publishers finish under a separate serialized job group. HEAD is checked before publication and again before alias promotion; all alias assets are verified. Interrupted or out-of-order runs must still use the build-specific link for exact identity.
+
+## Less installation friction
+
+Read the install/update line at the top of each exact build release. It reports `private-key-configured` or `ephemeral-debug` behavior from that build, plus Nano package, version code and checksum. Evidence includes the actual public certificate fingerprints. “Private key configured” does not prove compatibility with an older installed debug key.
+
+1. Open the new Nano APK. If Android offers **Update**, accept it; there is no reason to uninstall first.
+2. Confirm the expected `3.0.<build>-nano` in Settings and that your history remains.
+3. If Android rejects the update, keep the existing app installed while you export and check the backup. Only then follow the reinstall/restore procedure above. Settings/voice preferences need separate setup after uninstall.
+4. Test only the changed flows for a small personal iteration; run the broader checklist before wider distribution. A previous APK is a comparison artifact, not guaranteed in-place downgrade support.
+
+See the [whole-process audit](audits/iteration-efficiency.md) for remaining signing, default-branch and device acceptance gaps. Stable signing is the largest unresolved update friction; it requires the owner-controlled private secret setup, not more unit tests.

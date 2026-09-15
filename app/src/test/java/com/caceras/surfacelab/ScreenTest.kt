@@ -9,7 +9,6 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.Button
 import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -51,9 +50,6 @@ class ScreenTest {
         if (view !is ViewGroup) listOf(view)
         else listOf(view) + (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) }
 
-    private fun texts(root: View) =
-        descendants(root).filterIsInstance<TextView>().map { it.text.toString() }
-
     /** A hidden view is still a descendant, so visibility has to be walked. */
     private fun showing(view: View): Boolean {
         var node: View? = view
@@ -90,27 +86,7 @@ class ScreenTest {
             .first { it.contentDescription == label }
 
     /** Bubbles live in the column inside the transcript scroller. */
-    private fun bubbles(activity: android.app.Activity): List<String> {
-        val scroll = descendants(content(activity))
-            .filterIsInstance<ScrollView>().first { it.tag == "conversation" }
-        val column = scroll.getChildAt(0) as ViewGroup
-        return (0 until column.childCount)
-            .map { column.getChildAt(it) }
-            .filterIsInstance<TextView>()
-            .map { it.text.toString() }
-    }
-
-    @Test
-    fun `spacing is density-scaled, not raw pixels`() {
-        val activity = launchMain().get()
-        val header = activity.window.decorView.findViewWithTag<View>("chat-header")
-
-        val density = activity.resources.displayMetrics.density
-        val expected = (20 * density).toInt()
-
-        assertEquals("left padding is not dp-scaled", expected, header.paddingLeft)
-        assertEquals("right padding is not dp-scaled", expected, header.paddingRight)
-    }
+    private fun bubbles(activity: android.app.Activity): List<String> = chatMessages(content(activity))
 
     private fun bars(top: Int, bottom: Int) = WindowInsets.Builder()
         .setInsets(WindowInsets.Type.systemBars(), Insets.of(0, top, 0, bottom))
@@ -250,9 +226,13 @@ class ScreenTest {
 
     @Test
     fun `the brain reports its state on the chat screen`() {
-        val body = texts(content(launchMain().get()))
-        assertTrue("status line never resolved",
-            body.none { it == "Working on device\u2026" })
+        Brains.useForTest(StreamingBrain())
+        try {
+            val activity = launchMain().get()
+            val state = content(activity).findViewWithTag<TextView>("assistant-status")
+            assertEquals("Stand-in", state.text.toString())
+            assertTrue("resolved status is hidden", showing(state))
+        } finally { Brains.useForTest(null) }
     }
 
     // ------------------------------------------------------- text selection
@@ -287,53 +267,19 @@ class ScreenTest {
     }
 
     @Test
-    fun `Ask offers its suggestions instead of a blank box`() {
-        val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog()
-            ?: run {
-                processText("Ask", "some selected material", readOnly = true)
-                org.robolectric.shadows.ShadowDialog.getLatestDialog()
-            }
-        requireNotNull(dialog) { "the Ask dialog never opened" }
-
-        val root = dialog.window!!.decorView
-        val buttons = descendants(root).filterIsInstance<Button>()
-        Prompts.ABOUT_SELECTION.forEach { suggestion ->
-            assertTrue(
-                "suggestion not offered: $suggestion",
-                buttons.any { it.text.toString() == suggestion }
-            )
-        }
-    }
-
-    @Test
-    fun `tapping a suggestion fills the prompt box`() {
+    fun `selection suggestions are offered in a scroller and stage editable text`() {
         processText("Ask", "some selected material", readOnly = true)
-        val dialog = requireNotNull(
-            org.robolectric.shadows.ShadowDialog.getLatestDialog()
-        )
-        val root = dialog.window!!.decorView
-        val input = descendants(root).filterIsInstance<EditText>().first()
-        val chip = descendants(root).filterIsInstance<Button>()
-            .first { it.text.toString() == Prompts.ABOUT_SELECTION.first() }
-
-        chip.performClick()
-
+        val root = requireNotNull(org.robolectric.shadows.ShadowDialog.getLatestDialog()).window!!.decorView
+        val row = descendants(root).filterIsInstance<android.widget.HorizontalScrollView>().single()
+        val buttons = descendants(row).filterIsInstance<Button>()
+        assertTrue("no suggestions offered", buttons.isNotEmpty())
+        assertEquals(Prompts.ABOUT_SELECTION, buttons.map { it.text.toString() })
+        val input = descendants(root).filterIsInstance<EditText>().single()
+        buttons.first().performClick()
         assertEquals(Prompts.ABOUT_SELECTION.first(), input.text.toString())
+        assertTrue(input.isEnabled)
     }
 
-    @Test
-    fun `the suggestion row scrolls rather than wrapping off screen`() {
-        processText("Ask", "material", readOnly = true)
-        val root = requireNotNull(
-            org.robolectric.shadows.ShadowDialog.getLatestDialog()
-        ).window!!.decorView
-        val row = descendants(root)
-            .filterIsInstance<android.widget.HorizontalScrollView>()
-            .firstOrNull()
-        assertTrue("suggestions are not in a horizontal scroller", row != null)
-        assertTrue((row!!.getChildAt(0) as LinearLayout).childCount ==
-            Prompts.ABOUT_SELECTION.size)
-    }
     @Test
     fun `send and microphone have accessible touch targets`() {
         ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)

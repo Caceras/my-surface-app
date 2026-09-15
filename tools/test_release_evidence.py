@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from release_evidence import digest
-from release_evidence import REQUIRED_SHOTS, junit_summary, lint_summary, lint_inventory, validate_identity, verify
+from release_evidence import REQUIRED_SHOTS, certificate_digests, junit_summary, lint_summary, lint_inventory, validate_identity, verify
 
 
 class EvidenceTests(unittest.TestCase):
@@ -50,6 +50,15 @@ class EvidenceTests(unittest.TestCase):
         validate_identity(valid, "nano", 102)
         for flavor, number in (("core", 102), ("nano", 103)):
             with self.assertRaises(ValueError): validate_identity(valid, flavor, number)
+
+    def test_signing_evidence_requires_matching_valid_certificates(self):
+        core = self.xml("core.txt", "Signer #1 certificate SHA-256 digest: " + "a" * 64)
+        nano = self.xml("nano.txt", "Signer #1 certificate SHA-256 digest: " + "a" * 64)
+        self.assertEqual(len(certificate_digests([core, nano])), 2)
+        nano.write_text("Signer #1 certificate SHA-256 digest: " + "b" * 64)
+        with self.assertRaisesRegex(ValueError, "same signing"): certificate_digests([core, nano])
+        nano.write_text("verified, but missing a fingerprint")
+        with self.assertRaisesRegex(ValueError, "Missing signing"): certificate_digests([core, nano])
 
     def test_tampered_missing_or_traversing_files_block(self):
         for path in ("missing.apk", "../outside", "tampered.apk"):

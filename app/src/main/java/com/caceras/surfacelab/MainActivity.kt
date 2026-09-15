@@ -179,6 +179,7 @@ class MainActivity : Activity() {
                 tag = "brand-title"; medium(); letterSpacing = -0.035f; isAccessibilityHeading = true
             })
             status = label("Your on-device assistant", 11f, true).apply {
+                tag = "assistant-status"
                 maxLines = 2; accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
             }
             addView(status)
@@ -874,6 +875,7 @@ class MainActivity : Activity() {
     private fun addBubble(text: String, fromUser: Boolean): TextView {
         showBlank(false)
         val bubble = TextView(this).apply {
+            tag = if (fromUser) "user-message" else "assistant-message"
             this.text = text
             textSize = 17f
             setLineSpacing(dp(3).toFloat(), 1.12f)

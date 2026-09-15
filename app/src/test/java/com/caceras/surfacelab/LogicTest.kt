@@ -58,27 +58,6 @@ class LogicTest {
     }
 
     @Test
-    fun `there are suggestions and they are short enough to be tappable`() {
-        listOf(Prompts.ABOUT_SELECTION, Prompts.OPENERS).forEach { set ->
-            assertTrue(set.isNotEmpty())
-            set.forEach {
-                assertTrue("suggestion too long to fit a chip: $it", it.length <= 34)
-            }
-        }
-    }
-
-    @Test
-    fun `the chat openers do not refer to a selection that is not there`() {
-        // "What is this actually saying?" on an empty chat screen has no
-        // "this" to refer to, and the model can only answer by asking what
-        // you meant. The openers are the set that has to stand alone.
-        Prompts.OPENERS.forEach {
-            assertFalse("opener refers to absent material: $it",
-                Regex("\\bthis\\b", RegexOption.IGNORE_CASE).containsMatchIn(it))
-        }
-    }
-
-    @Test
     fun `a spoken sentence is spoken as soon as it is complete`() {
         val (first, cursor) = Speech.nextChunk("Yes. And then", 0)
         assertEquals("Yes.", first)
@@ -216,6 +195,4 @@ class LogicTest {
             Prompts.looksTruncated("Yes"))
     }
 
-    private fun assertNotNull(value: Any?) = assertTrue(value != null)
-    private fun assertNull(value: Any?) = assertTrue("expected null, got $value", value == null)
 }

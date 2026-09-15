@@ -6,6 +6,6 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 for command in (["tools/verify.py", "."], ["tools/test_verify.py"],
-                ["tools/check_docs.py", "."], ["tools/test_release_evidence.py"], ["tools/test_publish_preview.py"]):
+                ["tools/check_docs.py", "."], ["tools/test_ci_scope.py"], ["tools/test_release_evidence.py"], ["tools/test_publish_preview.py"]):
     subprocess.run([sys.executable, *command], cwd=root, check=True)
 print("Preflight passed. Android validation: see docs/testing.md")

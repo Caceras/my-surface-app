@@ -8,6 +8,26 @@ from unittest.mock import patch
 import publish_preview as publisher
 
 
+class DownloadTests(unittest.TestCase):
+    def test_batch_download_still_compares_every_asset(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            assets = [Path(tmp) / name for name in ("first.apk", "second.apk")]
+            for path in assets: path.write_bytes(path.name.encode())
+            def download(*args):
+                destination = Path(args[args.index("--dir") + 1])
+                for path in assets: (destination / path.name).write_bytes(path.read_bytes())
+            with patch.object(publisher, "gh", side_effect=download) as command:
+                publisher.verify_download("owner/repo", "build-1", assets)
+                command.assert_called_once()
+                self.assertEqual(command.call_args.args.count("--pattern"), 2)
+            def corrupt(*args):
+                download(*args)
+                (Path(args[args.index("--dir") + 1]) / "second.apk").write_bytes(b"wrong")
+            with patch.object(publisher, "gh", side_effect=corrupt):
+                with self.assertRaisesRegex(ValueError, "second.apk"):
+                    publisher.verify_download("owner/repo", "build-1", assets)
+
+
 class PublicationTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

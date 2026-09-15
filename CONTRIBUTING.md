@@ -16,7 +16,7 @@ gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assem
 - `app/src/main` and `app/src/core` use framework APIs only. No AndroidX/Compose/coroutine runtime imports there. Nano-specific SDK dependencies belong in `app/src/nano`; test dependencies are exempt.
 - Preserve offline-only recognition/playback behavior and explicit user consent for sharing. Do not add a quiet remote fallback.
 - Every asynchronous activity update must belong to the active request and lifecycle. Cancel queued rendering on final/stop/pause/destruction.
-- Layout changes need a meaningful regression test. Use native graphics for text wrapping/scroll geometry and inspect fresh screenshots.
+- Behavioral layout regressions need a focused test; reversible copy/style edits use existing native captures and visual review. Use native graphics for text wrapping/scroll geometry and inspect fresh screenshots.
 - Do not persist failed partial answers as successful exchanges or destroy a newer draft when restoring an interrupted question.
 - Never commit signing keys, credentials, personal chat exports, or unredacted user screenshots.
 
@@ -39,3 +39,7 @@ Include installed build number, Android/device details, reproduction steps, and 
 Use [the iteration workflow](docs/iteration-workflow.md): reproduce a scoped defect, run `python tools/check.py`, inspect native evidence, verify the exact build-specific APK and document device limits. Successful screenshots do not mean visual approval. Keep behavior, tests and current guides coherent in the same batch.
 
 Update [current preview changes](docs/preview-notes.md) before the final push; release descriptions include it automatically. For phone reports, paste **Settings → Help & feedback → Copy app info** with the minimal reproduction. See the [iteration concurrency and publication contracts](docs/iteration-workflow.md).
+
+## Keep iterations lean
+
+Read the [test and process audit](docs/audits/iteration-efficiency.md). Use `gradle testCoreDebugUnitTest --tests 'com.caceras.surfacelab.ConversationTest' --no-daemon` for focused chat work; the final candidate still runs the full release gate. Test count is not a target. Pure documentation changes receive preflight without a new APK. Preview draft PRs defer duplicate merge validation until ready-for-review; forks and non-preview branches retain PR checks. To force capture of unchanged source, dispatch the workflow manually (validation only).

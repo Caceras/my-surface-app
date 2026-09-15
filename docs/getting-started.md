@@ -8,6 +8,8 @@ Use the Nano APK on the Pixel. The core APK is a developer demo that uppercases 
 
 Installation and initial model/language downloads require connectivity. Open Settings and choose **Check / prepare on-device model**. A speech language download does not install the language model, and a model download does not install a text-to-speech voice: they are independent requirements.
 
+For an update, open the new APK and use Android’s Update action when offered; verify the new version and history. Keep the old app installed until you have a safe export if Android rejects it. Each release states its actual signing mode.
+
 Each new handoff can use a build-specific APK link from its release or CI summary. The usual preview link remains a convenience alias. Verify the version in Settings after installing.
 
 ## Daily controls

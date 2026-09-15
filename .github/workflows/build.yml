@@ -2,8 +2,9 @@ name: Build Ægentica AI APKs
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main", "improve-pixel-assistant"]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
 
 # Compilation/tests never need repository write access.
@@ -12,6 +13,8 @@ permissions:
 
 jobs:
   verify:
+    outputs:
+      android: ${{ steps.scope.outputs.android }}
     concurrency:
       group: preflight-${{ github.ref }}
       cancel-in-progress: true
@@ -22,8 +25,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - run: python -m pip install pyyaml
       - run: python tools/check.py
+      - name: Choose validation scope
+        id: scope
+        run: python tools/ci_scope.py
 
   quality:
     concurrency:
@@ -31,6 +38,7 @@ jobs:
       cancel-in-progress: true
     name: Android quality
     needs: verify
+    if: needs.verify.outputs.android == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -77,7 +85,7 @@ jobs:
         # Reads app/build/outputs/apk/ plus JUnit, lint and native render outputs.
         run: python tools/release_evidence.py collect dist/evidence
       - name: Keep test and lint diagnostics
-        if: always()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: android-diagnostics
@@ -94,6 +102,7 @@ jobs:
           path: dist/evidence/
           retention-days: 30
           if-no-files-found: error
+          compression-level: 0
       - name: Remove temporary signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/aegentica-personal.jks"

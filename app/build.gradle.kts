@@ -93,3 +93,9 @@ dependencies {
     testImplementation("androidx.test:core:1.7.0")
     testImplementation("androidx.test.ext:junit:1.3.0")
 }
+
+// Native renders are test outputs too. A cached test result must restore its
+// PNGs; otherwise evidence collection would see XML without the matching views.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    if (name == "testCoreDebugUnitTest") outputs.dir(layout.buildDirectory.dir("screenshots"))
+}

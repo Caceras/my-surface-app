@@ -101,6 +101,32 @@ def lint_inventory(paths):
     ).items())) for path in paths}
 
 
+def test_cost(paths):
+    """JUnit timings are diagnostic, not a flaky wall-clock release budget."""
+    suites, cases = [], []
+    for path in paths:
+        root = ET.parse(path).getroot()
+        suites.append(dict(suite=root.get("name", path.stem), tests=int(root.get("tests", "0")),
+                           seconds=float(root.get("time", "0"))))
+        cases.extend(dict(suite=t.get("classname", root.get("name", "")), test=t.get("name", ""),
+                          seconds=float(t.get("time", "0"))) for t in root.iter("testcase"))
+    return dict(note="JUnit-reported seconds include fixture/runtime initialization; sums are not CI wall time.",
+                suites=sorted(suites, key=lambda s: (-s["seconds"], s["suite"])),
+                slowest=sorted(cases, key=lambda s: (-s["seconds"], s["suite"], s["test"]))[:10])
+
+
+def certificate_digests(paths):
+    certificates = {}
+    for path in paths:
+        match = re.search(r"Signer #1 certificate SHA-256 digest: ([a-fA-F0-9]{64})(?:\s|$)", path.read_text())
+        if not match:
+            raise ValueError(f"Missing signing certificate digest: {path.name}")
+        certificates[path.name] = match.group(1).lower()
+    if len(certificates) != 2 or len(set(certificates.values())) != 1:
+        raise ValueError("Both preview flavors must use the same signing certificate")
+    return certificates
+
+
 def validate_identity(identity, flavor, number):
     expected = "com.caceras.surface" + (".nano" if flavor == "nano" else "")
     if identity != dict(package=expected, versionName=f"3.0.{number}-{flavor}", versionCode=int(number)):
@@ -167,6 +193,12 @@ def collect(destination, root=Path(".")):
         folder.mkdir(exist_ok=True)
         shutil.copy2(src, folder / src.name)
     (destination / "reports/lint-inventory.json").write_text(json.dumps(lint_inventory(lint), indent=2) + "\n")
+    (destination / "reports/test-cost.json").write_text(json.dumps(test_cost(tests), indent=2) + "\n")
+    meta["signing"] = dict(mode="private-key-configured" if os.environ.get("SURFACE_KEYSTORE_FILE") else "ephemeral-debug",
+                           certificates=certificate_digests(signatures))
+    process_audit = root / "docs/audits/iteration-efficiency.md"
+    if process_audit.is_file():
+        shutil.copy2(process_audit, destination / "process-audit.md")
     for src in shots:
         data = src.read_bytes()
         if data[:8] != b"\x89PNG\r\n\x1a\n":
@@ -231,6 +263,14 @@ def verify(folder):
     inventory = folder / "reports/lint-inventory.json"
     if inventory.exists() and json.loads(inventory.read_text()) != lint_inventory(sorted((folder / "reports").glob("lint-results-*.xml"))):
         raise ValueError("Lint inventory mismatch")
+    cost = folder / "reports/test-cost.json"
+    if cost.exists() and json.loads(cost.read_text()) != test_cost(sorted((folder / "reports").glob("TEST-*.xml"))):
+        raise ValueError("Test timing report mismatch")
+    if "signing" in meta:
+        if meta["signing"].get("mode") not in {"private-key-configured", "ephemeral-debug"}:
+            raise ValueError("Unknown signing mode")
+        if meta["signing"]["certificates"] != certificate_digests(sorted((folder / "reports").glob("apk-signature-*.txt"))):
+            raise ValueError("Signing inventory mismatch")
     return meta
 
 

@@ -5,7 +5,7 @@ Read `README.md`, `docs/architecture.md`, and `docs/iteration-workflow.md` befor
 ## Iteration contract
 
 1. Inspect branch HEAD and local changes. Preserve unrelated edits and continue the existing branch/PR when that is the current task. Do not merge main or change external distribution scope without authorization.
-2. Use `docs/audits/2026-09-15.md` as the current repair register. Identify a concrete user-flow defect or acceptance gap. For visual findings, capture fresh native renders and inspect them; distinguish code inspection, layout fixtures and real-device evidence.
+2. Use `docs/audits/2026-09-15.md` for app repairs and `docs/audits/iteration-efficiency.md` for process/test decisions. Identify a concrete user-flow defect or acceptance gap. For visual findings, capture fresh native renders and inspect them; distinguish code inspection, layout fixtures and real-device evidence.
 3. Reuse `Design.kt` controls and navigation pause behavior. Keep Settings, History, Actions, chat and Voice consistent. Never let hidden capture/generation continue after an explicit navigation pause.
 4. Keep main/core framework-only. Nano SDK code belongs in the Nano source set. Runtime dependencies and test dependencies have different boundaries.
 5. Add focused regressions for meaningful behavior changes. Preserve draft recovery, cancellation tokens, speech muting, private defaults and export compatibility. Do not weaken failing assertions merely to make a build green.
@@ -20,3 +20,9 @@ Read `README.md`, `docs/architecture.md`, and `docs/iteration-workflow.md` befor
 Never commit or expose signing keys, secrets, real conversation exports or private user captures. Private signing material belongs only in the documented private secret/local environment mechanism. PR jobs must not receive that material. Do not auto-execute model text as Android commands.
 
 Published build releases are immutable by convention; a retry can repair a draft but must not silently replace a public build. The rolling alias is not transactional. Prefer the exact verified build URL for testing and rollback.
+
+## Spend verification where it matters
+
+Do not add tests for reversible copy/style edits or to mirror constants. Keep meaningful failure regressions; consolidate overlapping fixtures and prefer stable roles over child indices. Read test-cost evidence before deleting a slow-looking test: initialization is shared overhead. Run targeted checks during editing, then one full Android gate for the candidate. Canonical preview draft PRs use the push gate; ready-for-review runs merge validation. Documentation-only changes need preflight, not another APK. Manual dispatch forces full validation without publication.
+
+Use failed XML and the failing job, not repeated full-log dumps. Inspect affected final screenshots; do not recapture/review every unchanged state automatically. Finish with a short current PR record linking the audit/evidence and previous releases, not copied historical descriptions. Stop optional verification once the scoped risk is resolved. Signing continuity and actual Pixel acceptance remain explicit; never store a key in public git, caches or artifacts to avoid installation friction.

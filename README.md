@@ -7,7 +7,7 @@ A native Android assistant for typing, talking, thinking things through, and ope
 [![Android checks](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg?branch=improve-pixel-assistant)](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-70CEFA.svg)](LICENSE)
 
-**[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [What changed](docs/preview-notes.md) · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Deep audit](docs/audits/2026-09-15.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribute](CONTRIBUTING.md)
+**[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [What changed](docs/preview-notes.md) · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Deep audit](docs/audits/2026-09-15.md) · [Test/process audit](docs/audits/iteration-efficiency.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribute](CONTRIBUTING.md)
 
 > This is the **Ægentica AI** app on `improve-pixel-assistant`. The main branch and `/releases/latest` may contain an older experience. This preview is not a Play Store release. Export your conversations before any reinstall.
 
@@ -81,12 +81,13 @@ gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assem
 | `nano` | The actual Gemini Nano assistant | `com.caceras.surface.nano` |
 | `core` | Deterministic demo and UI tests; uppercase output, no AI model | `com.caceras.surface` |
 
-APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots appear under `app/build/screenshots/`. CI runs one shared Android job for JVM tests, lint and both builds. Successful runs generate a source-linked evidence bundle and verified build-specific APK links; failed runs retain diagnostics. Tests exercise the core variant, so green CI does **not** establish Nano quality, real speech latency, or device gesture behavior. [Testing and device checklist](docs/testing.md).
+APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots appear under `app/build/screenshots/`. App/tooling candidates run one shared Android job for JVM tests, lint and both builds. Known documentation-only changes run preflight; canonical draft PRs defer duplicate merge checks until ready-for-review. Successful runs generate a source-linked evidence bundle and verified build-specific APK links; failed runs retain diagnostics. Tests exercise the core variant, so green CI does **not** establish Nano quality, real speech latency, or device gesture behavior. [Testing and device checklist](docs/testing.md).
 
 ## Documentation
 
 | Guide | Covers |
 |---|---|
+| [Test/process audit](docs/audits/iteration-efficiency.md) | Test necessity, measured CI costs, request-to-install gaps and fixes |
 | [Iteration workflow](docs/iteration-workflow.md) | Pipeline audit, automated evidence, verified releases and feedback loop |
 | [Deep audit and fixes](docs/audits/2026-09-15.md) | Prioritized repair register, current flow evidence and open acceptance gates |
 | [Cohesion audit](docs/cohesion-audit.md) | Current cross-flow fixes, fresh baseline and remaining device gates |

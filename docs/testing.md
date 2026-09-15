@@ -71,7 +71,7 @@ A green build is necessary; it is not an approval for a Play Store rollout. Prod
 
 Run `python tools/check.py` for local preflight, then `gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug --no-daemon` in the pinned SDK environment. CI uses one invocation with the build number. Lint errors/fatals and missing/failed/skipped JVM results block release evidence. Lint warnings remain visible.
 
-Every run retains **android-diagnostics** (JUnit XML, lint reports, screenshots); successful runs additionally provide **aegentica-evidence**. Extract it, run `python tools/release_evidence.py verify <directory>`, and open `review.html`. The bundle records source/build/run, test counts, APK identities and hashes. [Iteration workflow](iteration-workflow.md) explains reproducible reproduction, visual review and release verification.
+Failed/cancelled Android runs retain **android-diagnostics** (JUnit XML, lint reports, screenshots); successful runs provide the complete **aegentica-evidence** bundle without a duplicate upload. Extract it, run `python tools/release_evidence.py verify <directory>`, and open `review.html`. The bundle records source/build/run, test counts, APK identities and hashes. [Iteration workflow](iteration-workflow.md) explains reproducible reproduction, visual review and release verification.
 
 Additional regressions cover Settings/History/Actions cancelling hidden streams, dictation/draft retention, stale completion, quiet voice state, dark switch colors, private search and reachable History close. Native renders include dark Settings and the timer form. On a Pixel, also open each sheet during dictation/streaming and confirm no automatic restart when returning.
 
@@ -90,3 +90,9 @@ Screenshot capture drains immediate dialog layout work, remeasures the frame and
 ## Deep audit acceptance
 
 Use the [current register](audits/2026-09-15.md) as the canonical list. New regression cases cover selection prompt privacy/recreation/validation, paused Voice recreation, failed question recovery, explicit chat retry replacement, conflicting archive IDs, calendar limits and reduced motion. Fresh captures add selection/error, failed-voice and narrow large-answer states. Capture remeasures the full tree, dispatches pre-draw, settles rendering and requires close bounds inside the PNG viewport. Inspect the image: bounds alone are insufficient. The release bundle includes `audit.html`, `audit.md` and `reports/lint-inventory.json`.
+
+## Test value and scope
+
+The [efficiency audit](audits/iteration-efficiency.md) records the 156-test baseline, three retired constant/wording checks, three selection checks consolidated into one, strengthened status validation and role-based chat selectors. The resulting suite has 151 cases; count itself is not a gate. All 22 native capture cases remain. `reports/test-cost.json` records measured suite and slow-case times on each full run; initialization is included, and this is advisory rather than a timing threshold.
+
+Documentation-only changes run preflight. Canonical same-repository draft preview PRs rely on the push candidate gate; ready-for-review triggers merge-result Android validation. Other branches/forks keep PR validation. Unknown paths or unavailable diffs choose the full gate. Workflow dispatch forces full validation without publication. Full releases never use a selectively filtered test result. Gradle declares screenshots as test outputs so cached XML cannot silently omit its PNGs.

@@ -30,8 +30,9 @@ def release(repo, tag):
 
 def verify_download(repo, tag, assets):
     with tempfile.TemporaryDirectory() as tmp:
+        patterns = [arg for path in assets for arg in ("--pattern", path.name)]
+        gh("release", "download", tag, "--repo", repo, *patterns, "--dir", tmp)
         for path in assets:
-            gh("release", "download", tag, "--repo", repo, "--pattern", path.name, "--dir", tmp)
             if digest(Path(tmp) / path.name) != digest(path):
                 raise ValueError(f"Published download mismatch: {path.name}")
 
@@ -74,10 +75,18 @@ def main():
     assets = [*sorted(folder.glob("*.apk")), folder / "release-evidence.json", folder / "SHA256SUMS", bundle]
     url = f"https://github.com/{repo}/releases/download/{tag}/aegentica-ai-nano.apk"
     notes = folder.parent / "release-notes.md"
+    signing = meta.get("signing", {}).get("mode", "unknown")
+    install = ("Private signing key configured. In-place updates require the installed app to have the same certificate."
+               if signing == "private-key-configured" else
+               "Ephemeral debug signing: an in-place update is not guaranteed. Export conversations before any required uninstall, then install and restore.")
     changes = (Path(__file__).resolve().parents[1] / "docs/preview-notes.md").read_text().replace("# Current preview changes", "## What changed", 1)
     notes.write_text(f"""Ægentica AI **3.0.{meta['build']}-nano** · Æ signum · sky-blue native Android assistant.
 
 [Download Nano for your Pixel]({url})
+
+**Install/update:** {install}
+Package: `com.caceras.surface.nano` · version code: **{meta['build']}**.
+APK SHA-256: `{digest(folder / 'aegentica-ai-nano.apk')}`.
 
 {changes}
 
@@ -86,7 +95,7 @@ JVM: **{meta['tests']['tests']} passed**, no skipped tests. Both flavor APKs and
 Download `aegentica-evidence.zip` and open `review.html` for native core-fixture screenshots; these are not real Nano responses or physical-device certification.
 
 Open Settings and verify **3.0.{meta['build']}-nano**. Prepare the model, then use **Set up voice & test playback**.
-If Android reports a signature conflict, export your conversations before any uninstall/reinstall, then restore. Persistent signing secrets are owner setup.
+If Android offers Update, use it and check your history afterward. If installation fails, keep the existing app until your export is safe. Initial downloads and speech settings are separate from conversation restore.
 
 [Phone setup](https://github.com/{repo}/blob/{sha}/docs/getting-started.md) · [Workflow audit](https://github.com/{repo}/blob/{sha}/docs/iteration-workflow.md).
 Legacy pixel-surface-lab APK names are identical aliases. This is a personal preview, not a Play Store release.
