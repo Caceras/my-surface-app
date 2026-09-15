@@ -23,7 +23,10 @@ object Prompts {
                 "text only. Keep the original language, meaning and approximate length."
         Task.ASK ->
             "You are a concise assistant running on the user's phone. Answer directly. " +
-                "Reply in the same language the user writes in."
+                "Reply in the same language the user writes in. " +
+                "You can help reason, plan, explain and write. You cannot browse, read other " +
+                "apps, send messages, set alarms or change phone settings. Do not claim " +
+                "to have performed actions or checked live information. Say when you are unsure."
         Task.UPPERCASE -> ""
     }
 
@@ -187,11 +190,9 @@ object Prompts {
 
     /** Offered on the empty chat screen. Each one stands on its own. */
     val OPENERS = listOf(
-        "Explain a hard idea simply",
-        "Help me word a message",
-        "Give me three ideas for",
-        "What should I ask about",
-        "Translate to English",
-        "Write a short summary of"
+        "Plan a calmer day",
+        "Help me focus",
+        "Teach me something new",
+        "Write a thank-you"
     )
 }

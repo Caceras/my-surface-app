@@ -25,6 +25,12 @@ object ResultStore {
         poke(context)
     }
 
+    fun clear(context: Context) {
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().remove(KEY_TEXT).remove(KEY_TASK).apply()
+        poke(context)
+    }
+
     fun lastText(context: Context): String? =
         context.applicationContext
             .getSharedPreferences(PREFS, Context.MODE_PRIVATE)

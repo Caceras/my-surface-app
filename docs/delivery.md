@@ -1,140 +1,69 @@
-# Getting the APK onto the phone
+# Delivery and updates
 
-## The iteration loop
+[Download Nano preview](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk) · [Install guide](getting-started.md)
 
-The point of all of this is a short loop: say what should change, and try it on
-the phone. Everything below exists to keep that loop to one tap at your end.
+The rebrand preserves `com.caceras.surface.nano` and existing backups. Ægentica AI replaces the Surface Preview display name; it does not create a new app data identity. Signing compatibility still governs in-place updates.
 
-```
-you say what to change
-      │
-      ▼
-change lands on main ──► CI: verify, test, build both flavours (~3 min)
-                                        │
-                                        ▼
-                          rolling release "debug-latest" is replaced
-                                        │
-                                        ▼
-              phone bookmark /releases/latest ──► tap the .apk ──► install
-```
+## Which release
 
-Three things make it survivable:
+`improve-pixel-assistant` publishes a prerelease at `preview-improve-pixel-assistant`. Its Nano asset is the current Ægentica AI experience. The main branch publishes the rolling `debug-latest` release. GitHub's `/releases/latest` points to the non-prerelease experience and may therefore be older.
 
-- **The download URL never changes.** One rolling tag, reused. Bookmark
-  `/releases/latest` on the phone once and never think about it again.
-- **A broken change never reaches the phone.** The release job needs `build`
-  *and* `test` to pass first, so a red build simply leaves the previous APK in
-  place.
-- **The build number is on screen.** `versionName` carries the CI run number,
-  the launcher screen shows it, and the release is titled with the same number.
-  After installing you can see whether the install actually took, which is the
-  one question a rolling tag makes hard to answer.
+The release title includes the CI build number. The app uses version `3.0.<build>-nano` and displays it in Settings. A stable URL is a convenience, not proof that Android accepted an update: verify the installed version.
 
-An install over the top keeps your data and settings; it is an upgrade, not a
-fresh install, as long as the signing key does not change (see **Signing**).
-
-## Trying a branch before it merges
-
-The loop above starts at "change lands on main", which is the wrong place to
-find out that a change is not what you wanted. So every push to any branch
-publishes its own release as well:
-
-```
-/releases/tag/preview-<branch>
-```
-
-Same two APKs, same rolling-tag trick — the tag is replaced on every push to
-that branch, so the URL is stable for the life of the branch — and the same
-debug key, so it installs straight over whatever is on the phone.
-
-It is created with `--prerelease`, and that flag is the whole reason this is
-safe to add: GitHub excludes prereleases from `/releases/latest`, so the
-bookmark on the phone keeps meaning "the build from `main`" no matter how many
-branches are in flight. Deleting the branch does not delete its preview; do
-that by hand, or leave it, since a prerelease is invisible to the bookmark
-either way.
-
-## Why the release, not the artifact
-
-The workflow publishes the APK twice, and the distinction matters more than it
-looks.
-
-A **workflow artifact** is always served as a `.zip`, even for a single file.
-GitHub has no option to change this. On a phone, that zip lands in Downloads and
-Android will not install it — the user has to find a file manager with an
-extractor, unzip it, then locate the APK. Several minutes of confusion at the
-exact moment the thing was supposed to be finished.
-
-A **release asset** is served at its own URL with its original filename. Tapping
-it in Chrome triggers the package installer directly. That is the path to give
-the user.
-
-The artifact upload is kept anyway because it is useful from a desktop and
-survives even if release creation fails due to permissions.
-
-## Required workflow permissions
-
-Creating a release from CI needs:
-
-```yaml
-permissions:
-  contents: write
-```
-
-Without it, `gh release create` fails with a 403 while the build itself passes —
-a confusing state, because the log looks mostly green. If the repo or
-organisation sets default workflow permissions to read-only, that setting
-overrides the workflow block and has to be changed in repo settings under
-Actions → General → Workflow permissions.
-
-## First-install prompts on a Pixel
-
-The user will hit a permission gate the first time. Chrome needs "Allow from
-this source" for installing unknown apps, granted per-source in Settings → Apps
-→ Special app access. Modern Android routes this inline — a prompt appears with
-a link to the right settings screen and returns afterwards.
-
-Play Protect may also warn about an unrecognised developer. For a self-built
-debug APK this is expected and the user can proceed.
+| Build | Application ID | Use |
+|---|---|---|
+| Ægentica AI Nano | `com.caceras.surface.nano` | Actual assistant on supported devices |
+| Ægentica AI core | `com.caceras.surface` | Deterministic developer demo |
+| Original Pixel Surface Lab Nano | `com.caceras.surfacelab.nano` | Earlier application identity; no automatic data migration |
 
 ## Signing
 
-Debug builds are signed automatically with a generated debug keystore. This is
-fine for a personal test and requires no configuration.
+Android updates require a compatible signing identity as well as the same application ID and an acceptable version code. CI debug keys are not persisted by default. Different runs/local machines can therefore produce APKs that cannot update each other in place.
 
-Two consequences to be aware of:
+**Before reinstalling:** Export conversation from Settings, keep the file, then uninstall only the app you intend to replace. Install the new APK and Restore conversation. Exports include retained chats and drafts, not speech preferences. Reconfigure voice if needed.
 
-**Upgrades require the same key.** An APK signed with a different key cannot
-install over an existing one; it fails with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`
-and the only fix is uninstalling first. Because each machine and each CI run may
-have a different debug keystore, mixing local and CI builds of the same package
-hits this regularly.
+For consistent personal-preview updates, the workflow already supports these **private repository secrets**:
 
-**Debug builds are not distributable.** They are debuggable, unoptimised, and
-signed with a key that is not secret. If the app is going to anyone else:
+| Secret | Value |
+|---|---|
+| `SURFACE_KEYSTORE_BASE64` | Base64-encoded private keystore |
+| `SURFACE_KEYSTORE_PASSWORD` | Keystore password |
+| `SURFACE_KEY_ALIAS` | Signing alias |
+| `SURFACE_KEY_PASSWORD` | Key password |
 
-1. Generate a keystore with `keytool`.
-2. Store it base64-encoded as a repository secret, along with the passwords.
-3. Decode it in the workflow and configure `signingConfigs` in the app module.
-4. Build `assembleRelease` instead.
+The workflow restores the key into the runner's temporary directory and passes credentials through environment variables. It does not include the keystore in APK artifacts. Keep a private, recoverable backup of the key; do not commit it, publish it as an artifact, or put it in a public cache. These secrets have not been provisioned by the app overhaul. Moving from a generated debug key to a personal key can require one export/reinstall/restore cycle.
 
-That is a meaningfully different setup, and the point at which the throwaway
-framing in this skill stops applying.
+For a local build, `app/build.gradle.kts` accepts the equivalent `SURFACE_KEYSTORE_FILE`, password and alias environment variables. Do not put secret values in a shell history or shared logs.
 
-## Private repos
+The branded assets are `aegentica-ai-nano.apk` and `aegentica-ai-core.apk`. Legacy `pixel-surface-lab` asset names are byte-identical aliases so existing bookmarks keep working.
 
-Release assets in a private repo require authentication to download, so tapping
-the link on a phone that is not signed into GitHub will fail. Either sign into
-GitHub in the phone's browser, or use a public repo for throwaway experiments.
+## CI
 
-## Alternatives to GitHub Actions
+The [iteration workflow](iteration-workflow.md) is the operational reference. Preflight runs source/resource, documentation and tool regressions. One Android job performs JVM tests, lint and both flavor builds. Errors block publication; diagnostics are kept even on failure. PR runs validate merge results without signing secrets and never publish. Manual dispatch validates without publishing. App/tooling pushes to main/improve-pixel-assistant publish after all gates pass. Known documentation-only changes run preflight and leave APKs alone; canonical draft PRs defer duplicate merge validation until ready-for-review.
 
-If the user does not want a repo at all:
+Successful builds carry `release-evidence.json`, `SHA256SUMS`, reports, native screenshots and `review.html` in **aegentica-evidence.zip**. CI validates package IDs/version codes, checks source/run provenance, downloads release assets and compares hashes. Screenshot generation is not visual approval or physical Pixel certification.
 
-- **Android Studio over USB** — fastest iteration loop once set up, but the
-  setup is the thing this skill exists to avoid.
-- **`gradle assembleDebug` locally** — needs a JDK and the Android SDK
-  installed; the APK lands in `app/build/outputs/apk/debug/`.
+A build-specific release such as `preview-improve-pixel-assistant-build-102` is published and verified before compatibility aliases are refreshed. These unique links are the preferred handoff and rollback reference. A rerun adds `-r<attempt>` to its release tag, but can reuse the Android version code. Existing published build assets are not silently replaced. Retrying a partially uploaded draft is supported.
 
-Both are reasonable if the user already has an Android environment. If they do
-not, the CI route stays faster overall even accounting for the wait.
+The rolling preview tag is updated without deleting the previous release first. Its multiple asset/tag updates are not atomic; use the unique build URL when exact identity matters. If alias refresh fails, the verified unique build remains available. Branches that have advanced are skipped before publication. Main's existing distribution identity remains distinct from preview links.
+
+Use `.apk` release assets on Android. Evidence ZIPs are for inspection, not installation. Core and Nano are both included; Nano is the assistant.
+
+## Distribution boundary
+
+These are debug/personal preview APKs. Publishing to Google Play requires a deliberate release build/signing strategy, device validation, current policy review and accurate product/privacy disclosures. The repository does not claim a production rollout, signing-key escrow service, or automatic cross-device migration.
+
+Both APKs also pass Android `apksigner verify`; certificate fingerprints are retained in the evidence bundle. This proves signature integrity, not continuity with a previously installed preview key.
+
+Release descriptions include the tracked [preview changes](preview-notes.md). Superseded validation can be cancelled, while active publishers finish under a separate serialized job group. HEAD is checked before publication and again before alias promotion; all alias assets are verified. Interrupted or out-of-order runs must still use the build-specific link for exact identity.
+
+## Less installation friction
+
+Read the install/update line at the top of each exact build release. It reports `private-key-configured` or `ephemeral-debug` behavior from that build, plus Nano package, version code and checksum. Evidence includes the actual public certificate fingerprints. “Private key configured” does not prove compatibility with an older installed debug key.
+
+1. Open the new Nano APK. If Android offers **Update**, accept it; there is no reason to uninstall first.
+2. Confirm the expected `3.0.<build>-nano` in Settings and that your history remains.
+3. If Android rejects the update, keep the existing app installed while you export and check the backup. Only then follow the reinstall/restore procedure above. Settings/voice preferences need separate setup after uninstall.
+4. Test only the changed flows for a small personal iteration; run the broader checklist before wider distribution. A previous APK is a comparison artifact, not guaranteed in-place downgrade support.
+
+See the [whole-process audit](audits/iteration-efficiency.md) for remaining signing, default-branch and device acceptance gaps. Stable signing is the largest unresolved update friction; it requires the owner-controlled private secret setup, not more unit tests.

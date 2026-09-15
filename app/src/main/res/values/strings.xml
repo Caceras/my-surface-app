@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Pixel Surface Lab</string>
-    <string name="shortcut_alpha">First shortcut</string>
-    <string name="shortcut_beta">Second shortcut</string>
+    <string name="app_name">Ægentica AI</string>
+    <string name="shortcut_alpha">Open chat</string>
+    <string name="shortcut_beta">Continue chat</string>
 
     <!-- Labels shown in the text-selection popup. Keep them short: the
          popup truncates hard and the overflow is already crowded. -->
@@ -12,7 +12,7 @@
     <string name="task_proofread">Proofread</string>
     <string name="task_rewrite">Make professional</string>
 
-    <string name="working">Working on device\u2026</string>
+    <string name="working">Thinking on your phone\u2026</string>
     <string name="copy">Copy</string>
     <string name="close">Close</string>
     <string name="replace">Replace selection</string>
@@ -20,17 +20,17 @@
     <string name="ask_hint">Ask anything about the selected text</string>
     <string name="send">Send</string>
     <string name="cancel">Cancel</string>
-    <string name="ask_title">Ask Nano</string>
+    <string name="ask_title">Ask about this text</string>
 
     <!-- The chat screen. -->
-    <string name="chat_hint">Ask anything</string>
+    <string name="chat_hint">What is on your mind?</string>
     <string name="listening">Listening\u2026</string>
     <string name="mic">Speak</string>
-    <string name="mic_denied">Microphone permission was declined.</string>
-    <string name="more">More</string>
+    <string name="mic_denied">Microphone access is off. You can enable it in app settings, or keep typing.</string>
+    <string name="more">Settings</string>
     <string name="new_chat">New</string>
-    <string name="empty_title">Ask anything.</string>
-    <string name="empty_body">The model runs on this phone. No account, no server, no connection needed -- what you type here does not leave the device.</string>
+    <string name="empty_title">A little clarity.\nA little possibility.</string>
+    <string name="empty_body">Think it through. Find the words. Make a plan.\nYour own space, powered on your phone.</string>
     <string name="echoed">Nano recited its own instructions instead of answering. That happens on a short or empty question -- try asking it in a sentence, or tap New to start over.</string>
     <string name="truncated">Nano stopped here: it has a hard output limit of a few hundred words, so a long piece gets cut off rather than finished.</string>
     <string name="prepare_model">Check / prepare on-device model</string>
@@ -41,13 +41,34 @@
     <!-- Speech. The rationale says the true thing, which is also the
          reassuring thing: the audio never leaves the phone. -->
     <string name="mic_rationale">Audio is transcribed on this phone.</string>
-    <string name="listening_hint">Listening. Stop talking to send.</string>
-    <string name="tap_to_talk">Tap to talk.</string>
+    <string name="listening_hint">Listening to you</string>
+    <string name="tap_to_talk">Ready when you are</string>
     <string name="talk_again">Talk</string>
     <string name="answering">Answering\u2026</string>
-    <string name="voice_unavailable">This phone has no on-device speech recognition, so there is no microphone here. Nothing is ever sent to a server to make up for it.</string>
+    <string name="voice_unavailable">Voice needs Android on-device speech. Update Speech Recognition and Synthesis by Google, then return here. You can type in the meantime.</string>
     <string name="voice_ready">Tap to talk</string>
-    <string name="voice_off">No offline speech</string>
-    <string name="get_offline_speech">Get offline speech</string>
+    <string name="voice_off">Set up offline speech</string>
+    <string name="get_offline_speech">Download language</string>
     <string name="shortcut_voice">Talk</string>
+    <string name="speak_replies">Read every reply aloud</string>
+    <string name="voice_settings">Text-to-speech settings</string>
+    <string name="default_assistant">Set as digital assistant</string>
+    <string name="settings_unavailable">Open Android Settings to change this option.</string>
+    <string name="open_voice">Start voice conversation</string>
+    <string name="read_last">Read last answer aloud</string>
+    <string name="read_aloud">Read aloud</string>
+    <string name="stop_speaking">Stop speaking</string>
+    <string name="stop_response">Stop response</string>
+    <string name="response_stopped">Response stopped. Your question is ready to edit or resend.</string>
+    <string name="answer_actions">Answer. Long press to copy, read aloud, or share.</string>
+    <string name="share_answer">Share answer</string>
+    <string name="finish_dictation">Finish dictation</string>
+    <string name="type_instead">Type</string>
+    <string name="widget_empty">A little clarity, one tap away. Ask by text or voice.</string>
+    <string name="keep_talking">Keep talking</string>
+    <string name="speech_language">Speech language</string>
+    <string name="language_selected">Speech language: %1$s</string>
+    <string name="shortcut_history">History</string>
+    <string name="shortcut_actions">Actions</string>
+    <string name="widget_description">Open chat or voice, with an optional private answer preview.</string>
 </resources>

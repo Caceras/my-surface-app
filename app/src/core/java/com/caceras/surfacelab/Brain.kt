@@ -20,7 +20,7 @@ private object CoreBrain : SurfaceBrain {
     override val tasks = listOf(Task.UPPERCASE)
 
     override fun status(context: Context, onStatus: (BrainStatus) -> Unit) {
-        onStatus(BrainStatus("No model - framework APIs only", ready = true))
+        onStatus(BrainStatus("Demo mode · Install Nano for AI", ready = true))
     }
 
     override fun prepare(context: Context, onStatus: (BrainStatus) -> Unit) {

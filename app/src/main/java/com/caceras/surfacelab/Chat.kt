@@ -6,6 +6,7 @@ import org.json.JSONObject
 
 /** One exchange: what you said, and what came back. */
 data class Turn(val you: String, val reply: String)
+data class SavedConversation(val id: String, val title: String, val savedAt: Long, val turns: List<Turn>, val draft: String)
 
 /**
  * The conversation itself.
@@ -26,6 +27,7 @@ object Chat {
 
     /** Kept on disk. Older turns are dropped rather than growing forever. */
     private const val KEEP = 40
+    const val MAX_BACKUP_BYTES = 4_000_000
 
     fun load(context: Context): MutableList<Turn> {
         val raw = prefs(context).getString(KEY, null) ?: return mutableListOf()
@@ -54,6 +56,126 @@ object Chat {
 
     fun clear(context: Context) {
         prefs(context).edit().remove(KEY).apply()
+    }
+
+    fun append(context: Context, turn: Turn) {
+        save(context, load(context) + turn)
+    }
+
+    fun draft(context: Context): String = prefs(context).getString("draft", "").orEmpty()
+    fun saveDraft(context: Context, text: String) {
+        prefs(context).edit().putString("draft", text).apply()
+    }
+
+    fun speakReplies(context: Context): Boolean = prefs(context).getBoolean("speak_replies", false)
+    fun setSpeakReplies(context: Context, value: Boolean) {
+        prefs(context).edit().putBoolean("speak_replies", value).apply()
+    }
+
+    /** New starts fresh without destroying the conversation the user just left. */
+    fun archiveCurrent(context: Context, draft: String = draft(context)): Boolean {
+        val turns = load(context)
+        if (turns.isEmpty() && draft.isBlank()) return false
+        val saved = SavedConversation(java.util.UUID.randomUUID().toString(),
+            (turns.firstOrNull()?.you ?: draft).replace('\n', ' ').take(80),
+            System.currentTimeMillis(), turns, draft)
+        val previous = archives(context).filterNot { it.turns == turns && it.draft == draft }
+        writeArchives(context, listOf(saved) + previous)
+        return true
+    }
+
+    fun archives(context: Context): List<SavedConversation> = runCatching {
+        val parsed = parseArchives(JSONArray(prefs(context).getString("conversations", "[]")), validateIds = false)
+        uniqueIds(parsed).also { if (it != parsed) writeArchives(context, it) }
+    }.getOrDefault(emptyList())
+
+    private fun parseArchives(rows: JSONArray, validateIds: Boolean = true): List<SavedConversation> {
+        require(rows.length() <= 12) { "Too many saved conversations." }
+        val ids = mutableSetOf<String>()
+        return (0 until rows.length()).map { i ->
+            val row = rows.getJSONObject(i)
+            val id = row.getString("id")
+            require(!validateIds || (id.isNotBlank() && ids.add(id))) { "Saved conversation IDs must be non-empty and unique." }
+            val turns = row.getJSONArray("turns")
+            require(turns.length() <= KEEP) { "Too many saved exchanges." }
+            SavedConversation(row.getString("id"), row.getString("title"), row.getLong("savedAt"),
+                (0 until turns.length()).map { n -> turns.getJSONObject(n).let { Turn(it.getString("q"), it.getString("a")) } },
+                row.optString("draft", ""))
+        }
+    }
+
+    fun deleteArchive(context: Context, id: String) {
+        writeArchives(context, archives(context).filterNot { it.id == id })
+    }
+
+    fun clearArchives(context: Context) {
+        prefs(context).edit().remove("conversations").apply()
+    }
+
+    fun openArchive(context: Context, id: String): Boolean {
+        val selected = archives(context).firstOrNull { it.id == id } ?: return false
+        archiveCurrent(context)
+        writeArchives(context, archives(context).filterNot { it.id == id || (it.turns == selected.turns && it.draft == selected.draft) })
+        save(context, selected.turns)
+        saveDraft(context, selected.draft)
+        return true
+    }
+
+    private fun writeArchives(context: Context, saved: List<SavedConversation>) {
+        val rows = JSONArray()
+        var used = 0
+        // Bound JSON work and disk space; retain whole conversations, newest first.
+        saved.take(12).forEach { chat ->
+            val row = JSONObject().put("id", chat.id).put("title", chat.title).put("savedAt", chat.savedAt)
+                .put("draft", chat.draft).put("turns", JSONArray().apply {
+                    chat.turns.forEach { put(JSONObject().put("q", it.you).put("a", it.reply)) }
+                })
+            val size = row.toString().length
+            if (rows.length() == 0 || used + size <= 512_000) { rows.put(row); used += size }
+        }
+        prefs(context).edit().putString("conversations", rows.toString()).apply()
+    }
+
+    /** Portable backup chosen through Android's file picker; no storage permission. */
+    fun backup(context: Context): String = JSONObject()
+        .put("format", "surface-chat-v1")
+        .put("turns", JSONArray().apply { load(context).forEach { put(JSONObject().put("q", it.you).put("a", it.reply)) } })
+        .put("draft", draft(context))
+        .put("conversations", JSONArray(prefs(context).getString("conversations", "[]"))).toString().also {
+            require(it.toByteArray(Charsets.UTF_8).size <= MAX_BACKUP_BYTES) {
+                "This backup is too large. Shorten the draft or remove saved conversations, then export again."
+            }
+            readBackup(it)
+        }
+
+    fun readBackup(raw: String): Pair<List<Turn>, String> {
+        require(raw.toByteArray(Charsets.UTF_8).size <= MAX_BACKUP_BYTES) { "This backup is too large." }
+        val objectValue = JSONObject(raw)
+        require(objectValue.getString("format") == "surface-chat-v1") { "Choose an Ægentica AI or Surface conversation backup." }
+        val array = objectValue.getJSONArray("turns")
+        require(array.length() <= KEEP) { "This backup contains too many turns." }
+        val turns = (0 until array.length()).map { i ->
+            val turn = array.getJSONObject(i)
+            Turn(turn.getString("q"), turn.getString("a"))
+        }
+        parseArchives(objectValue.optJSONArray("conversations") ?: JSONArray())
+        val draft = objectValue.optString("draft", "")
+        return turns to draft
+    }
+
+    fun restoreArchives(context: Context, raw: String) {
+        val imported = parseArchives(JSONObject(raw).optJSONArray("conversations") ?: JSONArray())
+        val merged = uniqueIds((imported + archives(context)).distinctBy { it.turns to it.draft })
+        writeArchives(context, merged)
+    }
+
+    private fun uniqueIds(saved: List<SavedConversation>): List<SavedConversation> {
+        val ids = mutableSetOf<String>()
+        return saved.map { chat ->
+            var id = chat.id
+            while (id.isBlank() || !ids.add(id)) id = java.util.UUID.randomUUID().toString()
+            if (id == chat.id) chat else chat.copy(id = id)
+        }
     }
 
     private fun prefs(context: Context) = context.applicationContext

@@ -52,12 +52,18 @@ class ProcessTextActivity : Activity() {
     /** True while the pending question came from the microphone. */
     private var askedAloud = false
     private var listening = false
+    private var listenDraft = ""
+    private var receivedWords = false
 
     /** Set on the way out; see the same flag in MainActivity and docs/voice.md. */
     private var gone = false
+    private var active = false
+    private var requestId = 0
+    private var streamed: StreamUpdates? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NativePrivacy.apply(this, window)
 
         selection = intent
             .getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
@@ -74,17 +80,23 @@ class ProcessTextActivity : Activity() {
             return
         }
 
-        if (task == Task.ASK) ask() else send("")
+        if (task == Task.ASK) {
+            askedAloud = savedInstanceState?.getBoolean("selection-aloud") ?: false
+            ask(savedInstanceState?.getString("selection-prompt").orEmpty(), savedInstanceState?.getInt("selection-cursor", -1) ?: -1)
+        } else send("")
     }
 
     /** Free-form: the user writes the prompt, the selection is the material. */
-    private fun ask() {
+    private fun ask(draft: String = "", cursor: Int = -1) {
         val input = EditText(this).apply {
             hint = getString(R.string.ask_hint)
             inputType = InputType.TYPE_CLASS_TEXT or
                 InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or
                 InputType.TYPE_TEXT_FLAG_MULTI_LINE
             maxLines = 4
+            styleField()
+            setText(draft)
+            setSelection(if (cursor < 0) length() else cursor.coerceIn(0, length()))
         }
 
         // A blank box is a worse prompt than a bad suggestion.
@@ -102,7 +114,7 @@ class ProcessTextActivity : Activity() {
         val preview = TextView(this).apply {
             text = if (selection.length > 220) selection.take(217) + "..." else selection
             textSize = 13f
-            alpha = 0.6f
+            setTextColor(ink(R.color.text_dim))
             padDp(0, 8, 0, 0)
         }
 
@@ -120,7 +132,9 @@ class ProcessTextActivity : Activity() {
                     setImageResource(R.drawable.ic_mic)
                     background = null
                     contentDescription = getString(R.string.mic)
-                    val pad = dp(8)
+                    minimumWidth = dp(48)
+                    minimumHeight = dp(48)
+                    val pad = dp(10)
                     setPadding(pad, pad, pad, pad)
                     setOnClickListener { toggleListening() }
                 }
@@ -129,6 +143,19 @@ class ProcessTextActivity : Activity() {
             }
         }
 
+        val validation = label("", 13f, true).apply {
+            tag = "selection-error"
+            visibility = android.view.View.GONE
+            accessibilityLiveRegion = android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
+            padDp(0, 8, 0, 4)
+        }
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!s.isNullOrBlank()) { validation.visibility = android.view.View.GONE; input.error = null }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             padDp(20, 12, 20, 0)
@@ -136,6 +163,7 @@ class ProcessTextActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ))
+            addView(validation)
             addView(HorizontalScrollView(this@ProcessTextActivity).apply {
                 isHorizontalScrollBarEnabled = false
                 addView(chips)
@@ -145,16 +173,38 @@ class ProcessTextActivity : Activity() {
 
         dialog = AlertDialog.Builder(this, DIALOG_THEME)
             .setTitle(R.string.ask_title)
-            .setView(body)
-            .setPositiveButton(R.string.send) { _, _ ->
-                send(input.text.toString())
-            }
+            .setView(ScrollView(this).apply { addView(body) })
+            .setPositiveButton(R.string.send, null)
             .setNegativeButton(R.string.cancel) { d, _ -> d.dismiss() }
             .setOnDismissListener { if (dialog != null) finish() }
             .show()
+        NativePrivacy.apply(this, dialog?.window)
+        fun invalid(message: String) {
+            input.error = message
+            validation.text = message
+            validation.visibility = android.view.View.VISIBLE
+            input.requestFocus()
+        }
+        dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+            when {
+                listening -> { ears.stop(); invalid("Finish dictation, review your words, then send.") }
+                input.text.isBlank() -> { invalid("What would you like to know about this text?") }
+                !active -> send(input.text.toString())
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("selection-prompt", prompt?.text?.toString().orEmpty())
+        outState.putInt("selection-cursor", prompt?.selectionStart ?: -1)
+        outState.putBoolean("selection-aloud", askedAloud)
+        super.onSaveInstanceState(outState)
     }
 
     private fun send(instruction: String) {
+        streamed?.cancel()
+        val token = ++requestId
+        active = true
         // Modality is inherited: this answer is spoken only because the
         // question was. The flag is consumed here.
         val aloud = askedAloud
@@ -174,7 +224,7 @@ class ProcessTextActivity : Activity() {
             // Barge-in: touching the answer stops it being read aloud.
             setOnClickListener { mouth?.hush() }
         }
-        val scroll = ScrollView(this).apply {
+        val scroll = ReadingScrollView(this).apply {
             addView(
                 stream,
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -189,7 +239,12 @@ class ProcessTextActivity : Activity() {
             .setNegativeButton(R.string.close) { d, _ -> d.dismiss() }
             .setOnDismissListener { finish() }
             .show()
+        NativePrivacy.apply(this, dialog?.window)
 
+        streamed = StreamUpdates { text ->
+            stream.text = Markdown.render(text, dp(18))
+            scroll.contentChanged()
+        }
         if (aloud) speaker().begin(ears.locale())
 
         Brains.get().run(
@@ -198,16 +253,25 @@ class ProcessTextActivity : Activity() {
             input = selection,
             instruction = instruction,
             onPartial = { partial ->
-                if (gone) return@run
-                stream.text = partial
-                if (aloud) mouth?.follow(partial)
-                scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+                if (gone || token != requestId) return@run
+                if (Prompts.isEcho(partial, task)) return@run
+                streamed?.offer(Prompts.reply(partial))
+                if (aloud) mouth?.follow(Markdown.strip(Prompts.reply(partial)))
             }
-        ) { result ->
-            if (gone) return@run
+        ) { raw ->
+            if (gone || token != requestId) return@run
+            streamed?.cancel()
+            active = false
+            val result = if (raw.ok && Prompts.isEcho(raw.text, task))
+                BrainResult.failure(getString(R.string.echoed))
+                else raw.copy(text = Prompts.reply(raw.text))
+            if (!result.ok) mouth?.hush()
+            if (result.ok && task == Task.ASK) {
+                Chat.append(this, Turn(Prompts.user(task, selection, instruction), result.text))
+            }
             if (result.ok) ResultStore.save(this, task, result.text)
-            if (aloud && result.ok) mouth?.finish(result.text)
-            val note = result.note ?: Lang.caveat(task, selection)
+            if (aloud && result.ok) mouth?.finish(Markdown.strip(result.text))
+            val note = result.note
 
             // Replacing the selection is the better outcome, but only when
             // there is nothing the user needs to read first.
@@ -238,14 +302,13 @@ class ProcessTextActivity : Activity() {
 
         val builder = AlertDialog.Builder(this, DIALOG_THEME)
             .setTitle(task.alias)
-            .setMessage(body)
+            .setMessage(Markdown.render(body, dp(18)))
             .setOnDismissListener { finish() }
             .setNegativeButton(R.string.close) { d, _ -> d.dismiss() }
 
         if (result.ok) {
             builder.setPositiveButton(R.string.copy) { d, _ ->
-                getSystemService(ClipboardManager::class.java)
-                    .setPrimaryClip(ClipData.newPlainText(task.alias, result.text))
+                NativePrivacy.copy(this, task.alias, result.text)
                 d.dismiss()
             }
             if (!readOnly) {
@@ -260,11 +323,15 @@ class ProcessTextActivity : Activity() {
         }
 
         dialog = builder.show()
+        NativePrivacy.apply(this, dialog?.window)
     }
 
     // ----------------------------------------------------------- speaking
 
-    private fun speaker(): Mouth = mouth ?: Mouth(this).also { mouth = it }
+    private fun speaker(): Mouth = mouth ?: Mouth(this).also { voice ->
+        mouth = voice
+        voice.onProblem = { if (!gone) Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
+    }
 
     private fun toggleListening() {
         if (listening) {
@@ -282,21 +349,23 @@ class ProcessTextActivity : Activity() {
 
     private fun startListening() {
         val input = prompt ?: return
+        listenDraft = input.text.toString()
+        receivedWords = false
+        mouth?.hush()
         listening = true
         setMicActive(true)
 
         ears.listen(
             onLevel = { rms ->
-                val scale = 1f + (rms.coerceIn(0f, 10f) / 20f)
-                mic?.scaleX = scale
-                mic?.scaleY = scale
+                mic?.speechLevel(rms)
             },
             onPartial = { partial ->
-                input.setText(partial)
+                input.setText(listenDraft + (if (listenDraft.isBlank()) "" else " ") + partial)
                 input.setSelection(input.text.length)
             },
             onFinal = { text ->
-                input.setText(text)
+                receivedWords = true
+                input.setText(listenDraft + (if (listenDraft.isBlank()) "" else " ") + text)
                 input.setSelection(input.text.length)
                 // The transcript stays editable here, unlike the hands-free
                 // screen: you are already looking at the box, so a misheard
@@ -304,6 +373,7 @@ class ProcessTextActivity : Activity() {
                 askedAloud = true
             },
             onStop = { problem ->
+                if (!receivedWords) { input.setText(listenDraft); input.setSelection(input.length()) }
                 listening = false
                 setMicActive(false)
                 if (problem != null) {
@@ -314,6 +384,7 @@ class ProcessTextActivity : Activity() {
     }
 
     private fun setMicActive(active: Boolean) {
+        mic?.contentDescription = getString(if (active) R.string.finish_dictation else R.string.mic)
         mic?.setColorFilter(
             resources.getColor(
                 if (active) R.color.listening else R.color.text_dim, theme
@@ -339,8 +410,26 @@ class ProcessTextActivity : Activity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        streamed?.cancel()
+        ears.cancel()
+        listening = false
+        setMicActive(false)
+        mouth?.hush()
+        if (active) {
+            requestId++
+            active = false
+            Brains.get().cancel()
+            finish()
+        }
+    }
+
     override fun onDestroy() {
         gone = true
+        streamed?.cancel()
+        requestId++
+        if (active) Brains.get().cancel()
         // The microphone is not left held, and the engine is shut down rather
         // than merely stopped -- stop() is barge-in, not teardown.
         ears.cancel()
@@ -354,7 +443,7 @@ class ProcessTextActivity : Activity() {
     }
 
     private companion object {
-        const val DIALOG_THEME = android.R.style.Theme_DeviceDefault_Dialog_Alert
+        const val DIALOG_THEME = R.style.SurfaceDialog
         const val MIC_REQUEST = 1
     }
 }

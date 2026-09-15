@@ -5,8 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Most build failures are toolchain version skew. Please check
-        [docs/versions.md](../../blob/main/docs/versions.md) first — it maps the
+        Please check
+        [the version guide](https://github.com/Caceras/my-surface-app/blob/improve-pixel-assistant/docs/versions.md) first — it maps the
         common error strings to the fix.
   - type: input
     id: error
@@ -35,5 +35,9 @@ body:
     attributes:
       label: Before submitting
       options:
-        - label: "`python tools/verify.py .` passes"
-        - label: "`python tools/test_verify.py` passes"
+        - label: "I ran `python tools/check.py` and included its first failure, if any."
+  - type: input
+    id: run
+    attributes:
+      label: CI run URL and source SHA
+      description: For Actions failures, include the run and failing step. The android-diagnostics artifact retains reports.

@@ -50,7 +50,12 @@ class VoiceTest {
     @Before
     fun setUp() {
         assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+        Chat.clear(app())
+        ResultStore.clear(app())
         Brains.useForTest(brain)
+        ShadowTextToSpeech.addVoice(android.speech.tts.Voice(
+            "offline", java.util.Locale.getDefault(), 300, 300, false, emptySet()
+        ))
         ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
         shadowOf(app()).grantPermissions(Manifest.permission.RECORD_AUDIO)
     }
@@ -115,9 +120,8 @@ class VoiceTest {
     private fun drain() = shadowOf(Looper.getMainLooper()).idle()
 
     private fun tap(activity: VoiceActivity) {
-        val down = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 1f, 1f, 0)
-        activity.dispatchTouchEvent(down)
-        down.recycle()
+        descendants(activity.findViewById(android.R.id.content)).filterIsInstance<TextView>()
+            .first { it.text == "Quiet voice · Keep reading" }.performClick()
         drain()
     }
 
@@ -240,6 +244,37 @@ class VoiceTest {
     }
 
     @Test
+    fun `quiet voice stays quiet and final text does not restore a misleading control`() {
+        val activity = open().get()
+        say("A thoughtful answer")
+        brain.emit("One.")
+        drain()
+        descendants(activity.window.decorView).filterIsInstance<TextView>()
+            .first { it.text == "Quiet voice · Keep reading" }.performClick()
+        brain.emit("One. Two.")
+        brain.complete("One. Two.")
+        drain()
+        assertFalse(descendants(activity.window.decorView).filterIsInstance<TextView>()
+            .any { it.text == "Quiet voice · Keep reading" && it.isClickable })
+        assertEquals(listOf("One."), spoken())
+    }
+
+    @Test
+    fun `stopping a finished spoken reply does not restart the microphone`() {
+        val activity = open().get()
+        say("Tell me something")
+        brain.complete("A useful answer.")
+        // The shadow completes speech on the next looper turn. Tap while the
+        // utterance is active, before delivering its completion callback.
+        val previous = ShadowSpeechRecognizer.getLatestSpeechRecognizer()
+        descendants(activity.findViewById(android.R.id.content)).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.stop_speaking) }.performClick()
+        drain()
+        assertEquals(previous, ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+        assertTrue(texts(activity).contains(activity.getString(R.string.tap_to_talk)))
+    }
+
+    @Test
     fun `sentences finished before the engine started are spoken, in order`() {
         // TTS init is asynchronous, and by the time it lands the brain may
         // already have streamed several sentences. One slot that each new
@@ -271,7 +306,7 @@ class VoiceTest {
         drain()
 
         val engine = ShadowTextToSpeech.getLastTextToSpeechInstance()
-        assertEquals(Ears(app()).locale(), shadowOf(engine).currentLanguage)
+        assertEquals(Ears(app()).locale(), shadowOf(engine).currentVoice.locale)
     }
 
     @Test
@@ -327,6 +362,153 @@ class VoiceTest {
         assertNull("a discarded answer reached the widget",
             ResultStore.lastText(app()))
     }
+    @Test
+    fun `voice continues typed history and saves its reply for chat`() {
+        Chat.append(app(), Turn("Plan my day", "Start with your hardest task."))
+        open()
+        say("What next?")
+        assertTrue(brain.instruction.contains("Plan my day"))
+        assertTrue(brain.instruction.contains("Start with your hardest task."))
+        brain.complete("Take a break.")
+        assertEquals("Take a break.", Chat.load(app()).last().reply)
+    }
+
+    @Test
+    fun `a pause discards late inference and restores the spoken question as a draft`() {
+        val controller = open()
+        say("Keep this question")
+        controller.pause()
+        brain.complete("Late answer.")
+        assertTrue(Chat.load(app()).isEmpty())
+        assertEquals("Keep this question", Chat.draft(app()))
+        assertNull(ResultStore.lastText(app()))
+    }
+
+    @Test
+    fun `typing is available when offline recognition is missing`() {
+        ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(false)
+        val activity = open().get()
+        val type = descendants(activity.findViewById(android.R.id.content))
+            .filterIsInstance<TextView>().first { it.text == activity.getString(R.string.type_instead) }
+        type.performClick()
+        assertEquals(MainActivity::class.java.name,
+            shadowOf(activity).nextStartedActivity.component?.className)
+    }
+
+    @Test
+    fun `continuous conversation listens again only when explicitly enabled`() {
+        val activity = open().get()
+        val toggle = descendants(activity.findViewById(android.R.id.content))
+            .filterIsInstance<android.widget.Switch>().first()
+        assertFalse(toggle.isChecked)
+        toggle.isChecked = true
+        say("first question")
+        val first = ShadowSpeechRecognizer.getLatestSpeechRecognizer()
+        brain.complete("First answer.")
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1))
+        assertTrue(first !== ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+        say("and then?")
+        assertTrue(brain.instruction.contains("first question"))
+    }
+
+    @Test
+    fun `silence ends continuous conversation without a retry loop`() {
+        val activity = open().get()
+        val toggle = descendants(activity.findViewById(android.R.id.content))
+            .filterIsInstance<android.widget.Switch>().first()
+        toggle.isChecked = true
+        recognizer().triggerOnError(SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
+        drain()
+        assertFalse(toggle.isChecked)
+        assertEquals(0, brain.runs)
+    }
+
+    @Test
+    fun `stopped voice question is available for typing and late replies are discarded`() {
+        val activity = open().get()
+        say("Please keep my question")
+        descendants(activity.findViewById(android.R.id.content)).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.stop_response) }.performClick()
+        brain.complete("Late result")
+        assertEquals("Please keep my question", Chat.draft(app()))
+        assertTrue(Chat.load(app()).isEmpty())
+    }
+
+    @Test
+    fun `speaker labels are stripped consistently before streamed speech and its tail`() {
+        open()
+        say("say hello")
+        brain.emit("Assistant: Hello.")
+        drain()
+        brain.complete("Assistant: Hello. How are you")
+        drain()
+        assertEquals(listOf("Hello.", "How are you"), spoken())
+    }
+
+    @Test
+    fun `language error releases the microphone and offers typing and setup`() {
+        val activity = open().get()
+        val client = recognizer()
+        client.triggerOnError(SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE)
+        drain()
+        assertTrue("microphone connection survived a terminal error", client.isDestroyed)
+        assertTrue(texts(activity).containsAll(listOf("Type", "Voice setup", "Choose speaking language")))
+    }
+
+    @Test
+    fun `speech setup does not start the microphone`() {
+        val activity = Robolectric.buildActivity(VoiceActivity::class.java,
+            android.content.Intent().putExtra("setup", true)).setup().get()
+        assertNull(ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+        assertTrue(texts(activity).contains("A quick voice check"))
+    }
+
+    @Test
+    fun `opening setup on an existing voice activity never restarts the microphone`() {
+        val controller = open()
+        val previous = ShadowSpeechRecognizer.getLatestSpeechRecognizer()
+        controller.newIntent(android.content.Intent().putExtra("setup", true))
+        drain()
+        assertEquals(previous, ShadowSpeechRecognizer.getLatestSpeechRecognizer())
+        assertTrue(shadowOf(previous).isDestroyed)
+        assertTrue(texts(controller.get()).contains("Make yourself heard"))
+        assertFalse(texts(controller.get()).contains("Finish speaking"))
+    }
+
+    @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun `voice streaming preserves the reading position until latest is requested`() {
+        val activity = open().get()
+        say("Tell me a long story")
+        brain.emit("An earlier paragraph. ".repeat(400))
+        val decor = activity.window.decorView
+        fun layout() {
+            decor.measure(View.MeasureSpec.makeMeasureSpec(activity.dp(411), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(activity.dp(914), View.MeasureSpec.EXACTLY))
+            decor.layout(0, 0, activity.dp(411), activity.dp(914))
+            drain()
+        }
+        layout()
+        val scroll = decor.findViewWithTag<ReadingScrollView>("voice-transcript")
+        assertTrue(scroll.getChildAt(0).height > scroll.height + 30)
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        scroll.scrollTo(0, 30)
+        brain.complete("An earlier paragraph. ".repeat(400) + "The end.")
+        layout()
+        assertEquals(30, scroll.scrollY)
+        val latest = decor.findViewWithTag<View>("voice-latest")
+        assertEquals(View.VISIBLE, latest.visibility)
+        latest.performClick()
+        assertEquals(View.GONE, latest.visibility)
+    }
+
+    @Test
+    fun `regional speech selection prefers exact then same language only`() {
+        assertEquals("en-US", Ears.bestLanguage(java.util.Locale.forLanguageTag("en-SE"), listOf("sv-SE", "en-US")))
+        assertEquals("en-GB", Ears.bestLanguage(java.util.Locale.UK, listOf("en-US", "en-GB")))
+        assertNull(Ears.bestLanguage(java.util.Locale.forLanguageTag("sv-SE"), listOf("en-US")))
+    }
+
 }
 
 /**
@@ -386,4 +568,5 @@ internal class StreamingBrain : SurfaceBrain {
         done = true
         result?.invoke(BrainResult.failure(note))
     }
+
 }
