@@ -79,4 +79,40 @@ class CoherenceTest {
         assertEquals(3, switches.size)
         switches.forEach { assertEquals(activity.getColor(R.color.text_primary), it.currentTextColor); assertTrue(it.minHeight >= activity.dp(48)) }
     }
+    @Test fun `keyboard done validates timer and preserves input for correction`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val sheet = NativeActions.show(activity)
+        tap(sheet.window!!.decorView, "Set a timer")
+        val form = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog()
+        val field = children(form.window!!.decorView).filterIsInstance<EditText>().single()
+        field.setText("0")
+        field.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
+        assertTrue(form.isShowing)
+        assertEquals("0", field.text.toString())
+        assertEquals("Choose 1 to 1,440 minutes.", field.error.toString())
+        assertNull(shadowOf(activity).nextStartedActivity)
+        field.setText("12")
+        field.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
+        assertEquals(720, shadowOf(activity).nextStartedActivity.getIntExtra(android.provider.AlarmClock.EXTRA_LENGTH, 0))
+        assertFalse(form.isShowing)
+        assertFalse(sheet.isShowing)
+        field.onEditorAction(android.view.inputmethod.EditorInfo.IME_ACTION_DONE)
+        assertNull(shadowOf(activity).nextStartedActivity)
+    }
+
+    @Test fun `app info is an explicit metadata allowlist and does not include drafts`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        children(activity.window.decorView).filterIsInstance<EditText>().first().setText("private words that must not be copied")
+        tap(activity.window.decorView, "Settings")
+        tap(ShadowDialog.getLatestDialog().window!!.decorView, "Copy app info")
+        val value = activity.getSystemService(android.content.ClipboardManager::class.java).primaryClip!!
+            .getItemAt(0).text.toString()
+        assertEquals(AppInfo.summary(activity), value)
+        assertEquals(6, value.lines().size)
+        assertTrue(value.contains("Package: ${activity.packageName}"))
+        assertTrue(value.contains("Android:"))
+        assertFalse(value.contains("private words"))
+        assertEquals("private words that must not be copied", Chat.draft(activity))
+    }
+
 }

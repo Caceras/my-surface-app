@@ -177,6 +177,10 @@ def verify(folder):
         path = (folder / name).resolve()
         if not path.is_relative_to(folder.resolve()) or not path.is_file() or digest(path) != checksum:
             raise ValueError(f"Artifact mismatch: {name}")
+    expected_files = set(meta["files"]) | {"release-evidence.json", "SHA256SUMS"}
+    actual_files = {str(p.relative_to(folder)) for p in folder.rglob("*") if p.is_file()}
+    if actual_files != expected_files or any(p.is_symlink() for p in folder.rglob("*")):
+        raise ValueError("Evidence contains unlisted files or symbolic links")
     for name, identity in meta["apks"].items():
         if apk_identity(folder / name) != identity:
             raise ValueError(f"APK identity mismatch: {name}")

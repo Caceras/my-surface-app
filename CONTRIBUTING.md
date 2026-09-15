@@ -37,3 +37,5 @@ Include installed build number, Android/device details, reproduction steps, and 
 ## Close the loop
 
 Use [the iteration workflow](docs/iteration-workflow.md): reproduce a scoped defect, run `python tools/check.py`, inspect native evidence, verify the exact build-specific APK and document device limits. Successful screenshots do not mean visual approval. Keep behavior, tests and current guides coherent in the same batch.
+
+Update [current preview changes](docs/preview-notes.md) before the final push; release descriptions include it automatically. For phone reports, paste **Settings → Help & feedback → Copy app info** with the minimal reproduction. See the [iteration concurrency and publication contracts](docs/iteration-workflow.md).

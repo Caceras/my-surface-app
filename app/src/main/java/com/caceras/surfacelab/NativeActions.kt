@@ -11,6 +11,8 @@ import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.text.InputType
 import android.view.Gravity
+import android.view.inputmethod.EditorInfo
+import android.view.KeyEvent
 import android.view.Window
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -53,7 +55,14 @@ object NativeActions {
             val field = EditText(activity).apply {
                 this.hint = hint; inputType = type; setText(initial); maxLines = 3
                 styleField()
-                filters = arrayOf(android.text.InputFilter.LengthFilter(if (type == InputType.TYPE_CLASS_PHONE) 40 else 500))
+                setSingleLine(true)
+                imeOptions = imeOptions or EditorInfo.IME_ACTION_DONE
+                filters = arrayOf(android.text.InputFilter.LengthFilter(when {
+                    type == InputType.TYPE_CLASS_PHONE -> 40
+                    type == InputType.TYPE_CLASS_NUMBER -> 4
+                    else -> 500
+                }))
+                setSelection(text.length)
             }
             val fieldContainer = android.widget.FrameLayout(activity).apply {
                 padDp(24, 12, 24, 8)
@@ -63,10 +72,20 @@ object NativeActions {
                 .setNegativeButton("Cancel", null).setPositiveButton(confirm, null).create()
             form.show()
             NativePrivacy.apply(activity, form.window)
-            form.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            fun submit() {
+                if (!form.isShowing) return
                 try { launch(activity, make(field.text.toString())) { form.dismiss(); dialog.dismiss() } }
-                catch (e: IllegalArgumentException) { field.error = e.message }
+                catch (e: IllegalArgumentException) { field.error = e.message; field.requestFocus() }
             }
+            form.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { submit() }
+            field.setOnEditorActionListener { _, action, event ->
+                val enter = event?.keyCode == KeyEvent.KEYCODE_ENTER
+                if (action == EditorInfo.IME_ACTION_DONE || enter) {
+                    if (event == null || (event.action == KeyEvent.ACTION_UP && !event.isCanceled)) submit()
+                    true
+                } else false
+            }
+            field.requestFocus()
         }
         val content = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL; padDp(24, 16, 24, 24)

@@ -47,3 +47,5 @@ Headset/media Pause or Stop ends active foreground speech. Headphone disconnect 
 [Android intents](https://developer.android.com/guide/components/intents-common), [shortcuts](https://developer.android.com/develop/ui/compose/system/shortcuts/creating-shortcuts), [keyboard actions](https://developer.android.com/develop/ui/views/touch-and-input/keyboard-input/commands), [media callbacks](https://developer.android.com/media/legacy/audio/mediasession).
 
 All navigation sheets use the same pause-and-preserve-draft behavior. Action forms share the private editor styling used by History search and bound their field length before validated handoff.
+
+Single-field action forms support keyboard **Done** and hardware Enter. Invalid input remains visible with an inline error and focus for correction. A successful handoff closes the form and sheet; repeated editor callbacks do not relaunch it. Timer input is bounded to four digits, within the documented minute range.

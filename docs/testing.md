@@ -82,3 +82,7 @@ Both APKs also pass Android `apksigner verify`; certificate fingerprints are ret
 Two source-local exceptions are documented beside the code: the Intent tile overload is used only under an explicit runtime API < 34 check because the PendingIntent overload does not exist there; `PresenceView` deliberately extends the framework ImageView and applies its own tint despite Nano's transitive AppCompat dependency. Neither exception disables lint globally. Other errors/fatals still block the release.
 
 Screenshot capture drains immediate dialog layout work, remeasures the frame and verifies shared-header close controls before drawing. This catches missing or clipped exits that a painted-pixel threshold alone cannot detect.
+
+## Iteration regression checks
+
+`python tools/check.py` also exercises publication decisions without networking: stale source, wrong provenance, upload mismatch, draft repair, immutable public builds and rerun tags. Evidence rejects unlisted files and symlinks. Native regressions cover keyboard Done validation/correction, duplicate submission and the metadata-only app-info clipboard. The `settings-feedback` render checks that the feedback control remains reachable at the bottom of Settings. On Pixel, confirm Gboard Done and hardware Enter dispatch once, preserve an invalid timer for correction, and copy app info without losing the chat draft.

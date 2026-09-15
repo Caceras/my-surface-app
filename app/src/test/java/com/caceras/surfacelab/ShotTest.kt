@@ -49,7 +49,7 @@ class ShotTest {
      * colours, and passed on a screen that was ninety per cent unpainted --
      * an assertion weak enough to be worthless.
      */
-    private fun shoot(name: String, decor: View, minPainted: Double = 0.9, shotWidth: Int = width, shotHeight: Int = height) {
+    private fun shoot(name: String, decor: View, minPainted: Double = 0.9, shotWidth: Int = width, shotHeight: Int = height, afterLayout: () -> Unit = {}) {
         decor.measure(
             View.MeasureSpec.makeMeasureSpec(shotWidth, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(shotHeight, View.MeasureSpec.EXACTLY)
@@ -70,6 +70,7 @@ class ShotTest {
             assertTrue("$name close action is clipped", rect.width() >= done.context.dp(48) && rect.height() >= done.context.dp(48))
         }
 
+        afterLayout()
         val bitmap = Bitmap.createBitmap(shotWidth, shotHeight, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.MAGENTA)   // so "drew nothing" is unmistakable
         decor.draw(Canvas(bitmap))
@@ -307,6 +308,21 @@ class ShotTest {
         parent.removeView(content)
         host.addView(content, android.widget.FrameLayout.LayoutParams(-1, -2, android.view.Gravity.CENTER))
         shoot("cohesion-timer", host, shotWidth = 1233, shotHeight = 1233)
+    }
+
+    @Test fun `settings feedback stays reachable at the end of the sheet`() {
+        val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        fun children(v: View): List<View> = listOf(v) + if (v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
+        children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == "Settings" }.performClick()
+        val decor = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+        shoot("settings-feedback", decor) {
+            val scroll = decor.findViewWithTag<android.widget.ScrollView>("settings")
+            scroll.scrollTo(0, scroll.getChildAt(0).height)
+            val copy = children(decor).filterIsInstance<android.widget.TextView>().first { it.text == "Copy app info" }
+            val rect = android.graphics.Rect()
+            assertTrue(copy.getGlobalVisibleRect(rect))
+            assertTrue(rect.height() >= activity.dp(48))
+        }
     }
 
 }

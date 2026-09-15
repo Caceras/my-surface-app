@@ -350,6 +350,13 @@ class MainActivity : Activity() {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("application/json"), IMPORT_CHAT)
         })
+        panel.addView(label("HELP & FEEDBACK", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
+        panel.addView(flatButton("Copy app info") {
+            NativePrivacy.copy(this, "Ægentica AI app info", AppInfo.summary(this))
+            Toast.makeText(this, "App info copied. Paste it with the steps that went wrong.", Toast.LENGTH_LONG).show()
+        })
+        panel.addView(label("Build, phone, Android and language only. No conversations or recordings.", 13f, true))
+
         return panel
     }
 

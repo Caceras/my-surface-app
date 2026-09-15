@@ -54,3 +54,5 @@ Use `.apk` release assets on Android. Evidence ZIPs are for inspection, not inst
 These are debug/personal preview APKs. Publishing to Google Play requires a deliberate release build/signing strategy, device validation, current policy review and accurate product/privacy disclosures. The repository does not claim a production rollout, signing-key escrow service, or automatic cross-device migration.
 
 Both APKs also pass Android `apksigner verify`; certificate fingerprints are retained in the evidence bundle. This proves signature integrity, not continuity with a previously installed preview key.
+
+Release descriptions include the tracked [preview changes](preview-notes.md). Superseded validation can be cancelled, while active publishers finish under a separate serialized job group. HEAD is checked before publication and again before alias promotion; all alias assets are verified. Interrupted or out-of-order runs must still use the build-specific link for exact identity.

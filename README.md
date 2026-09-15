@@ -7,7 +7,7 @@ A native Android assistant for typing, talking, thinking things through, and ope
 [![Android checks](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg?branch=improve-pixel-assistant)](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-70CEFA.svg)](LICENSE)
 
-**[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Quality audit](docs/cohesion-audit.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribute](CONTRIBUTING.md)
+**[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [What changed](docs/preview-notes.md) · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Quality audit](docs/cohesion-audit.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribute](CONTRIBUTING.md)
 
 > This is the **Ægentica AI** app on `improve-pixel-assistant`. The main branch and `/releases/latest` may contain an older experience. This preview is not a Play Store release. Export your conversations before any reinstall.
 
@@ -106,4 +106,4 @@ The original surface generator remains available in `tools/scaffold.py`; it gene
 
 ## Status
 
-An actively developed personal preview, not a claim of production readiness or guaranteed model accuracy. Hardware validation is required before wider distribution. Issues and focused contributions are welcome; include the build number, steps to reproduce, and redacted screenshots. **MIT licensed.**
+An actively developed personal preview, not a claim of production readiness or guaranteed model accuracy. Hardware validation is required before wider distribution. Issues and focused contributions are welcome. Use **Settings → Help & feedback → Copy app info**, then include the steps to reproduce and redacted screenshots. **MIT licensed.**

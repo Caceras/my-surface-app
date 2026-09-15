@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from release_evidence import digest
 from release_evidence import REQUIRED_SHOTS, junit_summary, lint_summary, validate_identity, verify
 
 
@@ -56,6 +57,25 @@ class EvidenceTests(unittest.TestCase):
                         apks={"aegentica-ai-core.apk": {}, "aegentica-ai-nano.apk": {}})
             (self.root / "release-evidence.json").write_text(json.dumps(meta))
             with self.assertRaisesRegex(ValueError, "Artifact mismatch"): verify(self.root)
+
+    def test_unlisted_files_and_symlinks_block_before_apk_parsing(self):
+        required = {f"{prefix}-{flavor}.apk" for prefix in ("aegentica-ai", "pixel-surface-lab") for flavor in ("core", "nano")}
+        required |= {f"screenshots/{name}.png" for name in REQUIRED_SHOTS}
+        required |= {"review.html", "reports/apk-signature-core.txt", "reports/apk-signature-nano.txt"}
+        for name in required:
+            path = self.root / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(b"fixture")
+        meta = dict(schema=1, source_sha="a" * 40,
+                    files={name: digest(self.root / name) for name in required},
+                    apks={"aegentica-ai-core.apk": {}, "aegentica-ai-nano.apk": {}})
+        (self.root / "release-evidence.json").write_text(json.dumps(meta))
+        (self.root / "SHA256SUMS").write_text("")
+        extra = self.root / "accidental-private-export.json"
+        extra.write_text("must not ship")
+        with self.assertRaisesRegex(ValueError, "unlisted files"): verify(self.root)
+        extra.unlink()
+        link = self.root / "review.html"
+        link.unlink(); link.symlink_to(self.root / "aegentica-ai-core.apk")
+        with self.assertRaisesRegex(ValueError, "symbolic links"): verify(self.root)
 
     def test_missing_apk_inventory_blocks(self):
         (self.root / "release-evidence.json").write_text(json.dumps(dict(schema=1, source_sha="a" * 40, apks={})))

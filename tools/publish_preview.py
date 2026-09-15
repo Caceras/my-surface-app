@@ -36,6 +36,18 @@ def verify_download(repo, tag, assets):
                 raise ValueError(f"Published download mismatch: {path.name}")
 
 
+def current_head(repo, branch, sha):
+    return json.loads(gh("api", f"repos/{repo}/git/ref/heads/{branch}"))["object"]["sha"] == sha
+
+
+def report_download(meta, url, rolling_updated):
+    with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+        out.write(f"\n## Verified download\n\n[Install Ægentica AI build {meta['build']}]({url})\n\n"
+                  "Build assets were downloaded and compared by SHA-256. Build-specific release retained for rollback.\n"
+                  + ("Rolling assets also verified.\n" if rolling_updated else "Branch advanced; rolling preview left unchanged.\n"))
+    print(url)
+
+
 def main():
     folder = Path("dist/evidence")
     meta = verify(folder)
@@ -44,8 +56,7 @@ def main():
         raise ValueError("Build provenance does not match publication")
     if meta["build"] != int(os.environ["GITHUB_RUN_NUMBER"]) or meta["attempt"] != int(os.environ["GITHUB_RUN_ATTEMPT"]):
         raise ValueError("Build attempt does not match publication")
-    head = json.loads(gh("api", f"repos/{repo}/git/ref/heads/{branch}"))["object"]["sha"]
-    if head != sha:
+    if not current_head(repo, branch, sha):
         print("Branch advanced; preserving the newer preview. This run's evidence remains in Actions.")
         return
     slug = re.sub(r"[^a-z0-9._-]+", "-", branch.lower()).strip("-")
@@ -63,9 +74,12 @@ def main():
     assets = [*sorted(folder.glob("*.apk")), folder / "release-evidence.json", folder / "SHA256SUMS", bundle]
     url = f"https://github.com/{repo}/releases/download/{tag}/aegentica-ai-nano.apk"
     notes = folder.parent / "release-notes.md"
+    changes = (Path(__file__).resolve().parents[1] / "docs/preview-notes.md").read_text().replace("# Current preview changes", "## What changed", 1)
     notes.write_text(f"""Ægentica AI **3.0.{meta['build']}-nano** · Æ signum · sky-blue native Android assistant.
 
 [Download Nano for your Pixel]({url})
+
+{changes}
 
 Source: `{sha}` · [CI evidence](https://github.com/{repo}/actions/runs/{meta['run_id']}).
 JVM: **{meta['tests']['tests']} passed**, no skipped tests. Both flavor APKs and Android lint passed.
@@ -88,6 +102,11 @@ Legacy pixel-surface-lab APK names are identical aliases. This is a personal pre
     # A retry must never silently replace a previously published build.
     verify_download(repo, tag, assets)
     gh("release", "edit", tag, "--repo", repo, "--draft=false")
+    # A newer push may arrive during upload. Keep the verified unique download,
+    # but do not promote an obsolete candidate to the convenient rolling alias.
+    if not current_head(repo, branch, sha):
+        report_download(meta, url, False)
+        return
     existing = release(repo, rolling)
     if not existing:
         gh("release", "create", rolling, "--repo", repo, "--target", sha, *( ["--latest=true"] if branch == "main" else ["--prerelease", "--latest=false"] ),
@@ -98,10 +117,8 @@ Legacy pixel-surface-lab APK names are identical aliases. This is a personal pre
            input_data=json.dumps(dict(sha=sha, force=True)))
         gh("release", "edit", rolling, "--repo", repo, "--target", sha,
            "--title", f"Ægentica AI preview · build {meta['build']}", "--notes-file", str(notes))
-    verify_download(repo, rolling, assets[:4])
-    with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
-        out.write(f"\n## Verified download\n\n[Install Ægentica AI build {meta['build']}]({url})\n\nRelease assets were downloaded and compared byte-for-byte by SHA-256. Build-specific release retained for rollback.\n")
-    print(url)
+    verify_download(repo, rolling, assets)
+    report_download(meta, url, True)
 
 
 if __name__ == "__main__":

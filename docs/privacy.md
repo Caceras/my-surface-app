@@ -48,3 +48,5 @@ Speech's foreground MediaSession publishes only a generic Ægentica AI label, no
 Use redacted screenshots, dummy conversations, and the build number when reporting bugs. Do not attach a full export to a public GitHub issue if it contains personal or client information. No vulnerability-reporting SLA or production security certification is claimed for this preview.
 
 Search and native action fields request the same no-personalized-learning IME flag as the composer. Settings, History and Actions stop hidden microphone/generation work before opening. CI evidence uses deterministic fixture text and never captures your live conversations.
+
+**Copy app info** is an explicit local clipboard action. Its allowlist contains version, version code, package, manufacturer/model, Android release/API and app-language tags. It does not read chat storage, record audio, collect unique device identifiers or upload anything. Clipboard handling uses the same sensitive-preview metadata as answer copies.

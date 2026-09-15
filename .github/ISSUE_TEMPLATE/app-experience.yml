@@ -43,5 +43,5 @@ body:
   - type: textarea
     id: evidence
     attributes:
-      label: Redacted evidence
-      description: Optional screenshot, exact message, or CI/build-specific release link. Do not attach private exports.
+      label: App info and redacted evidence
+      description: Paste Settings → Help & feedback → Copy app info. Add an optional screenshot, exact message, or build-specific release link. Do not attach private exports.

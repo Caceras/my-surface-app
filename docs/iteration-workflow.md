@@ -1,6 +1,6 @@
 # Iteration workflow and audit
 
-September 14, 2026 · Ægentica AI · Applies to `improve-pixel-assistant`.
+September 15, 2026 · Ægentica AI · Applies to `improve-pixel-assistant`.
 
 ## Goal and boundary
 
@@ -40,7 +40,7 @@ flowchart TD
 1. **Establish the source.** Read branch HEAD and local status; preserve unrelated edits. Use the existing feature branch and draft PR. Capture a fresh baseline when evaluating the actual product flow. A PR-only test rerun can capture without republishing old APKs.
 2. **Define the failure.** Record the affected flow, expected/actual behavior and a concrete acceptance check. Separate visual evidence from lifecycle behavior, which needs a test or device reproduction.
 3. **Implement one coherent batch.** Reuse `Design.kt`, shared navigation pause behavior, native controls and data contracts. Add focused regression tests for meaningful failure modes. Do not add features solely because an Android API exists.
-4. **Run `python tools/check.py`.** This runs resource/source checks, checker regressions, documentation links and release-evidence tests. Fix the first concrete failure, then rerun. Android validation runs in the pinned SDK environment.
+4. **Run `python tools/check.py`.** This runs resource/source checks, checker regressions, documentation links, release-evidence tests and publication regressions. Fix the first concrete failure, then rerun. Android validation runs in the pinned SDK environment.
 5. **Inspect CI evidence.** The Android quality job runs tests, lint and both builds together. Download **aegentica-evidence**, run `python tools/release_evidence.py verify <directory>`, and open `review.html`. Inspect affected states and their light/dark/size variants. Failing runs expose **android-diagnostics**; rerun infrastructure failures once after identifying them, rather than hiding flaky behavior with blind retries.
 6. **Verify the handoff.** Push runs publish a unique release only after mechanical gates pass. CI compares downloaded release bytes before updating compatibility URLs. Read the job summary for the new APK link and match the installed build in Settings. Use the unique link in user handoffs.
 7. **Close the feedback loop.** Record visual acceptance and material limitations in the PR. On Pixel, run the relevant checks in [testing](testing.md). Turn a device failure into a redacted issue and regression where practical, not an unbounded rewrite.
@@ -69,3 +69,13 @@ The package tool rejects incomplete evidence and stale non-empty destinations. P
 Least-privilege tokens follow [GitHub's authentication guidance](https://docs.github.com/en/actions/tutorials/authenticate-with-github_token). Pinned action versions were checked against the official [checkout](https://github.com/actions/checkout/releases), [setup-java](https://github.com/actions/setup-java/releases), [upload-artifact](https://github.com/actions/upload-artifact/releases), [download-artifact](https://github.com/actions/download-artifact/releases) and [Gradle actions](https://github.com/gradle/actions/releases) repositories. Native switches retain the [Android Switch API](https://developer.android.com/reference/android/widget/Switch) interaction model.
 
 Both APKs also pass Android `apksigner verify`; certificate fingerprints are retained in the evidence bundle. This proves signature integrity, not continuity with a previously installed preview key.
+
+## This release: smoother feedback and safer overlap
+
+Update [current preview changes](preview-notes.md) in the same source batch as the implementation. The publisher inserts that tracked text into both release descriptions, so the install link explains what to try. In Settings, **Help & feedback → Copy app info** produces an explicit metadata allowlist; paste it with reproduction steps. It does not send an issue automatically or include conversations. Add AICore version and selected speech language manually when relevant; app language is not necessarily recognition language.
+
+Preflight and Android quality each cancel superseded jobs for the same ref. Publication has its own concurrency group with cancellation disabled: an active upload finishes, while a newer candidate waits. A pending job can be replaced by a newer pending candidate. The publisher checks branch HEAD at entry and again after verifying the unique build, before touching rolling assets. A push during final alias operations can briefly leave an older verified preview; serialization lets the next passing publisher replace it. This is not atomic promotion or guaranteed queue ordering. Manual cancellation, timeout and network failure can still interrupt publication; the unique build remains the handoff.
+
+Every rolling asset is downloaded and checked, including metadata and the ZIP. Bundle verification also rejects unlisted files and symlinks before publishing. SDK-free publication tests exercise stale candidates, provenance mismatch, failed download, draft repair, public-release immutability and rerun suffixes. They model the orchestration; the real push job provides live upload evidence.
+
+Concurrency follows [GitHub's job concurrency contract](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency). Form submission uses [Android's editor action callback](https://developer.android.com/reference/android/widget/TextView.OnEditorActionListener).

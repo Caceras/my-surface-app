@@ -86,3 +86,7 @@ Settings such as speech language, privacy options and the read-aloud preference 
 | Share/selection action absent | The source app must expose plain text and support Android's relevant action |
 
 For a useful bug report, include the build, Android version, speech language, observed behavior, and reproducible steps. Remove private text from screenshots and exports.
+
+## Reporting a problem
+
+In **Settings → Help & feedback**, tap **Copy app info**. Paste it with the exact steps and message. It includes app version/package, phone model, Android and app language, with no chats, drafts, recordings or device serial. Add selected speech language, AICore version and speaker/headset manually for voice issues. Nothing is sent automatically.
