@@ -824,8 +824,9 @@ class MainActivity : Activity() {
                 hushPlayback()
                 if (input.text.isBlank()) input.setText(text)
                 answer.setOnClickListener(null)
-                messages.addView(pill("Edit question") { editQuestion(text) },
-                    messages.indexOfChild(answer) + 1, LinearLayout.LayoutParams(-2, -2))
+                messages.addView(LinearLayout(this).apply {
+                    addView(pill("Edit question") { editQuestion(text) })
+                }, messages.indexOfChild(answer) + 1, LinearLayout.LayoutParams(-2, -2))
             }
             scrollToEnd()
         }
@@ -949,11 +950,11 @@ class MainActivity : Activity() {
                 addView(flatButton("Copy") {
                     NativePrivacy.copy(this@MainActivity, "Answer", text)
                     Toast.makeText(this@MainActivity, "Copied", Toast.LENGTH_SHORT).show()
-                }.apply { padDp(12, 10, 18, 10) })
+                }.apply { padDp(4, 10, 18, 10) })
                 addView(flatButton("Share") {
                     startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
                         .putExtra(Intent.EXTRA_TEXT, text), getString(R.string.share_answer)))
-                }.apply { padDp(12, 10, 12, 10) })
+                }.apply { padDp(4, 10, 12, 10) })
             }, parent.indexOfChild(bubble) + 1)
         }
         bubble.setOnLongClickListener {

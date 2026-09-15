@@ -64,6 +64,10 @@ fun suggestionButton(context: Context, text: String, onTap: () -> Unit) =
         this.text = text
         textSize = 13f
         isAllCaps = false
+        setTextColor(context.ink(R.color.text_primary))
+        background = android.graphics.drawable.RippleDrawable(
+            android.content.res.ColorStateList.valueOf(context.ink(R.color.outline)),
+            context.surface(R.color.chip_bg, 24), null)
         minHeight = context.dp(48)
         minimumHeight = context.dp(48)
         setPadding(context.dp(14), 0, context.dp(14), 0)

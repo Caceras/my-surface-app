@@ -120,9 +120,11 @@ class DeepAuditTest {
         tap(activity.window.decorView, "Edit question")
         assertEquals("New draft", input.text.toString())
         latest().getButton(AlertDialog.BUTTON_NEGATIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
         assertEquals("New draft", input.text.toString())
         tap(activity.window.decorView, "Edit question")
         latest().getButton(AlertDialog.BUTTON_POSITIVE).performClick()
+        shadowOf(Looper.getMainLooper()).idle()
         assertEquals("Original question", input.text.toString())
         assertEquals(1, brain.runs)
     }

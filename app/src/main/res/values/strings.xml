@@ -20,7 +20,7 @@
     <string name="ask_hint">Ask anything about the selected text</string>
     <string name="send">Send</string>
     <string name="cancel">Cancel</string>
-    <string name="ask_title">Ask Nano</string>
+    <string name="ask_title">Ask about this text</string>
 
     <!-- The chat screen. -->
     <string name="chat_hint">What is on your mind?</string>

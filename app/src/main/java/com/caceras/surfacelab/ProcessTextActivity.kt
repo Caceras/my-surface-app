@@ -143,6 +143,19 @@ class ProcessTextActivity : Activity() {
             }
         }
 
+        val validation = label("", 13f, true).apply {
+            tag = "selection-error"
+            visibility = android.view.View.GONE
+            accessibilityLiveRegion = android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
+            padDp(0, 8, 0, 4)
+        }
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (!s.isNullOrBlank()) { validation.visibility = android.view.View.GONE; input.error = null }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             padDp(20, 12, 20, 0)
@@ -150,6 +163,7 @@ class ProcessTextActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ))
+            addView(validation)
             addView(HorizontalScrollView(this@ProcessTextActivity).apply {
                 isHorizontalScrollBarEnabled = false
                 addView(chips)
@@ -165,10 +179,16 @@ class ProcessTextActivity : Activity() {
             .setOnDismissListener { if (dialog != null) finish() }
             .show()
         NativePrivacy.apply(this, dialog?.window)
+        fun invalid(message: String) {
+            input.error = message
+            validation.text = message
+            validation.visibility = android.view.View.VISIBLE
+            input.requestFocus()
+        }
         dialog?.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
             when {
-                listening -> { ears.stop(); input.error = "Finish dictation, review your words, then send." }
-                input.text.isBlank() -> { input.error = "What would you like to know about this text?"; input.requestFocus() }
+                listening -> { ears.stop(); invalid("Finish dictation, review your words, then send.") }
+                input.text.isBlank() -> { invalid("What would you like to know about this text?") }
                 !active -> send(input.text.toString())
             }
         }
