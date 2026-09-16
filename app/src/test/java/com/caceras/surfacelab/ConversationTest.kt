@@ -71,7 +71,7 @@ class ConversationTest {
         Chat.saveDraft(context, "Current draft")
         val backup = Chat.backup(context)
         assertEquals("Current draft", Chat.readBackup(backup).second)
-        context.getSharedPreferences("surfacelab", 0).edit().remove("conversations").apply()
+        Chat.clearArchives(context)
         Chat.restoreArchives(context, backup)
         assertEquals("Follow up", Chat.archives(context).single().draft)
         assertEquals(emptyList<Turn>(), Chat.readBackup("""{"format":"surface-chat-v1","turns":[],"draft":""}""").first)

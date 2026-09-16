@@ -47,11 +47,13 @@ class SurfaceWidgetProvider : AppWidgetProvider() {
     }
 
     internal fun views(context: Context, compact: Boolean): RemoteViews {
-        val last = if (NativePrivacy.widgetPreview(context)) ResultStore.lastText(context)?.let { Markdown.strip(it) } else null
+        val last = if (NativePrivacy.widgetPreview(context)) WorkspaceStore(context).use { it.list().firstOrNull { r -> r.pinned }?.let { r -> r.title + "\n" + r.body } }
+            ?: ResultStore.lastText(context)?.let { Markdown.strip(it) } else null
         val value = last?.let { if (it.length > 160) it.take(157) + "…" else it } ?: context.getString(R.string.widget_empty)
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val pending = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP), flags)
+        val capture = PendingIntent.getActivity(context, 2, WorkspaceActivity.intent(context,"library").putExtra("capture",true),flags)
         val talk = PendingIntent.getActivity(context, 1, Intent(context, VoiceActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), flags)
         return RemoteViews(context.packageName, if (compact) R.layout.widget_compact else R.layout.widget).apply {
@@ -60,7 +62,9 @@ class SurfaceWidgetProvider : AppWidgetProvider() {
             setContentDescription(R.id.widget_type, "Open Ægentica AI chat")
             setContentDescription(R.id.widget_talk, "Open Ægentica AI voice")
             setOnClickPendingIntent(R.id.widget_root, pending)
-            setOnClickPendingIntent(R.id.widget_type, pending)
+            setTextViewText(R.id.widget_type, "Capture")
+            setContentDescription(R.id.widget_type, "Capture a note")
+            setOnClickPendingIntent(R.id.widget_type, capture)
             setOnClickPendingIntent(R.id.widget_talk, talk)
         }
     }

@@ -30,7 +30,7 @@ object Chat {
     const val MAX_BACKUP_BYTES = 4_000_000
 
     fun load(context: Context): MutableList<Turn> {
-        val raw = prefs(context).getString(KEY, null) ?: return mutableListOf()
+        val raw = content(context, KEY).ifBlank { return mutableListOf() }
         val turns = mutableListOf<Turn>()
         try {
             val array = JSONArray(raw)
@@ -51,20 +51,20 @@ object Chat {
         turns.takeLast(KEEP).forEach {
             array.put(JSONObject().put("q", it.you).put("a", it.reply))
         }
-        prefs(context).edit().putString(KEY, array.toString()).apply()
+        putContent(context, KEY, array.toString())
     }
 
     fun clear(context: Context) {
-        prefs(context).edit().remove(KEY).apply()
+        putContent(context, KEY, "")
     }
 
     fun append(context: Context, turn: Turn) {
         save(context, load(context) + turn)
     }
 
-    fun draft(context: Context): String = prefs(context).getString("draft", "").orEmpty()
+    fun draft(context: Context): String = content(context, "draft")
     fun saveDraft(context: Context, text: String) {
-        prefs(context).edit().putString("draft", text).apply()
+        putContent(context, "draft", text)
     }
 
     fun speakReplies(context: Context): Boolean = prefs(context).getBoolean("speak_replies", false)
@@ -85,7 +85,7 @@ object Chat {
     }
 
     fun archives(context: Context): List<SavedConversation> = runCatching {
-        val parsed = parseArchives(JSONArray(prefs(context).getString("conversations", "[]")), validateIds = false)
+        val parsed = parseArchives(JSONArray(content(context, "conversations", "[]").ifBlank { "[]" }), validateIds = false)
         uniqueIds(parsed).also { if (it != parsed) writeArchives(context, it) }
     }.getOrDefault(emptyList())
 
@@ -109,7 +109,7 @@ object Chat {
     }
 
     fun clearArchives(context: Context) {
-        prefs(context).edit().remove("conversations").apply()
+        putContent(context, "conversations", "[]")
     }
 
     fun openArchive(context: Context, id: String): Boolean {
@@ -133,7 +133,7 @@ object Chat {
             val size = row.toString().length
             if (rows.length() == 0 || used + size <= 512_000) { rows.put(row); used += size }
         }
-        prefs(context).edit().putString("conversations", rows.toString()).apply()
+        putContent(context, "conversations", rows.toString())
     }
 
     /** Portable backup chosen through Android's file picker; no storage permission. */
@@ -141,7 +141,7 @@ object Chat {
         .put("format", "surface-chat-v1")
         .put("turns", JSONArray().apply { load(context).forEach { put(JSONObject().put("q", it.you).put("a", it.reply)) } })
         .put("draft", draft(context))
-        .put("conversations", JSONArray(prefs(context).getString("conversations", "[]"))).toString().also {
+        .put("conversations", JSONArray(content(context, "conversations", "[]").ifBlank { "[]" })).toString().also {
             require(it.toByteArray(Charsets.UTF_8).size <= MAX_BACKUP_BYTES) {
                 "This backup is too large. Shorten the draft or remove saved conversations, then export again."
             }
@@ -177,6 +177,9 @@ object Chat {
             if (id == chat.id) chat else chat.copy(id = id)
         }
     }
+
+    private fun content(context: Context, key: String, fallback: String = "") = WorkspaceStore(context).use { it.value(key, fallback) }
+    private fun putContent(context: Context, key: String, value: String) { WorkspaceStore(context).use { it.put(key, value) }; prefs(context).edit().remove(key).apply() }
 
     private fun prefs(context: Context) = context.applicationContext
         .getSharedPreferences(PREFS, Context.MODE_PRIVATE)

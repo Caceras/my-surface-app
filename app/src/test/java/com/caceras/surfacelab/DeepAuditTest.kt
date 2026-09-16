@@ -182,7 +182,7 @@ class DeepAuditTest {
 
     @Test fun `legacy stored ID collisions are repaired once without hiding history`() {
         val raw = JSONArray().put(archive("same", "One")).put(archive("same", "Two")).put(archive("", "Three"))
-        context.getSharedPreferences("surfacelab", 0).edit().putString("conversations", raw.toString()).commit()
+        WorkspaceStore(context).use { it.put("conversations", raw.toString()) }
         val saved = Chat.archives(context)
         assertEquals(3, saved.size)
         assertEquals(3, saved.map { it.id }.distinct().size)

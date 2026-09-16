@@ -617,7 +617,8 @@ def check_kotlin_strings(project, problems):
                 if raw:
                     continue
 
-                code = re.sub(r"//.*", "", code)
+                code = re.sub(r'"(?:\\.|[^"\\])*"|//.*',
+                              lambda match: match.group(0) if match.group(0).startswith('"') else "", code)
                 code = re.sub(r"\\.", "", code)      # escapes, including \"
                 code = re.sub(r"'.'", "", code)      # the char literal '"'
                 if code.count('"') % 2 == 1:

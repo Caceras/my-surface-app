@@ -31,3 +31,8 @@ object NativePrivacy {
 
 fun android.app.AlertDialog.Builder.showProtected(context: Context): android.app.AlertDialog =
     show().also { NativePrivacy.apply(context, it.window) }
+
+fun <T : android.app.Dialog> T.showProtected(context: Context): T = apply {
+    show()
+    NativePrivacy.apply(context, window)
+}

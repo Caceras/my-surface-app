@@ -8,6 +8,7 @@ import android.graphics.drawable.Icon
 import android.widget.Toast
 
 object NativeShortcuts {
+    const val CAPTURE = "com.caceras.surfacelab.OPEN_CAPTURE"
     const val HISTORY = "com.caceras.surfacelab.OPEN_HISTORY"
     const val ACTIONS = "com.caceras.surfacelab.OPEN_ACTIONS"
     fun pin(activity: Activity, voice: Boolean) {

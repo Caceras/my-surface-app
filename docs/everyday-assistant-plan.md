@@ -1,6 +1,6 @@
 # Ægentica AI: everyday assistant plan
 
-16 September 2026 · Proposed direction, not shipped functionality. Builds on the native Android preview and [capability inventory](android-native-plan.md).
+16 September 2026 · Implementation now underway; see the delivery status below and [everyday guide](everyday-workspace.md). Builds on the native Android preview and [capability inventory](android-native-plan.md).
 
 ## Product promise
 
@@ -10,11 +10,11 @@ Success is a reliable daily loop: dictate an idea, keep the original, turn part 
 
 ## Three destinations
 
-- **Today:** a restrained agenda, due tasks and items the user has chosen to revisit. Useful empty state with Capture and Ask; no decorative dashboard full of empty cards.
-- **Ask:** the existing assistant, now able to work with explicitly selected notes, projects and connected sources. Typing, dictation and playback share one thread and editable draft.
+- **Today:** a restrained agenda, due tasks and items the user has chosen to revisit. Useful empty state with Capture and AI; no decorative dashboard full of empty cards.
+- **AI:** the existing assistant, now able to work with explicitly selected notes, projects and connected sources. Typing, dictation and playback share one thread and editable draft.
 - **Library:** notes, people, projects and user-created collections. Search first. List and table are views of the same records; relations appear as useful links and backlinks before any optional graph visualization.
 
-Capture is available everywhere through a shared composer and explicit **Save note / Ask** action. Preserve the last intentional mode and show it clearly. Saving a note never depends on model availability or guesses about intent. Long-press microphone can be considered only as an optional shortcut after the visible tap controls work well.
+Capture is available everywhere through a shared composer and explicit **Save note / AI** action. Preserve the last intentional mode and show it clearly. Saving a note never depends on model availability or guesses about intent. Long-press microphone can be considered only as an optional shortcut after the visible tap controls work well.
 
 ## End-to-end example
 
@@ -83,4 +83,12 @@ Preserve generous typography and sky-blue restraint, but trade the static welcom
 
 Create and edit notes without AI or network; autosave survives recreation/process death; text and dictated input merge without overwriting a newer edit; pin/search/trash/undo work; saving an answer creates a source-linked note; exports round-trip existing chats plus notes; widget sizes waste no large empty region in the tested states. Inspect real native renders, run focused data/lifecycle regressions plus the full candidate gate, then publish an exact Nano build and record physical Pixel checks separately. Do not add a new regression solely for a copy or spacing edit.
 
-This is the proposed roadmap. It introduces no permissions, hosted service, messaging access, migration or new APK by itself.
+The initial planning commit introduced no runtime changes. The following implementation now adds optional permissions, SQLite migration and the explicitly configured connected model client; it does not provision a hosted account or remote service.
+
+## Implementation status
+
+The current implementation introduces all six areas as one native workspace: notes/search/migration, sentence-based background reading, tasks/calendar/reminders, experimental Beeper, linked collections/typed fields, and local plus opt-in connected routines. The navigation destination is **AI**, as requested. Native checks and the published candidate record establish what has been verified; do not treat this section as physical-device approval.
+
+The scope is deliberately explicit: existing hands-free Voice continues with Nano; the typed/dictated composer supports connected AI. No alpha speech SDK replacement was made without Pixel evaluation. Tables support typed values and membership, but not formulas, saved per-column filters or an arbitrary query builder. Search uses full-text indexing and selected context; there is no vector index or automatic memory extraction. Attachments, sync and graph visualization remain future extensions. External account/key setup, Beeper availability, device acceptance and signing continuity cannot be supplied by app source code.
+
+See [everyday workspace](everyday-workspace.md) for actual controls, limits, privacy and recovery behavior. The original sections above explain intent; where behavior differs, the everyday guide describes this implementation.

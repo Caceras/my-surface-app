@@ -2,7 +2,9 @@
 
 **A little clarity. A little possibility.**
 
-A native Android assistant for typing, talking, thinking things through, and opening useful actions on your phone. Ægentica AI uses Gemini Nano through Android AICore, with on-device dictation and spoken replies. No account or API key is required.
+A native Android workspace for **Today · AI · Library**: capture notes, connect ideas, plan your day, and think by typing or speaking. Gemini Nano, dictation, notes and local reminders need no account. Optional connected AI and scheduled generation use your own provider; calendar and Beeper access are explicit choices.
+
+**[Everyday guide](docs/everyday-workspace.md)** · [Implementation and limits](docs/everyday-assistant-plan.md)
 
 [![Android checks](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg?branch=improve-pixel-assistant)](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-70CEFA.svg)](LICENSE)
@@ -12,6 +14,11 @@ A native Android assistant for typing, talking, thinking things through, and ope
 > This is the **Ægentica AI** app on `improve-pixel-assistant`. The main branch and `/releases/latest` may contain an older experience. This preview is not a Play Store release. Export your conversations before any reinstall.
 
 ## The experience
+
+- **Capture and remember.** Autosaved notes, originals, full-text search, pinning, Trash/undo and whole-workspace backups.
+- **Connect ideas.** People, projects, linked tasks and collections with typed fields and a table view over the same records.
+- **Plan your day.** Selected-calendar agenda, reviewed reminders, local AI routines and separately approved connected routines.
+- **Read while walking.** Sentence highlighting, playback speed, pause/resume and native background media controls.
 
 - **Write naturally.** A roomy composer, editable dictation, and conversation context for follow-up questions.
 - **Talk and listen.** Pause to send in Voice, hear sentences as they become available, and enable **Keep talking** for a continuous foreground session.
@@ -50,18 +57,18 @@ The Pixel 10 Pro XL is listed in Google's Prompt API support table. Availability
 | Pixel Quick Tap | Opens chat with a back-of-phone double tap | Android Settings → System → Gestures → Quick Tap → Open app |
 | Assistant gesture | Opens Voice where Android supports the selected assistant | Settings → Set as digital assistant |
 | Quick Settings | Opens Voice, with setup and Type available | Add the app tile from Android's tile editor |
-| Home widget | Type/Talk; last-answer preview only when enabled | Settings → Add home screen widget |
-| Launcher shortcuts | Chat, Voice, History and Actions; Chat/Voice can be pinned | Long-press the launcher icon |
+| Home widget | Capture/Talk; pinned-note or last-answer preview only when enabled | Settings → Add home screen widget |
+| Launcher shortcuts | Chat, Voice, History and Capture note; Chat/Voice can be pinned | Long-press the launcher icon |
 | Share sheet | Stages shared **plain text** in the composer for review | Share text → Ægentica AI |
 | Text selection | Ask, Summarise, Proofread, or Make professional in the Nano build | Select text in a supporting app → overflow menu |
 
-Ægentica AI does not implement a wake word, autonomous phone automation, background inference, web browsing, Wear OS, or Android Auto. It sees other apps' text only when explicitly shared or selected. [Ægentica AI behavior and limits](docs/surfaces.md).
+Ægentica AI does not implement a wake word, autonomous phone automation, background Nano inference, web browsing, Wear OS, or Android Auto. Calendar and Beeper are optional permission-gated integrations. Background connected routines require explicit provider and routine approval. [Ægentica AI behavior and limits](docs/surfaces.md).
 
 ## Private, with clear boundaries
 
-Inference and speech use on-device APIs. Ægentica AI does not implement a cloud fallback or its own analytics service. System services still manage downloads and have their own policies; “on-device” does not mean the phone never uses a network.
+Nano and speech use on-device APIs by default. Connected AI is explicitly configured and sends scoped input to your chosen provider; it is never a silent fallback. There is no app analytics service. System services manage initial downloads and have their own policies.
 
-Chats and drafts are stored in app-private preferences. Up to 40 completed exchanges are kept in the current chat, and up to 12 recent conversations are archived within a soft size budget. Uninstalling removes local data. Manual exports are readable JSON and can include sensitive text; the file location and any syncing are controlled by the document provider you choose. Widget answer previews are off by default. Private screen can hide Recents previews and block screenshots; clipboard copies carry sensitive-preview metadata. [Privacy and data guide](docs/privacy.md).
+Notes, relationships, typed fields, chats and drafts are stored in app-private SQLite. Settings and encrypted provider configuration are separate. Notes have no automatic archive eviction. Up to 40 completed exchanges are kept in the current chat, and up to 12 recent conversations are archived within a soft size budget. Uninstalling removes local data. Manual exports are readable JSON and can include sensitive text; the file location and any syncing are controlled by the document provider you choose. Widget content previews are off by default. Whole-workspace exports use a separate versioned JSON format; credentials are excluded. Private screen can hide Recents previews and block screenshots; clipboard copies carry sensitive-preview metadata. [Privacy and data guide](docs/privacy.md).
 
 ## Build and test
 
@@ -88,7 +95,8 @@ APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots
 | Guide | Covers |
 |---|---|
 | [Test/process audit](docs/audits/iteration-efficiency.md) | Test necessity, measured CI costs, request-to-install gaps and fixes |
-| [Everyday assistant plan](docs/everyday-assistant-plan.md) | Proposed notes, unified voice, calendar, Beeper and linked knowledge roadmap |
+| [Everyday guide](docs/everyday-workspace.md) | Notes, tables, sources, playback, calendar, Beeper, connected routines and backups |
+| [Everyday assistant plan](docs/everyday-assistant-plan.md) | Product direction, delivery status and remaining acceptance boundaries |
 | [Iteration workflow](docs/iteration-workflow.md) | Pipeline audit, automated evidence, verified releases and feedback loop |
 | [Deep audit and fixes](docs/audits/2026-09-15.md) | Prioritized repair register, current flow evidence and open acceptance gates |
 | [Cohesion audit](docs/cohesion-audit.md) | Current cross-flow fixes, fresh baseline and remaining device gates |

@@ -1,5 +1,7 @@
 # On-device AI
 
+> **Everyday workspace update:** [Current behavior and limits](everyday-workspace.md) covers Today · AI · Library, SQLite migration, notes/relations/tables, explicit background reading, calendar/Beeper access and optional connected AI/routines. Earlier foreground-only and preferences-only descriptions below apply to the original chat/Voice path unless updated here.
+
 Ægentica AI's Nano flavor uses `com.google.mlkit:genai-prompt:1.0.0-beta4`, pinned in `app/build.gradle.kts`. The core flavor does not contain an AI model.
 
 ## Runtime behavior

@@ -4,6 +4,15 @@
     <!-- Asked for at the moment the microphone is first tapped, never on
          launch. Audio is transcribed on this phone and never written down. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="com.beeper.android.permission.READ_PERMISSION" />
+    <uses-permission android:name="com.beeper.android.permission.SEND_PERMISSION" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
     <!--
@@ -12,6 +21,7 @@
         fail to bind, silently, with nothing in the log worth reading.
     -->
     <queries>
+        <provider android:authorities="com.beeper.api" />
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
@@ -32,6 +42,18 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Chat">
 
+        <activity android:name=".WorkspaceActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ReadingActivity" android:exported="false" />
+        <service android:name=".ReadingService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+        <service android:name=".RoutineJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
+        <receiver android:name=".ReminderReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <activity
             android:name=".MainActivity"
             android:theme="@style/Launch"

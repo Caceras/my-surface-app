@@ -1,5 +1,7 @@
 # Testing and release checks
 
+> **Everyday workspace update:** [Current behavior and limits](everyday-workspace.md) covers Today · AI · Library, SQLite migration, notes/relations/tables, explicit background reading, calendar/Beeper access and optional connected AI/routines. Earlier foreground-only and preferences-only descriptions below apply to the original chat/Voice path unless updated here.
+
 ## Reproduce CI
 
 Use JDK 21, Gradle 9.7.1, Android SDK platform 36 and build-tools 36.0.0. Configure `ANDROID_HOME` or a local `sdk.dir` in `local.properties`. The Gradle version is pinned in CI; this repository does not contain a wrapper.
@@ -96,3 +98,9 @@ Use the [current register](audits/2026-09-15.md) as the canonical list. New regr
 The [efficiency audit](audits/iteration-efficiency.md) records the 156-test baseline, three retired constant/wording checks, three selection checks consolidated into one, strengthened status validation and role-based chat selectors. The resulting suite has 151 cases; count itself is not a gate. All 22 native capture cases remain. `reports/test-cost.json` records measured suite and slow-case times on each full run; initialization is included, and this is advisory rather than a timing threshold.
 
 Documentation-only changes run preflight. Canonical same-repository draft preview PRs rely on the push candidate gate; ready-for-review triggers merge-result Android validation. Other branches/forks keep PR validation. Unknown paths or unavailable diffs choose the full gate. Workflow dispatch forces full validation without publication. Full releases never use a selectively filtered test result. Gradle declares screenshots as test outputs so cached XML cannot silently omit its PNGs.
+
+## Everyday workspace acceptance
+
+`WorkspaceTest` covers transactional migration, revision conflicts, originals, Swedish search/trash, relational backup roundtrips, import rollback/conflicts, cascading deletion, DST recurrence, execution deduplication, selected AI context, URI encoding, sentence segmentation and note recreation. Native fixtures cover Today, Library, an edited note and a narrow dark/large-font workspace. Their data is synthetic. Existing 151 tests remain, with parser fixtures pointed at the new canonical store; no failing assertion should be removed merely because storage moved.
+
+On Pixel: export first; install and verify version; create/dictate/edit a note; rotate/reopen; link it to a project/collection; edit a typed field; export/restore; inspect selected AI context; listen with screen locked and unplug headphones; set/complete/snooze a reminder; allow/revoke a selected calendar; inspect Beeper availability and a reviewed draft. Only send to a recipient you explicitly choose. Test connected AI with your own provider and spending cap, then one harmless routine; test disabling, permission revocation, offline delivery and reboot. No real user data belongs in CI.

@@ -78,6 +78,7 @@ class MainActivity : Activity() {
     private var busy = false
     private var requestId = 0
     private var pendingQuestion = ""
+    private var routineRun = ""
     private var pendingAnswer: TextView? = null
     private var listenDraft = ""
     private var speakReplies = false
@@ -114,13 +115,14 @@ class MainActivity : Activity() {
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))
         root.addView(composer(), wide())
+        root.addView(workspaceNavigation("ai"), wide())
 
         setContentView(AdaptiveFrame(this, root).apply { padForSystemBars() })
         root.isFocusableInTouchMode = true
         root.requestFocus()
         readableSystemBars()
 
-        brain.status(this) { if (!gone && !busy) status.text = it.label }
+        brain.status(this) { if (!gone && !busy) status.text = if(ConnectedAI.enabled(this)) "Connected AI · " + ConnectedAI.host(this) else it.label }
 
         restoreHistory()
         askedAloud = savedInstanceState?.getBoolean("aloud") ?: false
@@ -154,10 +156,14 @@ class MainActivity : Activity() {
     }
 
     private fun acceptIntent(intent: Intent?) {
+        if(intent?.getBooleanExtra("workspaceDraft",false)==true) input.setText(Chat.draft(this))
         when (intent?.action) {
+            NativeShortcuts.CAPTURE -> startActivity(WorkspaceActivity.intent(this,"library").putExtra("capture",true))
             NativeShortcuts.HISTORY -> input.post { if (!gone) showConversations() }
             NativeShortcuts.ACTIONS -> input.post { if (!gone) showActions() }
         }
+        if (intent?.getBooleanExtra("settings", false) == true) input.post { if (!gone) showSettings(Brains.get()) }
+        if (intent?.getBooleanExtra("capture", false) == true) startActivity(WorkspaceActivity.intent(this, "library").putExtra("capture", true))
         if (intent?.action == Intent.ACTION_SEND) {
             val shared = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString().orEmpty().trim()
             if (shared.isNotEmpty()) {
@@ -336,6 +342,11 @@ class MainActivity : Activity() {
 
         line("Share sheet & Text selection", "Choose Ægentica AI when sharing text, or select text in a supporting app for " + brain.tasks.joinToString(", ") { it.alias } + ".")
 
+        panel.addView(flatButton("Workspace · notes, connections & backups") {
+            startActivity(WorkspaceActivity.intent(this, "library"))
+        })
+        panel.addView(flatButton("Connected AI · optional") { ConnectedAI.settings(this) })
+        panel.addView(flatButton("AI sources") { KnowledgeContext.choose(this) })
         panel.addView(label("YOUR CONVERSATION", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
         panel.addView(label("Saved on this phone. Export before reinstalling to keep your conversation.", 14f, true))
         panel.addView(flatButton("Export conversation") {
@@ -597,6 +608,7 @@ class MainActivity : Activity() {
             tag = "compose-state"
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
             padDp(8, 0, 8, 0)
+            setOnClickListener { KnowledgeContext.choose(this@MainActivity) }; isFocusable=true; buttonSemantics()
         }
         if (ears.available()) {
             val button = ImageButton(this).apply {
@@ -615,6 +627,15 @@ class MainActivity : Activity() {
             composeState.text = "Dictate a message"
         }
         tools.addView(composeState, LinearLayout.LayoutParams(0, -2, 1f))
+        tools.addView(pill("Save") {
+            val draft = input.text.toString()
+            if (draft.isNotBlank()) {
+                pauseForNavigation()
+                val record = WorkspaceStore(this@MainActivity).use { it.save(Record(body=draft, title=draft.lineSequence().first().take(80))) }
+                input.setText(""); Chat.saveDraft(this@MainActivity, "")
+                startActivity(WorkspaceActivity.intent(this@MainActivity, "library", record.id))
+            } else startActivity(WorkspaceActivity.intent(this@MainActivity, "library").putExtra("capture", true))
+        }.apply { contentDescription="Save draft as a note"; padDp(10,10,10,10) })
         tools.addView(send)
         bar.addView(tools, wide())
         playback = flatButton(getString(R.string.stop_speaking)) { hushPlayback() }.apply {
@@ -723,15 +744,17 @@ class MainActivity : Activity() {
         send.isEnabled = busy || (!listening && input.text.toString().isNotBlank())
         send.alpha = if (send.isEnabled) 1f else 0.4f
         if (::composeState.isInitialized && !listening) {
-            composeState.text = if (busy) "Thinking on your phone…" else if (askedAloud) "Review your words, then send" else "On device · Private"
+            composeState.text = if (busy) (if(ConnectedAI.enabled(this)) "Thinking · Connected AI" else "Thinking on your phone…") else if (askedAloud) "Review your words, then send" else KnowledgeContext.label(this)
         }
     }
 
     private fun stopAnswer() {
+        if(routineRun.isNotBlank()) { KnowledgeContext.completeRoutine(this,routineRun,"","cancelled"); routineRun="" }
         streamed.cancel()
         if (!busy) return
         requestId++
         Brains.get().cancel()
+        ConnectedAI.brain.cancel()
         busy = false
         thinkingMark?.let { it.show(PresenceView.Mode.REST); it.visibility = View.GONE }
         hushPlayback()
@@ -746,8 +769,10 @@ class MainActivity : Activity() {
         val text = question.trim()
         if (text.isEmpty() || busy) return
 
+        ReadingService.pauseForCapture()
         streamed.cancel()
         val token = ++requestId
+        routineRun = KnowledgeContext.startRoutine(this)
         busy = true
         playback.visibility = View.GONE
         followReply = true
@@ -774,12 +799,12 @@ class MainActivity : Activity() {
             speaker().begin(ears.locale())
         }
 
-        val brain = Brains.get()
+        val brain = if (ConnectedAI.enabled(this)) ConnectedAI.brain else Brains.get()
         brain.run(
             context = this,
             task = Task.ASK,
             input = "",
-            instruction = Prompts.conversation(history, text),
+            instruction = KnowledgeContext.prompt(this, Prompts.conversation(history, text)),
             onPartial = { partial ->
                 if (gone || token != requestId) return@run
                 // Never paint the instruction. On a device that cannot take a
@@ -816,10 +841,12 @@ class MainActivity : Activity() {
                 result.ok -> Markdown.render(said + "\n\n" + note, dp(18))
                 else -> Markdown.render(result.note ?: getString(R.string.failed))
             }
+            if(!result.ok || echoed) { KnowledgeContext.completeRoutine(this,routineRun,"","failed"); routineRun="" }
             if (result.ok && !echoed) {
                 answerActions(answer, said)
                 remember(Turn(text, said))
                 ResultStore.save(this, Task.ASK, said)
+                KnowledgeContext.completeRoutine(this, routineRun, said, "completed"); routineRun=""
                 if (aloud) mouth?.finish(Markdown.strip(said))
             } else {
                 hushPlayback()
@@ -857,6 +884,7 @@ class MainActivity : Activity() {
         setMicActive(false)
         input.hint = getString(R.string.chat_hint)
         hushPlayback()
+        WorkspaceStore(this).use { it.put("ai-context", ""); it.put("ai-routine", "") }
         val saved = Chat.archiveCurrent(this, input.text.toString())
         followReply = true
         latest.visibility = View.GONE
@@ -933,9 +961,7 @@ class MainActivity : Activity() {
         listening = false
         setMicActive(false)
         updateSend()
-        playback.text = getString(R.string.stop_speaking)
-        playback.visibility = View.VISIBLE
-        speaker().apply { begin(ears.locale()); finish(Markdown.strip(text)) }
+        ReadingService.start(this, text)
     }
 
     private fun answerActions(bubble: TextView, text: String) {
@@ -953,6 +979,11 @@ class MainActivity : Activity() {
                     NativePrivacy.copy(this@MainActivity, "Answer", text)
                     Toast.makeText(this@MainActivity, "Copied", Toast.LENGTH_SHORT).show()
                 }.apply { padDp(4, 10, 18, 10) })
+                addView(flatButton("Save") {
+                    val question = history.lastOrNull { it.reply == text }?.you.orEmpty()
+                    val saved = WorkspaceStore(this@MainActivity).use { it.save(Record(title=question.take(80), body=text, source="AI answer\nQuestion: $question")) }
+                    startActivity(WorkspaceActivity.intent(this@MainActivity,"library",saved.id))
+                }.apply { padDp(4,10,12,10) })
                 addView(flatButton("Share") {
                     startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
                         .putExtra(Intent.EXTRA_TEXT, text), getString(R.string.share_answer)))
@@ -990,6 +1021,7 @@ class MainActivity : Activity() {
     }
 
     private fun startListening() {
+        ReadingService.pauseForCapture()
         stopAnswer()
         hushPlayback()
         listenDraft = input.text.toString().trim()
@@ -1081,6 +1113,8 @@ class MainActivity : Activity() {
             restoreHistory()
             playback.visibility = View.GONE
         }
+        if (::composeState.isInitialized) composeState.text = KnowledgeContext.label(this)
+        if (ConnectedAI.enabled(this) && ::status.isInitialized) status.text = "Connected AI · " + ConnectedAI.host(this)
         if (::input.isInitialized && input.text.isBlank() && Chat.draft(this).isNotBlank()) {
             input.setText(Chat.draft(this))
         }

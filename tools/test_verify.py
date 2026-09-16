@@ -213,6 +213,14 @@ CASES = [
 
 def main():
     results = [case(name, fn) for name, fn in CASES]
+    with tempfile.TemporaryDirectory(prefix="verify-url-") as work:
+        project = os.path.join(work, "probe")
+        scaffold(project)
+        with open(kotlin_file(project), "a", encoding="utf-8") as handle:
+            handle.write('\nprivate val endpoint = "https://example.com/chat" // actual comment\n')
+        checked = verify(project)
+        results.append("ok   URL literals preserve their closing quote" if checked.returncode == 0 else
+                       "FAIL URL literal: " + checked.stdout)
     for line in results:
         print(line)
     failures = [r for r in results if r.startswith("FAIL")]

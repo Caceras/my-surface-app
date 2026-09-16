@@ -1,5 +1,7 @@
 # Android surfaces
 
+> **Everyday workspace update:** [Current behavior and limits](everyday-workspace.md) covers Today · AI · Library, SQLite migration, notes/relations/tables, explicit background reading, calendar/Beeper access and optional connected AI/routines. Earlier foreground-only and preferences-only descriptions below apply to the original chat/Voice path unless updated here.
+
 Every entry opens a foreground activity. The widget and tile do not run model inference in the background.
 
 | Entry | Implementation | Behavior and limits |

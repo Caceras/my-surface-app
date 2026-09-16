@@ -1,6 +1,8 @@
 # Architecture
 
-Ægentica AI is one native Android app with two product flavors. The UI uses framework views and shared tokens; there is no WebView, Compose runtime, backend, or cloud-model routing layer.
+> **Everyday workspace update:** [Current behavior and limits](everyday-workspace.md) covers Today · AI · Library, SQLite migration, notes/relations/tables, explicit background reading, calendar/Beeper access and optional connected AI/routines. Earlier foreground-only and preferences-only descriptions below apply to the original chat/Voice path unless updated here.
+
+Ægentica AI is one native Android app with two product flavors. The UI uses framework views and shared tokens; there is no WebView or Compose runtime. Optional connected AI uses a framework HTTPS client; the app does not provision a backend.
 
 ## Responsibilities
 
@@ -48,7 +50,7 @@ Keep talking is foreground/session-only. The next listen is scheduled after comp
 
 ## Storage
 
-Preferences use the `surfacelab` file in app-private storage. Current turns, a draft, speech preferences, archived conversations, and the last widget result have separate keys.
+`WorkspaceStore` owns app-private SQLite records, FTS4 search, links, typed properties, content and execution history. Chat/draft/archive keys migrate transactionally from `surfacelab` once. Settings, speech preferences and widget result remain preferences. The legacy value is retired after its first canonical write. `WorkspaceActivity`, `Connections`, `ReadingService`, `ConnectedAI`, `Reminders` and `RoutineJobService` own their respective flow boundaries; none executes model text as commands.
 
 Current chat retains the newest 40 exchanges. Archives retain at most 12 whole conversations under a soft 512,000-character serialized budget; the newest archive is retained in full even when larger. The first retained item is therefore an exception to the soft size budget. Old archives can be evicted by either limit. This is recent history, not unlimited storage.
 

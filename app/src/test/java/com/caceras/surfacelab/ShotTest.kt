@@ -388,4 +388,30 @@ class ShotTest {
         } finally { Brains.useForTest(null) }
     }
 
+    @Test fun `workspace today library and capture`() {
+        val context=RuntimeEnvironment.getApplication()
+        WorkspaceStore(context).use { store ->
+            val project=store.save(Record(kind="project",title="A calmer everyday",body="Make room for the things that matter.",pinned=true))
+            val note=store.save(Record(title="An idea for tomorrow",body="Start with a walk. Capture three ideas for the new project, then choose one small next step.",pinned=true))
+            store.link(note.id,project.id)
+            store.save(Record(kind="task",title="Write the first three examples",body="Keep them practical and easy to try."))
+        }
+        val today=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(context,"today")).setup()
+        shoot("workspace-today",today.get().window.decorView)
+        today.pause().stop().destroy()
+        val library=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(context,"library")).setup()
+        shoot("workspace-library",library.get().window.decorView)
+        library.pause().stop().destroy()
+        val id=WorkspaceStore(context).use { it.list(kind="note").single().id }
+        val edit=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(context,"library",id)).setup()
+        shoot("workspace-note",org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView)
+        edit.pause().stop().destroy()
+    }
+
+    @Test @Config(qualifiers="w360dp-h800dp-xxhdpi-night") fun `workspace dark at large font`() {
+        RuntimeEnvironment.setFontScale(1.5f)
+        val activity=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(RuntimeEnvironment.getApplication(),"library")).setup()
+        shoot("workspace-library-night",activity.get().window.decorView,shotWidth=1080,shotHeight=2400)
+        activity.pause().stop().destroy()
+    }
 }

@@ -73,6 +73,7 @@ class Ears(private val context: Context) {
         onStop: (VoiceProblem?) -> Unit = {}
     ) {
         if (Build.VERSION.SDK_INT < 31 || !available() || listening) return
+        ReadingService.pauseForCapture()
 
         // Every SpeechRecognizer method must run on the main thread, and the
         // instance must be destroyed or the microphone stays held after this
@@ -364,6 +365,7 @@ class Mouth(context: Context) {
     }
 
     fun begin(locale: Locale) {
+        ReadingService.pauseForCapture()
         hush()
         generation++
         muted = false

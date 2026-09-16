@@ -1,9 +1,13 @@
 # Current preview changes
 
-- Audited test necessity and the full request-to-install process. Retired three constant/wording tests, consolidated three overlapping selection checks into one, and strengthened model-status validation. The Android suite is now 151 meaningful cases with all 22 native captures retained.
-- Chat tests identify messages by role rather than view nesting; adding an action no longer masquerades as an answer. Switch checks allow additions while retaining theme/touch behavior.
-- Documentation-only changes skip Android builds and APK publication. Canonical draft preview PRs defer duplicate merge validation until ready-for-review; forks and other branches retain PR checks. Unknown changes still receive full validation.
-- Enabled Gradle task caching with native screenshots declared as outputs; removed duplicate successful artifact uploads and redundant release-download command setup while preserving every hash check.
-- Each release now states actual signing/update behavior, package, version code and checksum before installation. Evidence includes test timings, certificate fingerprints and the full process audit.
+- Added **Today · AI · Library**, preserving the Æ identity and sky-blue native design.
+- Added SQLite-backed notes, editable dictation, autosave, originals, pinning, search, Trash/undo and source-linked answer saving. Existing chats migrate once; old conversation imports stay supported.
+- Added people, projects, collections, backlinks, typed custom fields and a native table view over shared records.
+- Added a sentence-based read-aloud player with pause/resume, speed, retained position, background media playback, headset/lock-screen controls and microphone interruption handling.
+- Added linked tasks, reviewed reminder times, recurring routines and optional selected-calendar agenda. Local Nano routines invite foreground execution.
+- Added experimental on-phone Beeper browsing, explicit saved AI context and recipient/text-reviewed sends with separate permissions and no automatic retries.
+- Added optional owner-configured HTTPS connected AI and separately approved scheduled generation, with Keystore-protected keys and local run history.
+- Added whole-workspace export/merge, compact capture widget behavior, a Capture note launcher shortcut and an everyday usage guide.
+- Added focused data/migration/lifecycle/integration regressions and native workspace captures. Fixed a preflight false positive for URL string literals.
 
-This iteration primarily improves engineering and delivery. App behavior and the Æ / sky-blue experience are preserved. Actual in-place update continuity still requires owner-controlled signing and a Pixel check.
+Notes and Nano work without a cloud account. Connected AI requires your provider setup; Beeper requires its compatible installed experimental API. Calendar, notifications and microphone ask at first use. Reminder/job timing is controlled by Android. Hardware Nano/speech, third-party provider compatibility and stable-signing update continuity require device/owner validation; CI does not certify them.

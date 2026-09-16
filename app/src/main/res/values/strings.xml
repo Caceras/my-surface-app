@@ -64,11 +64,12 @@
     <string name="share_answer">Share answer</string>
     <string name="finish_dictation">Finish dictation</string>
     <string name="type_instead">Type</string>
-    <string name="widget_empty">A little clarity, one tap away. Ask by text or voice.</string>
+    <string name="widget_empty">Capture a thought. Continue with AI.</string>
     <string name="keep_talking">Keep talking</string>
     <string name="speech_language">Speech language</string>
     <string name="language_selected">Speech language: %1$s</string>
     <string name="shortcut_history">History</string>
     <string name="shortcut_actions">Actions</string>
-    <string name="widget_description">Open chat or voice, with an optional private answer preview.</string>
+    <string name="widget_description">Capture notes or talk, with optional pinned-note and answer previews.</string>
+    <string name="shortcut_capture">Capture note</string>
 </resources>
