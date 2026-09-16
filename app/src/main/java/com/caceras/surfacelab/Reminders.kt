@@ -18,7 +18,7 @@ import java.time.ZoneId
 /** Inexact, durable reminders. A notification invites foreground AI; it never starts inference. */
 object Reminders {
     const val CHANNEL = "workspace-reminders"
-    fun allowed(context: Context) = (Build.VERSION.SDK_INT < 33 || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) && context.getSystemService(NotificationManager::class.java).areNotificationsEnabled()
+    fun allowed(context: Context) = (Build.VERSION.SDK_INT < 33 || context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) && context.getSystemService(NotificationManager::class.java).areNotificationsEnabled() && context.getSystemService(NotificationManager::class.java).getNotificationChannel(CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE
     fun pending(context: Context, id: String, action: String = "due", due: Long = 0): PendingIntent = PendingIntent.getBroadcast(context, 0,
         Intent(context, ReminderReceiver::class.java).setAction(action).setData(Uri.Builder().scheme("aegentica").authority("reminder").appendPath(id).appendPath(action).build()).putExtra("id", id).putExtra("due",due),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

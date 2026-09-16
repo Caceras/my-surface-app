@@ -23,6 +23,7 @@ class WorkspaceActivity : Activity() {
     private var flush: (() -> Unit)?=null
     private var ears:Ears?=null
     private var dictate: (() -> Unit)?=null
+    private var stopDictation: (() -> Unit)?=null
     private val handler=Handler(Looper.getMainLooper())
     private var pendingSearch:Runnable?=null
     private var loaded=false
@@ -43,7 +44,7 @@ class WorkspaceActivity : Activity() {
     private fun note(text:String) { rows.addView(label(text,14f,true).apply { padDp(0,4,0,12) }) }
     private fun tools(vararg actions:Pair<String,()->Unit>)=HorizontalScrollView(this).apply {
         isHorizontalScrollBarEnabled=false
-        addView(LinearLayout(this@WorkspaceActivity).apply { actions.forEach { (title,action) -> addView(pill(title,onClick=action),LinearLayout.LayoutParams(-2,-2).apply { marginEnd=dp(8) }) } })
+        addView(LinearLayout(this@WorkspaceActivity).apply { actions.forEach { (title,action) -> addView(pill(title) { stopDictation?.invoke(); action() },LinearLayout.LayoutParams(-2,-2).apply { marginEnd=dp(8) }) } })
     }
     private fun render() {
         body=column().apply { setBackgroundColor(ink(R.color.chat_bg)); padDp(20,8,20,0) }
@@ -171,9 +172,14 @@ class WorkspaceActivity : Activity() {
         content.addView(input)
         val mic=pill("Dictate") {}
         val speech=Ears(this); ears=speech
+        stopDictation={ recognizing=false; speech.cancel(); mic.text="Dictate"; mic.speechLevel(0f) }
         val startDictation:()->Unit = {
             ReadingService.pauseForCapture()
-            if(recognizing) speech.stop() else {
+            if(!speech.available()) {
+                status.text="On-device dictation is unavailable. Keep typing or open voice setup."
+                AlertDialog.Builder(this).setTitle("Voice setup").setMessage("Your note is safe. Set up on-device speech to dictate on this phone.")
+                    .setNegativeButton("Keep typing",null).setPositiveButton("Voice setup") { _,_ -> startActivity(Intent(this,VoiceActivity::class.java).putExtra("setup",true)) }.showProtected(this)
+            } else if(recognizing) speech.stop() else {
                 recognizing=true; mic.text="Finish dictation"
                 val prefix=input.text.toString().trimEnd()
                 speech.listen(onLevel={mic.speechLevel(it)},onPartial={ partial ->
@@ -196,7 +202,7 @@ class WorkspaceActivity : Activity() {
         title.afterChange { savedTask?.let(handler::removeCallbacks); savedTask=Runnable { save() }.also { handler.postDelayed(it,350) } }
         val actions=LinearLayout(this).apply {
             addView(mic,LinearLayout.LayoutParams(0,-2,1f))
-            addView(pill("Listen") { if(input.text.isNotBlank()) { speech.cancel(); recognizing=false; ReadingService.start(this@WorkspaceActivity,input.text.toString()) } },LinearLayout.LayoutParams(0,-2,1f))
+            addView(pill("Listen") { if(input.text.isNotBlank()) { stopDictation?.invoke(); ReadingService.start(this@WorkspaceActivity,input.text.toString()) } },LinearLayout.LayoutParams(0,-2,1f))
             addView(pill("AI") { if(save(true)) { dialog.dismiss(); askWith(record) } },LinearLayout.LayoutParams(0,-2,1f))
         }
         content.addView(actions,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(12); bottomMargin=dp(12) })
@@ -249,7 +255,7 @@ class WorkspaceActivity : Activity() {
         dialog.window?.setBackgroundDrawableResource(R.color.chat_bg)
         dialog.setOnDismissListener {
             if(!closed) save(true)
-            closed=true; savedTask?.let(handler::removeCallbacks); speech.cancel(); ears=null; dictate=null; flush=null; editingId=null
+            closed=true; savedTask?.let(handler::removeCallbacks); speech.cancel(); ears=null; dictate=null; stopDictation=null; flush=null; editingId=null
             if(editor===dialog) editor=null
             populate()
         }
@@ -322,6 +328,7 @@ class WorkspaceActivity : Activity() {
         }
     }
     private fun chooseTime(record:Record, result:(Record)->Unit) {
+        stopDictation?.invoke()
         val calendar=Calendar.getInstance().apply { timeInMillis=if(record.due>System.currentTimeMillis()) record.due else System.currentTimeMillis()+3600000 }
         DatePickerDialog(this,{ _,y,m,d ->
             calendar.set(y,m,d)
@@ -386,7 +393,7 @@ class WorkspaceActivity : Activity() {
         if(code==BeeperAccess.SEND_REQUEST) toast("Return to the draft and review Send again.")
     }
     override fun onResume() { super.onResume(); NativePrivacy.apply(this,window); if(loaded && editor==null) populate() }
-    override fun onPause() { flush?.invoke(); ears?.cancel(); super.onPause() }
+    override fun onPause() { flush?.invoke(); stopDictation?.invoke(); super.onPause() }
     override fun onSaveInstanceState(state:Bundle) { flush?.invoke(); state.putString("destination",destination); state.putString("filter",filter); state.putString("query",query); state.putString("editing",editingId); super.onSaveInstanceState(state) }
     override fun onDestroy() { flush?.invoke(); editor?.dismiss(); pendingSearch?.let(handler::removeCallbacks); ears?.cancel(); store.close(); super.onDestroy() }
     private fun toast(text:String)=Toast.makeText(this,text,Toast.LENGTH_LONG).show()

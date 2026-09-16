@@ -27,9 +27,9 @@ class ReadingActivity:Activity() {
         root.addView(ScrollView(this).apply { addView(text) },LinearLayout.LayoutParams(-1,0,1f))
         root.addView(LinearLayout(this).apply {
             gravity=Gravity.CENTER
-            addView(pill("Previous") { ReadingService.move(-1) },LinearLayout.LayoutParams(0,-2,1f))
+            addView(pill("Back") { ReadingService.move(-1) }.apply { contentDescription="Previous sentence" },LinearLayout.LayoutParams(0,-2,1f))
             play=pill("Play",true) { ReadingService.toggle(this@ReadingActivity) }; addView(play,LinearLayout.LayoutParams(0,-2,1f))
-            addView(pill("Next") { ReadingService.move(1) },LinearLayout.LayoutParams(0,-2,1f))
+            addView(pill("Next") { ReadingService.move(1) }.apply { contentDescription="Next sentence" },LinearLayout.LayoutParams(0,-2,1f))
         })
         speed=pill("1×") {
             android.app.AlertDialog.Builder(this).setTitle("Reading speed").setItems(arrayOf("0.75×","1×","1.25×","1.5×","2×")) { _,n -> ReadingService.speed(listOf(.75f,1f,1.25f,1.5f,2f)[n]) }.showProtected(this)

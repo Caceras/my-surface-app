@@ -28,7 +28,7 @@ A routine opened through Run with AI stages its prompt for review. You still pre
 
 ## Listen anywhere
 
-Choose **Listen** on a saved note or completed AI answer to open the reader. It has sentence highlighting, Previous/Next, Pause/Play and speed selection. Explicit playback uses a media playback service, allowing screen lock, headset controls and notification transport. Notification metadata is generic. Resuming restarts the current sentence, not the exact word. Position is retained on this phone; after process death, open the player and explicitly press Play.
+Choose **Listen** on a saved note or completed AI answer to open the reader. It has sentence highlighting, Back/Next, Pause/Play and speed selection. Explicit playback uses a media playback service, allowing screen lock, headset controls and notification transport. Notification metadata is generic. Resuming restarts the current sentence, not the exact word. Position is retained on this phone; after process death, open the player and explicitly press Play.
 
 Microphone capture pauses the reader. Headphone disconnection or audio-focus loss pauses playback. It never restarts the microphone itself. Live streamed replies in the existing hands-free mode remain foreground-only. Installed offline TTS voices are required; download them in Android speech settings. Real device audio routing and recognizer quality need Pixel validation.
 

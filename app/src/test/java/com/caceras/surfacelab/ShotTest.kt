@@ -85,7 +85,11 @@ class ShotTest {
         // A real frame traversal can schedule drawable/text invalidation. Draw
         // the settled tree again rather than accepting a half-painted first frame.
         decor.viewTreeObserver.dispatchOnPreDraw()
-        decor.invalidate()
+        fun invalidateTree(view: View) {
+            view.invalidate()
+            if (view is android.view.ViewGroup) (0 until view.childCount).forEach { invalidateTree(view.getChildAt(it)) }
+        }
+        invalidateTree(decor)
         bitmap.eraseColor(Color.MAGENTA)
         decor.draw(Canvas(bitmap))
 
@@ -418,12 +422,34 @@ class ShotTest {
         activity.pause().stop().destroy()
     }
 
+    @Test fun `collection table renders shared records and typed values`() {
+        val context=RuntimeEnvironment.getApplication()
+        val id=WorkspaceStore(context).use { store ->
+            val group=store.save(Record(kind="collection",title="Small possibilities"))
+            store.addProperty(group.id,"Priority","number")
+            val field=store.properties(group.id).single()
+            for((title,priority) in listOf("A morning walk" to "1","Three ideas for the project" to "2")) {
+                val note=store.save(Record(title=title))
+                store.link(group.id,note.id,"member"); store.setProperty(note.id,field,priority)
+            }
+            group.id
+        }
+        val activity=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(context,"library",id)).setup()
+        fun children(v:View):List<View> = listOf(v)+if(v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
+        val editor=org.robolectric.shadows.ShadowDialog.getLatestDialog()
+        children(editor.window!!.decorView).filterIsInstance<android.widget.TextView>().first { it.text=="Table view" }.performClick()
+        val table=org.robolectric.shadows.ShadowDialog.getLatestDialog()
+        shoot("workspace-table",table.window!!.decorView)
+        assertTrue(children(table.window!!.decorView).filterIsInstance<android.widget.TextView>().any { it.text=="A morning walk" })
+        table.dismiss(); activity.pause().stop().destroy()
+    }
+
     @Test @Config(qualifiers="w320dp-h640dp-xxhdpi") fun `compact reader controls remain reachable`() {
         WorkspaceStore(RuntimeEnvironment.getApplication()).use { it.put("reading-text","Make space for one thing at a time. Start with a small step.") }
         val activity=Robolectric.buildActivity(ReadingActivity::class.java).setup()
         shoot("workspace-reader-compact",activity.get().window.decorView,shotWidth=960,shotHeight=1920)
         fun children(v:View):List<View> = listOf(v)+if(v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
-        for(title in listOf("Previous","Play","Next")) {
+        for(title in listOf("Back","Play","Next")) {
             val button=children(activity.get().window.decorView).filterIsInstance<android.widget.TextView>().first { it.text==title }
             val rect=android.graphics.Rect()
             assertTrue(button.getGlobalVisibleRect(rect)); assertTrue(rect.height()>=activity.get().dp(48))
