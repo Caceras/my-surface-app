@@ -1109,6 +1109,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         NativePrivacy.apply(this, window)
+        Reminders.reschedule(this)
         if (::messages.isInitialized && !busy && Chat.load(this) != history) {
             restoreHistory()
             playback.visibility = View.GONE

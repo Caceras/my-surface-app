@@ -77,14 +77,14 @@ object BeeperAccess {
             AlertDialog.Builder(activity).setTitle("Connect Beeper?").setMessage("Browse recent chats, then choose one to read. Nothing is imported or sent automatically. Beeper’s Android interface is experimental.")
                 .setNegativeButton("Not now",null).setPositiveButton("Allow reading") { _,_ -> activity.requestPermissions(arrayOf(READ),READ_REQUEST) }.showProtected(activity); return
         }
-        background(activity,{ activity.contentResolver.query(uri("chats","limit" to "50"),null,null,null,null)?.use { c -> buildList { while(c.moveToNext()) add(ChatRef(c.text("roomId"),c.text("title"),c.text("protocol"),c.text("messagePreview"))) } } ?: error("Beeper returned no provider response.") }) { chats ->
+        background<List<ChatRef>>(activity,{ activity.contentResolver.query(uri("chats","limit" to "50"),null,null,null,null)?.use { c -> buildList { while(c.moveToNext()) add(ChatRef(c.text("roomId"),c.text("title"),c.text("protocol"),c.text("messagePreview"))) } } ?: error("Beeper returned no provider response.") }) { chats ->
             if(chats.isEmpty()) { message(activity,"No recent chats found."); return@background }
             AlertDialog.Builder(activity).setTitle("Beeper · Choose a conversation").setItems(chats.map { "${it.title} · ${it.protocol}" }.toTypedArray()) { _,n -> conversation(activity,chats[n]) }.setNegativeButton("Close",null).showProtected(activity)
         }
     }
     private fun conversation(activity:Activity,chat:ChatRef) {
-        background(activity,{
-            activity.contentResolver.query(uri("messages","roomIds" to chat.id,"limit" to "40"),null,null,null,null)?.use { c -> buildList { while(c.moveToNext()) { if(c.text("isDeleted")=="1") continue; val text=c.text("text_content"); if(text.isNotBlank()) add(MessageRef(c.text("originalId"),c.text("roomId"),c.text("displayName"),text,c.text("timestamp").toLongOrNull() ?: 0)) } }.sortedBy { it.time } } ?: error("Messages unavailable.")
+        background<List<MessageRef>>(activity,{
+            activity.contentResolver.query(uri("messages","roomIds" to chat.id,"limit" to "40"),null,null,null,null)?.use { c -> buildList { while(c.moveToNext()) { if(c.text("isDeleted")=="1" || c.text("roomId")!=chat.id) continue; val text=c.text("text_content"); if(text.isNotBlank()) add(MessageRef(c.text("originalId"),c.text("roomId"),c.text("displayName"),text,c.text("timestamp").toLongOrNull() ?: 0)) } }.sortedBy { it.time } } ?: error("Messages unavailable.")
         }) { messages ->
             val text=messages.joinToString("\n\n") { "${it.sender}: ${it.text}" }.take(30000)
             AlertDialog.Builder(activity).setTitle(chat.title).setMessage(text.ifBlank { "No text messages available." })

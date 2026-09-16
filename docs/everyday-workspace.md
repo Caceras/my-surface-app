@@ -46,7 +46,7 @@ Use **Today/Library → More → Beeper conversations**. A compatible installed 
 
 Choose a chat to inspect up to 40 text messages. Use with AI asks before saving the displayed excerpt as a note; it records room/message identifiers and attaches that note as context. This is a deliberate saved snapshot, not live message synchronization. Deleted messages are excluded when returned by the provider.
 
-Draft reply keeps editable text locally. Review shows the exact chat, network, room and message before Send. There is no background sending, model-generated command execution or automatic retry. If Beeper does not confirm acceptance, check the original conversation before trying again: an uncertain response is not proof the send failed. Drafts persist across reopening; they are not currently included in the workspace restore allowlist. Provider errors do not disable notes or AI.
+Draft reply keeps editable text locally. Review shows the exact chat, network, room and message before Send. There is no background sending, model-generated command execution or automatic retry. If Beeper does not confirm acceptance, check the original conversation before trying again: an uncertain response is not proof the send failed. Drafts persist across reopening and are included in workspace backups. Provider errors do not disable notes or AI.
 
 ## Connected AI and routines
 
@@ -60,7 +60,7 @@ Android JobScheduler runs connected routines when network/system conditions perm
 
 ## Backup and updates
 
-**More → Export everything** creates a readable `aegentica-workspace-v1` JSON containing records, relationships, typed fields, content/drafts and execution history. Store it privately. Restore merges records transactionally; conflicting edited items get separate stable copies rather than overwriting local work. Malformed imports roll back. API keys, permissions, remote routine approvals and calendar selections are not restored. The JSON export is not encrypted.
+**More → Export everything** creates a readable `aegentica-workspace-v1` JSON containing records, relationships, typed fields, content/drafts and execution history. Store it privately. Restore merges records transactionally; conflicting edited items get separate stable copies rather than overwriting local work. Malformed imports roll back. Conflicting imported conversation/draft content becomes visible Library notes; imported execution history is informational and never replays actions. API keys, permissions, remote routine approvals and calendar selections are not restored. The JSON export is not encrypted.
 
 Legacy **AI Settings → Export/Restore conversation** remains `surface-chat-v1`, with the existing 40 current-exchange/12 archive bounds and 4 MB limit. Workspace backups have a 32 MB/10,000-record import bound; no attachments or raw recordings are supported. Initial SQLite migration copies the old conversation preferences once; subsequent writes retire the old value so cleared content does not reappear.
 

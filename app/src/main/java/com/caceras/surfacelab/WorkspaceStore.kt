@@ -62,7 +62,7 @@ class WorkspaceStore(context: Context) : SQLiteOpenHelper(context.applicationCon
         db.beginTransaction()
         try {
             val previous = get(record.id)
-            require(expectedRevision == null || previous == null || previous.revision == expectedRevision) { "This item changed elsewhere. Reopen it before editing." }
+            require(expectedRevision == null || previous?.revision == expectedRevision) { "This item changed elsewhere. Reopen it before editing." }
             val next = record.copy(original = previous?.original?.takeIf { it.isNotBlank() } ?: record.original, created = previous?.created ?: record.created,
                 updated = System.currentTimeMillis(), revision = (previous?.revision ?: 0) + 1)
             if (previous == null) db.insertOrThrow("records", null, recordValues(next))
@@ -177,14 +177,35 @@ class WorkspaceStore(context: Context) : SQLiteOpenHelper(context.applicationCon
                 val p=readableDatabase.rawQuery("SELECT * FROM properties WHERE id=?",arrayOf(id)).use { require(it.moveToFirst()); Property(it.getString(0),it.getString(1),it.getString(2),it.getString(3)) }
                 setProperty(mapping[f.getString("record")] ?: error("Missing item"),p,f.getString("value"))
             }
-            // Imported conversations are retained as content, but an active local draft is never replaced.
+            // Retain colliding imports as visible notes; never bury a conflicting draft in an inaccessible key.
             val content = json.getJSONArray("content")
             for(i in 0 until content.length()) {
                 val item=content.getJSONObject(i); val key=item.getString("key"); val value=item.getString("value")
-                if(key in listOf("chat_turns","draft","conversations") || key.startsWith("capture")) {
-                    if(value(key).isBlank()) put(key,value)
-                    else if(value(key)!=value) put("import-${UUID.nameUUIDFromBytes((key+value).toByteArray())}",JSONObject().put("key",key).put("value",value).toString())
+                val safe = key in listOf("chat_turns","draft","conversations","capture","reading-text","reading-index","reading-speed") || key.startsWith("beeper-draft:")
+                if(!safe) continue
+                when(key) {
+                    "chat_turns" -> Chat.readBackup(JSONObject().put("format","surface-chat-v1").put("turns",JSONArray(value.ifBlank { "[]" })).toString())
+                    "conversations" -> Chat.readBackup(JSONObject().put("format","surface-chat-v1").put("turns",JSONArray()).put("conversations",JSONArray(value.ifBlank { "[]" })).toString())
                 }
+                if(value(key).isBlank() || value(key)=="[]") put(key,value)
+                else if(value(key)!=value && value.isNotBlank() && key !in listOf("reading-index","reading-speed")) {
+                    val readable=when(key) {
+                        "chat_turns" -> JSONArray(value).let { a -> (0 until a.length()).joinToString("\n\n") { n -> a.getJSONObject(n).let { it.getString("q")+"\n"+it.getString("a") } } }
+                        "conversations" -> JSONArray(value).let { a -> (0 until a.length()).joinToString("\n\n") { n -> val c=a.getJSONObject(n); c.getString("title")+"\n"+c.optString("draft")+"\n"+c.getJSONArray("turns").let { t -> (0 until t.length()).joinToString("\n\n") { x -> t.getJSONObject(x).let { it.getString("q")+"\n"+it.getString("a") } } } } }
+                        else -> value
+                    }
+                    readable.chunked(100000).forEachIndexed { part, text ->
+                        val id=UUID.nameUUIDFromBytes((key+part+value).toByteArray()).toString()
+                        if(get(id)==null) save(Record(id=id,title="Imported ${if(key.contains("draft")) "draft" else "conversation"}${if(part>0) " · ${part+1}" else ""}",body=text,source="Workspace backup · $key"))
+                    }
+                }
+            }
+            val runs=json.optJSONArray("executions") ?: JSONArray()
+            require(runs.length()<=100000) { "Too much execution history." }
+            for(i in 0 until runs.length()) {
+                val run=runs.getJSONObject(i); val record=mapping[run.getString("record")] ?: continue
+                val id="import:"+UUID.nameUUIDFromBytes((run.getString("id")+record).toByteArray())
+                db.insertWithOnConflict("executions",null,values("id" to id,"record" to record,"at" to run.getLong("at"),"state" to ("Imported · "+run.getString("state").take(80)),"detail" to run.getString("detail").take(1000)),SQLiteDatabase.CONFLICT_IGNORE)
             }
             // Routines imported from another installation are paused; no unexpected notifications or execution.
             for(r in records) if(r.kind=="routine" && mapping[r.id] in inserted) {

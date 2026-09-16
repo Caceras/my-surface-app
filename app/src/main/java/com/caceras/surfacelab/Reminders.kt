@@ -27,8 +27,8 @@ object Reminders {
         context.getSystemService(NotificationManager::class.java).cancel(id,1)
     }
     fun schedule(context: Context, record: Record) {
-        cancel(context, record.id)
-        if(record.deleted || record.done || !record.enabled || record.due<=0 || record.kind !in listOf("task","routine")) return
+        context.getSystemService(AlarmManager::class.java).cancel(pending(context,record.id))
+        if(record.deleted || record.done || !record.enabled || record.due<=0 || record.kind !in listOf("task","routine")) { cancel(context,record.id); RoutineJobService.schedule(context); return }
         WorkspaceStore(context).use { store ->
             if(ConnectedAI.routineApproval(store,context,record)!=null) { RoutineJobService.schedule(context); return }
             val notified = store.readableDatabase.rawQuery("SELECT 1 FROM executions WHERE id=?",arrayOf("reminder:${record.id}:${record.due}")).use { it.moveToFirst() }
