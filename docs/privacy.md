@@ -1,56 +1,62 @@
 # Privacy and data
 
-> **Everyday workspace update:** [Current behavior and limits](everyday-workspace.md) covers Today · AI · Library, SQLite migration, notes/relations/tables, explicit background reading, calendar/Beeper access and optional connected AI/routines. Earlier foreground-only and preferences-only descriptions below apply to the original chat/Voice path unless updated here.
+This describes the implementation, not a guarantee about Android, keyboards, document providers, Google, Beeper or a configured AI provider. See the [everyday guide](everyday-workspace.md) for the controls that select these boundaries.
 
-This describes the implementation in this repository, not a legal guarantee about Android, a keyboard, a document provider, or Google's services.
+## Processing choices
 
-## Processing
+Gemini Nano through AICore is the default. Hands-free Voice and text-selection presets use Nano. Dictation uses Android's on-device recognizer; spoken output selects installed voices that do not require a network. There is no silent cloud recognition or inference fallback. The app does not retain raw microphone recordings.
 
-- Gemini Nano requests are passed to Android AICore through the ML Kit Prompt API. Ægentica AI has no implemented remote-model fallback or web-browsing capability.
-- Dictation uses `createOnDeviceSpeechRecognizer`, gated by runtime availability. The app does not fall back to Android's general cloud-capable recognizer.
-- Spoken output selects a matching installed voice that does not require the network. If none qualifies, the response remains available as text with an explanation.
-- The app does not save microphone audio buffers. Recognized text can become a draft or conversation turn.
-- Ægentica AI implements no analytics, account service, remote chat sync, or advertising SDK. Initial downloads and the behavior of system/SDK services remain outside that narrower statement.
+**Connected AI is optional.** The user supplies an HTTPS endpoint, model ID and key, reviews the provider and enables it for the typed/dictated AI composer. That provider receives the submitted question, bounded recent conversation and selected source excerpts. Provider charges and retention rules apply. Redirects are refused and cleartext network traffic is disabled. Cancelled requests may already have reached the provider and cannot be recalled.
 
-Google documents [on-device GenAI processing and service constraints](https://developers.google.com/ml-kit/genai). Speech behavior is also governed by the installed Android recognition and TTS services.
+A connected routine requires separate consent to its prompt, provider and fixed source IDs. It can read those records' current contents at execution time; it does not fetch calendars, Beeper or other apps automatically. Prompt/provider changes invalidate approval. There is no automatic retry of uncertain requests, message sending or calendar mutation. Local Nano routines only notify the user to open the app.
 
-## Retained data
+The app implements no analytics, advertising SDK, remote content synchronization or account backend. System services still manage initial model/speech downloads. [ML Kit service constraints](https://developers.google.com/ml-kit/genai).
 
-| Data | Location | Retention / removal |
+## Local storage
+
+| Data | Storage | Removal and limits |
 |---|---|---|
-| Current chat | App-private preferences | Newest 40 completed exchanges; New moves current content into recent archives |
-| Current draft | App-private preferences / activity state | Replaced as the conversation changes; persisted when leaving |
-| Recent conversations | App-private preferences | Up to 12; soft size budget may evict older entries; delete individually or clear saved |
-| Last successful answer | App-private preferences | Replaced by the next saved result or cleared by New |
-| Speech preferences | App-private preferences | Persist until changed or app data is cleared |
-| Manual export | User-selected document provider | Plain JSON; deletion and syncing belong to the chosen provider |
+| Notes, tasks, people, projects, collections | App-private SQLite | No automatic recent-history eviction; Trash, restore and permanent deletion |
+| Originals, links and typed fields | Same SQLite database | Original captured text survives edits; permanent item deletion cascades its links/values |
+| Current chat and draft | SQLite content keys | Latest 40 completed exchanges; New archives current content |
+| Recent conversation archives | SQLite content keys | Up to 12 within the existing soft size budget; delete individually or clear |
+| Reader text and sentence position | SQLite content keys | Replaced by the next selected text; retained for explicit resume |
+| Beeper snapshots and drafts | SQLite | Snapshots are ordinary deletable notes; drafts persist until successful send or replacement |
+| Routine approvals and execution history | SQLite | Local approval gates; history does not execute commands; remote approvals are excluded from restore |
+| Speech, privacy and calendar selection | Private preferences | Changed through settings; cleared with app data |
+| Provider configuration/key | Separate private preferences; key encrypted using Android Keystore | Disconnect removes saved configuration; never included in manual content backups |
+| Widget's last answer | Private preferences | Replaced by successful result or cleared by New |
+| Manual backups | User-chosen document provider | Readable JSON; user controls destination, retention and any provider sync |
 
-Uninstalling or clearing app storage removes local app data. Android automatic backup is disabled with `allowBackup="false"`. Explicit backup and device-transfer rules also exclude preference, file and database contents. Vendor/device behavior still needs verification. The app does not add a separate encryption layer to its preferences or exports; Android provides the app sandbox and device storage protection.
+Chat preferences migrate once in a SQLite creation transaction. The old value remains a recovery copy until that key is next written or cleared, then is removed. Explicit clear cannot resurrect it through a repeated migration.
 
-## Visible surfaces
+SQLite content and exports do not have a separate app encryption layer; Android supplies app isolation and device storage protection. Provider keys use Keystore-backed encryption. Uninstall/clear storage removes local data. Automatic backup and device transfer rules exclude preferences/files/databases; vendor behavior still needs device testing. Export before uninstalling to resolve a signing conflict.
 
-The home-screen widget defaults to generic text and Type/Talk controls. Last-answer previews require an explicit setting; compact widgets omit the preview. Anyone able to view an enabled home-screen preview may read it. Private screen uses FLAG_SECURE for app activities and dialogs, protecting Recents previews and blocking screenshots/casting of those windows. It is not encryption or protection for another app opened through a handoff. Copy uses Android's clipboard with sensitive-preview metadata; Share uses the app you choose. The keyboard you use has its own behavior and settings.
-
-Ægentica AI cannot silently inspect the screen or read arbitrary app contents. Share and text-selection entry points receive the text explicitly supplied by Android/the source app. The app does not implement an accessibility service, notification listener, background microphone service, or wake-word detector.
+Workspace imports merge transactionally. Conflicting content becomes separate records, including visible imported conversation/draft notes. Invalid imports roll back. Imported routines are paused; provider credentials, permission grants, calendar selection and remote approvals are not restored. Restored run history cannot replay an action.
 
 ## Permissions
 
-The source manifest requests microphone access for voice capture and the normal SET_ALARM permission for explicit Clock handoffs. It does not request direct contacts, call, location or calendar access. The microphone is requested when entering an actual recording flow, and setup alone does not start capture. File import/export uses Android's document picker instead of broad storage access. Widget pinning, tile addition and default-assistant selection use Android-managed user choices.
+- **Microphone:** requested when starting dictation/Voice, never merely to view setup. Capture stops on navigation/pause; no background microphone service.
+- **Calendar read:** requested when choosing calendars. Queries include only selected IDs. Creating/opening events uses Android handoff UI; no direct calendar write permission.
+- **Beeper read/send:** separate custom runtime grants. Read recent chats, then explicitly choose a conversation. Saving an excerpt for AI requires another visible choice. Send reviews exact destination and text.
+- **Notifications:** requested when setting reminders. Denial retains the saved item and explains that it cannot alert. Reminder delivery uses generic text.
+- **Foreground media service:** only explicit playback of existing text. It cannot run Nano in the background or reopen capture.
+- **Internet/network state:** used by the optionally configured connected provider and network-constrained jobs. No provider request is sent without configuration/approval.
+- **Boot completion:** restores pending reminders and scheduled job eligibility after restart.
+- **SET_ALARM:** normal permission for user-requested Clock handoffs.
 
-Review the merged manifest and dependencies when changing SDK versions: library manifests may contribute declarations that are not visible in the app's source manifest alone.
+No broad storage, contacts, direct-call, location, notification-listener, accessibility-service or wake-word access is requested. Document import/export uses Android's file picker. Review merged dependency manifests when changing SDK versions.
+
+## Visible surfaces
+
+Widget previews default off; enabling them can show a pinned note or last answer to anyone viewing the home screen. Compact widgets omit content. Private screen protects app windows/Recents using FLAG_SECURE; it does not encrypt files or protect other apps opened through handoffs. Clipboard copies set sensitive-preview metadata. Editors request no personalized learning, but the keyboard controls its own behavior.
+
+Media metadata and reminder/result notification text are generic. The reader still displays the full chosen text inside the app. Headset disconnection and audio-focus loss pause playback. Streamed foreground answers stop on leaving their original screen; explicit reader playback has its own lifecycle.
 
 ## External actions
 
-Maps receives the place query, the dialer receives the number, Calendar receives the event title, and Clock receives the chosen time/duration. This occurs only after the corresponding action in the visible UI. Destination apps have their own policies and may use the network. Calendar/dialer actions stage editable UI; Clock handlers may apply a requested timer/alarm when opened. The model cannot invoke these actions itself.
+Clock, Calendar, Maps and Dialer receive only the fields the user explicitly submits. Beeper receives the exact reviewed room and text. Actions are native validated operations; model-generated text is never interpreted as a command. Remote generation only saves a result note and can notify; it never performs a send or calendar write.
 
-Speech's foreground MediaSession publishes only a generic Ægentica AI label, not the answer text. No foreground service, permanent notification or background microphone is added. The widget updates on result changes, settings changes and launcher resize/update events instead of periodic polling.
+## Reporting
 
-## Reporting safely
-
-Use redacted screenshots, dummy conversations, and the build number when reporting bugs. Do not attach a full export to a public GitHub issue if it contains personal or client information. No vulnerability-reporting SLA or production security certification is claimed for this preview.
-
-Search and native action fields request the same no-personalized-learning IME flag as the composer. Settings, History and Actions stop hidden microphone/generation work before opening. CI evidence uses deterministic fixture text and never captures your live conversations.
-
-**Copy app info** is an explicit local clipboard action. Its allowlist contains version, version code, package, manufacturer/model, Android release/API and app-language tags. It does not read chat storage, record audio, collect unique device identifiers or upload anything. Clipboard handling uses the same sensitive-preview metadata as answer copies.
-
-Selection Ask uses the same IME learning-suppression request as chat/history/action fields. Configuration recreation does not automatically reopen Voice capture. Archive restore validates identities before mutation and separates colliding imported/existing entries. These changes preserve package IDs, private defaults and the existing backup format.
+Use redacted screenshots and synthetic examples. Never put private exports, provider keys or signing material into public GitHub issues. Copy app info copies an explicit local metadata allowlist (build/package/device/Android/language), without conversations, audio or telemetry. CI uses synthetic core fixtures; no production security certification or device acceptance is implied by a green build.

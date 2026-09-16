@@ -482,7 +482,7 @@ class VoiceActivity : Activity() {
             context = this,
             task = Task.ASK,
             input = "",
-            instruction = Prompts.conversation(Chat.load(this), spoken),
+            instruction = KnowledgeContext.prompt(this, Prompts.conversation(Chat.load(this), spoken)),
             onPartial = { partial ->
                 if (!gone && resumed && token == requestId && !Prompts.isEcho(partial, Task.ASK)) {
                     streamed.offer(Prompts.reply(partial))

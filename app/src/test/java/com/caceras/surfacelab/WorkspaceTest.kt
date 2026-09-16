@@ -132,4 +132,29 @@ class WorkspaceTest {
         WorkspaceStore(context).use { assertEquals("Keep this thought",it.list().single().body) }
         controller.pause().stop().destroy()
     }
+    @Test fun `pausing reader before engine initialization never resumes by itself`() {
+        val controller=Robolectric.buildService(ReadingService::class.java).create()
+        val service=controller.get()
+        service.onStartCommand(Intent(context,ReadingService::class.java).putExtra("text","First sentence. Second sentence."),0,1)
+        ReadingService.pauseForCapture()
+        val engine=org.robolectric.shadows.ShadowTextToSpeech.getLastTextToSpeechInstance()
+        org.robolectric.shadows.ShadowTextToSpeech.addVoice(android.speech.tts.Voice("local",java.util.Locale.getDefault(),300,300,false,emptySet()))
+        shadowOf(engine).onInitListener.onInit(android.speech.tts.TextToSpeech.SUCCESS)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertFalse(ReadingService.snapshot.playing)
+        assertTrue(shadowOf(engine).spokenTextList.isEmpty())
+        assertEquals("First sentence. Second sentence.",WorkspaceStore(context).use { it.value("reading-text") })
+        controller.destroy()
+    }
+
+    @Test fun `conflicting imported conversation remains accessible without replacing a live draft`() {
+        Chat.saveDraft(context,"Imported thought")
+        val backup=WorkspaceStore(context).use { it.backup() }
+        Chat.saveDraft(context,"Current thought")
+        WorkspaceStore(context).use { store ->
+            store.restore(backup); store.restore(backup)
+            assertEquals("Current thought",Chat.draft(context))
+            assertEquals("Imported thought",store.list().single().body)
+        }
+    }
 }

@@ -51,3 +51,9 @@ Opening chat navigation sheets stops capture/playback just as leaving the chat d
 ## Recreation and failure
 
 Rotating/recreating Voice pauses capture and preserves displayed text; tap Talk to continue. A failed or echoed response turns off Keep talking and saves the question to an empty typed draft. An existing different draft is preserved. Main and selection dictation level feedback follows Android’s disabled-animation preference. Selection prompts retain text/cursor during recreation and need an explicit Send after reviewing dictation.
+
+## Explicit reader
+
+`ReadingService` owns completed-text playback separately from the live `Mouth` stream. Listen on a note/answer opens `ReadingActivity`: sentence highlighting, pause/resume, previous/next and speed. A mediaPlayback foreground service, generic MediaSession metadata and native notification allow screen-lock/headset control. Position persists at sentence boundaries; after process death playback only resumes by an explicit user action. TTS voices still must be installed/offline. Audio-focus loss, headphone disconnect and all microphone entry points pause it. Navigation does not stop this explicitly requested reading session.
+
+Notes use editable on-device dictation. Manual editing cancels recognition so late partials cannot overwrite a newer draft. Saved text is independent of model or recognizer availability. The alpha GenAI recognizer remains an evaluation opportunity, not an untested default replacement.

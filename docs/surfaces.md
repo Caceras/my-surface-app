@@ -38,3 +38,9 @@ Add an entry only with a defined user trigger, permission boundary, foreground l
 - **Windows:** capped reading width, scrollable voice content, cutout handling and default predictive system back. Physical folding/desktop/gesture behavior remains a device gate.
 
 See the [complete Android plan](android-native-plan.md) for unsupported and conditional integrations, and [native actions](native-actions.md) for exact side effects.
+
+## Workspace additions
+
+Today and Library are internal native activities reached from the common Today · AI · Library navigation. Capture note launcher and widget actions route to the same editor. AI still receives plain-text sharing, with an explicit Save option before sending. The widget uses compact capture/talk controls and a bounded expanded preview; pinned-note text is included only when previews are enabled.
+
+Calendar is read only after choosing calendars; Beeper is a separately permission-gated experimental provider. Reminder notifications open their exact record and provide supported actions. Explicit read-aloud has a media playback notification and lock-screen transport. Connected routine completion opens its result note. No overlay permission, background microphone, notification scraping, accessibility automation, wearable or car surface was introduced.

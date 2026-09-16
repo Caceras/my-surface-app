@@ -44,6 +44,7 @@ object ConnectedAI {
     fun validateEndpoint(raw:String):URL = URL(raw).also { require(it.protocol=="https" && it.host.isNotBlank() && it.userInfo==null && it.query==null && it.ref==null) { "Use a full HTTPS Chat Completions endpoint without credentials or query parameters." } }
     fun request(context:Context,prompt:String,onConnection:(HttpsURLConnection)->Unit={}):String {
         require(configured(context)) { "Set up connected AI first." }
+        require(prompt.length<=16000) { "Shorten the question or remove some sources; connected requests are limited to 16,000 characters." }
         val settings=prefs(context)
         val endpoint=validateEndpoint(settings.getString("endpoint","").orEmpty())
         val conn=(endpoint.openConnection() as HttpsURLConnection)
@@ -51,7 +52,7 @@ object ConnectedAI {
             onConnection(conn)
             conn.instanceFollowRedirects=false; conn.requestMethod="POST"; conn.connectTimeout=15000; conn.readTimeout=45000; conn.doOutput=true
             conn.setRequestProperty("Authorization","Bearer ${secret(context)}"); conn.setRequestProperty("Content-Type","application/json")
-            val messages=JSONArray().put(JSONObject().put("role","system").put("content",Prompts.system(Task.ASK))).put(JSONObject().put("role","user").put("content",prompt.take(16000)))
+            val messages=JSONArray().put(JSONObject().put("role","system").put("content",Prompts.system(Task.ASK))).put(JSONObject().put("role","user").put("content",prompt))
             val body=JSONObject().put("model",settings.getString("model","")).put("messages",messages).put("max_completion_tokens",1024).put("stream",false)
             conn.outputStream.use { it.write(body.toString().toByteArray()) }
             require(conn.responseCode in 200..299) { "Provider returned HTTP ${conn.responseCode}. Check the model, key and provider account. No automatic retry was sent." }
@@ -74,7 +75,7 @@ object ConnectedAI {
             }.start()
         }
     }
-    fun settings(activity:Activity) {
+    fun settings(activity:Activity,after:()->Unit={}) {
         val settings=prefs(activity)
         val layout=LinearLayout(activity).apply { orientation=LinearLayout.VERTICAL; padDp(20,8,20,8) }
         layout.addView(activity.label("Optional. Your questions, recent conversation and selected sources go to the provider you choose. Provider charges and privacy terms apply. No calendar or Beeper data is fetched automatically.",14f,true))
@@ -85,7 +86,7 @@ object ConnectedAI {
         val enable=activity.preferenceSwitch("Use connected AI for typed chat",enabled(activity)) {}
         layout.addView(enable)
         layout.addView(activity.label("Keys are encrypted with Android Keystore and excluded from exports. Nano remains available when this is off. Voice mode uses Nano.",12f,true))
-        val dialog=AlertDialog.Builder(activity).setTitle("Connected AI").setView(ScrollView(activity).apply { addView(layout) }).setNegativeButton("Cancel",null).setNeutralButton("Disconnect") { _,_ -> settings.edit().clear().apply(); brain.cancel(); RoutineJobService.schedule(activity) }.setPositiveButton("Review",null).showProtected(activity)
+        val dialog=AlertDialog.Builder(activity).setTitle("Connected AI").setView(ScrollView(activity).apply { addView(layout) }).setNegativeButton("Cancel",null).setNeutralButton("Disconnect") { _,_ -> settings.edit().clear().apply(); brain.cancel(); RoutineJobService.schedule(activity); after() }.setPositiveButton("Review",null).showProtected(activity)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             runCatching {
                 val url=validateEndpoint(endpoint.text.toString().trim()); require(model.text.isNotBlank()) { "Enter a model ID." }
@@ -95,7 +96,7 @@ object ConnectedAI {
                 AlertDialog.Builder(activity).setTitle("Connect to ${url.host}?").setMessage("Endpoint: $url\nModel: ${model.text}\n\nWhen enabled, typed chat sends your question, recent conversation and selected source excerpts here. Routines require separate approval. Set spending limits with your provider.")
                     .setNegativeButton("Cancel",null).setPositiveButton("Save connection") { _,_ ->
                         settings.edit().putString("endpoint",url.toString()).putString("model",model.text.toString().trim()).putString("secret",encrypted).putBoolean("enabled",enable.isChecked).apply()
-                        RoutineJobService.schedule(activity); dialog.dismiss()
+                        RoutineJobService.schedule(activity); dialog.dismiss(); after()
                         Toast.makeText(activity,"Connection saved. Send a short question to test it.",Toast.LENGTH_LONG).show()
                     }.showProtected(activity)
             }.onFailure { endpoint.error=it.message ?: "Check the connection details." }

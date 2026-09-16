@@ -246,6 +246,7 @@ class WorkspaceActivity : Activity() {
         if(record.source.isNotBlank()) content.addView(label("Source\n${record.source}",12f,true).apply { setTextIsSelectable(true); padDp(0,20,0,8) })
         layout.addView(ScrollView(this).apply { addView(content) },LinearLayout.LayoutParams(-1,0,1f))
         dialog.setContentView(AdaptiveFrame(this,layout).apply { padForSystemBars() })
+        dialog.window?.setBackgroundDrawableResource(R.color.chat_bg)
         dialog.setOnDismissListener {
             if(!closed) save(true)
             closed=true; savedTask?.let(handler::removeCallbacks); speech.cancel(); ears=null; dictate=null; flush=null; editingId=null
@@ -267,16 +268,38 @@ class WorkspaceActivity : Activity() {
     private fun showTable(collection:Record) {
         val members=store.linked(collection.id,"member"); val props=store.properties(collection.id)
         val tableColumn=column()
+        val filter=EditText(this).apply { styleField(); hint="Filter rows and values"; setSingleLine(); setText(store.value("table-filter:${collection.id}")) }
+        val sort=Spinner(this).apply { adapter=ArrayAdapter(this@WorkspaceActivity,android.R.layout.simple_spinner_dropdown_item,listOf("Sort by title")+props.map { "Sort by ${it.name}" }); setSelection(store.value("table-sort:${collection.id}","0").toIntOrNull()?.coerceIn(0,props.size) ?: 0) }
         fun row(cells:List<String>,action:(()->Unit)?=null) = LinearLayout(this).apply {
             cells.forEachIndexed { i,text -> addView(label(text.ifBlank { "—" },if(action==null) 13f else 15f).apply { padDp(14,14,14,14); if(action==null) medium(); maxLines=3; ellipsize=TextUtils.TruncateAt.END; if(action!=null) { buttonSemantics(); isFocusable=true; setOnClickListener { action() } } },LinearLayout.LayoutParams(dp(if(i==0) 180 else 140),-2)) }
             background=surface(if(action==null) R.color.chip_bg else R.color.bubble_ai,8,true)
         }
-        tableColumn.addView(row(listOf("Item","Type")+props.map { it.name }))
-        members.forEach { r -> tableColumn.addView(row(listOf(r.title.ifBlank { r.body.take(60) },r.kind)+props.map { store.propertyValue(r.id,it.id) }) { if(props.isEmpty()) edit(r) else editProperties(r,props) }) }
-        if(members.isEmpty()) tableColumn.addView(label("Use Link to add items to this collection.",14f,true).apply { padDp(14,20,14,20) })
+        fun draw() {
+            val values=members.associate { r -> r.id to props.map { store.propertyValue(r.id,it.id) } }
+            val q=filter.text.toString()
+            val sortIndex=sort.selectedItemPosition-1
+            var visible=members.filter { r -> q.isBlank() || (listOf(r.title,r.body)+values.getValue(r.id)).any { it.contains(q,true) } }
+            visible=if(sortIndex in props.indices && props[sortIndex].type=="number") visible.sortedBy { values.getValue(it.id)[sortIndex].toDoubleOrNull() ?: Double.POSITIVE_INFINITY }
+                else visible.sortedBy { if(sortIndex in props.indices) values.getValue(it.id)[sortIndex].lowercase() else it.title.lowercase() }
+            tableColumn.removeAllViews(); tableColumn.addView(row(listOf("Item","Type")+props.map { it.name }))
+            visible.forEach { r -> tableColumn.addView(row(listOf(r.title.ifBlank { r.body.take(60) },r.kind)+values.getValue(r.id)) { if(props.isEmpty()) edit(r) else editProperties(r,props) { draw() } }) }
+            if(visible.isEmpty()) tableColumn.addView(label(if(members.isEmpty()) "Use Link to add items to this collection." else "No matching rows.",14f,true).apply { padDp(14,20,14,20) })
+        }
         val dialog=Dialog(this); dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        val root=column().apply { setBackgroundColor(ink(R.color.chat_bg)); padDp(16,12,16,12); addView(sheetHeader(collection.title.ifBlank { "Collection" }) { dialog.dismiss() }); addView(label("Swipe across to see fields. Tap a row to edit values.",13f,true)); addView(ScrollView(this@WorkspaceActivity).apply { addView(HorizontalScrollView(this@WorkspaceActivity).apply { addView(tableColumn) }) },LinearLayout.LayoutParams(-1,0,1f)) }
-        dialog.setContentView(AdaptiveFrame(this,root).apply { padForSystemBars() }); dialog.show(); dialog.window?.setLayout(-1,-1); dialog.window?.let { readableSystemBars(it) }
+        val root=column().apply {
+            setBackgroundColor(ink(R.color.chat_bg)); padDp(16,12,16,12)
+            addView(sheetHeader(collection.title.ifBlank { "Collection" }) { dialog.dismiss() })
+            addView(filter); addView(sort)
+            addView(label("Swipe across for fields. Tap a row to edit. This view is remembered.",13f,true).apply { padDp(0,8,0,10) })
+            addView(ScrollView(this@WorkspaceActivity).apply { addView(HorizontalScrollView(this@WorkspaceActivity).apply { addView(tableColumn) }) },LinearLayout.LayoutParams(-1,0,1f))
+        }
+        filter.afterChange { store.put("table-filter:${collection.id}",it); draw() }
+        sort.onItemSelectedListener=object:AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent:AdapterView<*>?) {}
+            override fun onItemSelected(parent:AdapterView<*>?,view:View?,position:Int,id:Long) { store.put("table-sort:${collection.id}",position.toString()); draw() }
+        }
+        draw()
+        dialog.setContentView(AdaptiveFrame(this,root).apply { padForSystemBars() }); dialog.window?.setBackgroundDrawableResource(R.color.chat_bg); dialog.show(); dialog.window?.setLayout(-1,-1); dialog.window?.let { readableSystemBars(it) }
     }
     private fun propertyForm(record:Record,after:()->Unit) {
         val name=EditText(this).apply { styleField(); hint="Field name"; setSingleLine() }
@@ -285,7 +308,7 @@ class WorkspaceActivity : Activity() {
         val dialog=AlertDialog.Builder(this).setTitle("Add a field").setView(layout).setNegativeButton("Cancel",null).setPositiveButton("Add",null).showProtected(this)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { runCatching { store.addProperty(record.id,name.text.toString(),type.selectedItem.toString()) }.onSuccess { dialog.dismiss(); after() }.onFailure { name.error=it.message ?: "Use a unique field name." } }
     }
-    private fun editProperties(record:Record,props:List<Property>) {
+    private fun editProperties(record:Record,props:List<Property>,after:()->Unit={}) {
         val layout=column().apply { padDp(20,8,20,8) }
         val fields=props.map { p ->
             layout.addView(label("${p.name} · ${p.type}${if(p.type=="date") " (YYYY-MM-DD)" else ""}",13f,true))
@@ -294,7 +317,7 @@ class WorkspaceActivity : Activity() {
         val dialog=AlertDialog.Builder(this).setTitle(record.title.ifBlank { "Edit fields" }).setView(ScrollView(this).apply { addView(layout) }).setNegativeButton("Cancel",null).setPositiveButton("Save",null).showProtected(this)
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val db=store.writableDatabase; db.beginTransaction()
-            try { props.forEachIndexed { i,p -> store.setProperty(record.id,p,fields[i].text.toString()) }; db.setTransactionSuccessful(); dialog.dismiss(); toast("Fields saved. Reopen the table to see changes.") }
+            try { props.forEachIndexed { i,p -> store.setProperty(record.id,p,fields[i].text.toString()) }; db.setTransactionSuccessful(); dialog.dismiss(); after() }
             catch(e:Exception) { toast(e.message ?: "Check the field values.") } finally { db.endTransaction() }
         }
     }

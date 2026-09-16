@@ -79,3 +79,15 @@ The source-to-release boundary is described in [the iteration workflow](iteratio
 ## Recovery guarantees
 
 Selection Ask stores prompt/cursor/modality for configuration recreation; blank Send keeps the private editor open. Voice recreation restores visible content and stays paused until an explicit Talk. Failed/echoed spoken questions fill an empty typed draft and disable continuous mode, while existing drafts remain intact. Chat recovery uses an explicit Edit question action and a replacement choice for a different draft. Imported archives reject empty/duplicate IDs within a backup; merges reassign conflicting IDs for distinct content. The JSON backup format remains `surface-chat-v1`.
+
+## Workspace boundaries
+
+- `WorkspaceStore`: framework SQLiteOpenHelper schema, FTS4 search, relations, typed fields, optimistic revisions, migration and transactional import. Stable IDs are shared by list/table views. Originals are retained independently of edited bodies.
+- `WorkspaceActivity`: Today/Library, capture/editor, linked records, date/time review and versioned document backups. Writes are small local transactions with debounced editing and a lifecycle flush; large exports/imports and provider queries use worker threads. Large-dataset UI performance still needs measurement.
+- `KnowledgeContext`: explicit live-source selection and bounded reference prompts. No model output dispatcher or hidden phone access.
+- `Connections`: selected Calendar reads and the experimental Beeper content provider. Read/send grants are separate; exact-room review precedes a send claim.
+- `ReadingService`/`ReadingActivity`: explicit existing-text playback with a media service/session, offline TTS, sentence position and audio interruption fencing.
+- `Reminders`/`ReminderReceiver`: inexact alarms, reboot/time-change recovery, notification actions, stored-zone recurrence and durable delivery claims.
+- `ConnectedAI`/`RoutineJobService`: opt-in HTTPS generation, Keystore credential custody, separately approved routine scope, network-constrained persisted jobs and execution history. No job runs Nano outside the foreground.
+
+All remain framework-only in main/core. Existing ML Kit stays in Nano; no Room, Compose or AndroidX runtime dependency was introduced. Provider keys are isolated from content backups. Full details: [everyday workspace](everyday-workspace.md).

@@ -75,6 +75,7 @@ class MainActivity : Activity() {
     /** True while the pending question came from the microphone. */
     private var askedAloud = false
     private var listening = false
+    private var applyingDictation = false
     private var busy = false
     private var requestId = 0
     private var pendingQuestion = ""
@@ -345,8 +346,8 @@ class MainActivity : Activity() {
         panel.addView(flatButton("Workspace · notes, connections & backups") {
             startActivity(WorkspaceActivity.intent(this, "library"))
         })
-        panel.addView(flatButton("Connected AI · optional") { ConnectedAI.settings(this) })
-        panel.addView(flatButton("AI sources") { KnowledgeContext.choose(this) })
+        panel.addView(flatButton("Connected AI · optional") { ConnectedAI.settings(this) { updateSend(); status.text=if(ConnectedAI.enabled(this)) "Connected AI · " + ConnectedAI.host(this) else "Gemini Nano · On device" } })
+        panel.addView(flatButton("AI sources") { KnowledgeContext.choose(this) { composeState.text=KnowledgeContext.label(this) } })
         panel.addView(label("YOUR CONVERSATION", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
         panel.addView(label("Saved on this phone. Export before reinstalling to keep your conversation.", 14f, true))
         panel.addView(flatButton("Export conversation") {
@@ -578,6 +579,9 @@ class MainActivity : Activity() {
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    if(listening && !applyingDictation) {
+                        listening=false; ears.cancel(); setMicActive(false); input.hint=getString(R.string.chat_hint)
+                    }
                     if (::send.isInitialized) updateSend()
                 }
                 override fun afterTextChanged(s: Editable?) {}
@@ -608,7 +612,7 @@ class MainActivity : Activity() {
             tag = "compose-state"
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
             padDp(8, 0, 8, 0)
-            setOnClickListener { KnowledgeContext.choose(this@MainActivity) }; isFocusable=true; buttonSemantics()
+            setOnClickListener { pauseForNavigation(); KnowledgeContext.choose(this@MainActivity) { composeState.text=KnowledgeContext.label(this@MainActivity) } }; isFocusable=true; buttonSemantics()
         }
         if (ears.available()) {
             val button = ImageButton(this).apply {
@@ -1036,12 +1040,16 @@ class MainActivity : Activity() {
             onPartial = { partial ->
                 // Words appear as they are recognised, so the screen is
                 // never blank while you are talking.
+                applyingDictation=true
                 input.setText(listOf(listenDraft, partial).filter { it.isNotBlank() }.joinToString(" "))
                 input.setSelection(input.text.length)
+                applyingDictation=false
             },
             onFinal = { text ->
+                applyingDictation=true
                 input.setText(listOf(listenDraft, text).filter { it.isNotBlank() }.joinToString(" "))
                 input.setSelection(input.text.length)
+                applyingDictation=false
                 // The transcript stays editable: a misheard word is a fix,
                 // not a redo. Send speaks the answer back, because this
                 // question was asked out loud.

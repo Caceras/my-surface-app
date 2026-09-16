@@ -43,7 +43,21 @@ class WorkspaceStore(context: Context) : SQLiteOpenHelper(context.applicationCon
     }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { error("Unsupported database upgrade") }
 
-    fun value(key: String, fallback: String = ""): String = readableDatabase.rawQuery("SELECT value FROM content WHERE key=?", arrayOf(key)).use { if (it.moveToFirst()) it.getString(0) else fallback }
+    fun value(key: String, fallback: String = ""): String {
+        // CursorWindow is bounded independently of SQLite TEXT size. Read large legacy drafts in code-point chunks.
+        val chunk=200000
+        val first=readableDatabase.rawQuery("SELECT substr(value,1,?),length(value) FROM content WHERE key=?",arrayOf(chunk.toString(),key)).use {
+            if(it.moveToFirst()) it.getString(0) to it.getInt(1) else return fallback
+        }
+        if(first.second<=chunk) return first.first
+        val out=StringBuilder(first.first)
+        var offset=chunk+1
+        while(offset<=first.second) {
+            readableDatabase.rawQuery("SELECT substr(value,?,?) FROM content WHERE key=?",arrayOf(offset.toString(),chunk.toString(),key)).use { if(it.moveToFirst()) out.append(it.getString(0)) }
+            offset+=chunk
+        }
+        return out.toString()
+    }
     fun put(key: String, value: String) { writableDatabase.insertWithOnConflict("content", null, values("key" to key, "value" to value), SQLiteDatabase.CONFLICT_REPLACE) }
     fun get(id: String): Record? = readableDatabase.rawQuery("SELECT * FROM records WHERE id=?", arrayOf(id)).use { if (it.moveToFirst()) row(it) else null }
     fun list(query: String = "", kind: String = "", trash: Boolean = false, limit: Int = 200): List<Record> {
@@ -120,9 +134,10 @@ class WorkspaceStore(context: Context) : SQLiteOpenHelper(context.applicationCon
             val result = JSONObject().put("format", "aegentica-workspace-v1")
             for (table in TABLES) {
                 val rows = JSONArray()
-                db.rawQuery("SELECT * FROM $table", null).use { c -> while(c.moveToNext()) {
+                db.rawQuery(if(table=="content") "SELECT key FROM content" else "SELECT * FROM $table", null).use { c -> while(c.moveToNext()) {
                     val item = JSONObject()
                     c.columnNames.forEachIndexed { i, name -> item.put(name, if(c.getType(i) == Cursor.FIELD_TYPE_INTEGER) c.getLong(i) else c.getString(i)) }
+                    if(table=="content") item.put("value",value(item.getString("key")))
                     rows.put(item)
                 } }
                 result.put(table, rows)

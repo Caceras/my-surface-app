@@ -217,7 +217,8 @@ class ShotTest {
         children(activity.window.decorView).filterIsInstance<android.widget.TextView>()
             .first { it.text == "Listen" }.performClick()
         shoot("chat-compact", activity.window.decorView, shotWidth = 960, shotHeight = 1920)
-        listOf("Voice", "History", activity.getString(R.string.stop_speaking)).forEach { label ->
+        org.junit.Assert.assertEquals(ReadingActivity::class.java.name, org.robolectric.Shadows.shadowOf(activity).nextStartedActivity.component!!.className)
+        listOf("Voice", "History", "AI").forEach { label ->
             val control = children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == label }
             val rect = android.graphics.Rect()
             assertTrue("$label is not visible", control.getGlobalVisibleRect(rect))
@@ -388,27 +389,49 @@ class ShotTest {
         } finally { Brains.useForTest(null) }
     }
 
-    @Test fun `workspace today library and capture`() {
+    private fun workspaceFixture():String {
         val context=RuntimeEnvironment.getApplication()
-        WorkspaceStore(context).use { store ->
+        return WorkspaceStore(context).use { store ->
             val project=store.save(Record(kind="project",title="A calmer everyday",body="Make room for the things that matter.",pinned=true))
             val note=store.save(Record(title="An idea for tomorrow",body="Start with a walk. Capture three ideas for the new project, then choose one small next step.",pinned=true))
             store.link(note.id,project.id)
             store.save(Record(kind="task",title="Write the first three examples",body="Keep them practical and easy to try."))
+            note.id
         }
-        val today=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(context,"today")).setup()
-        shoot("workspace-today",today.get().window.decorView)
-        today.pause().stop().destroy()
-        val library=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(context,"library")).setup()
-        shoot("workspace-library",library.get().window.decorView)
-        library.pause().stop().destroy()
-        val id=WorkspaceStore(context).use { it.list(kind="note").single().id }
-        val edit=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(context,"library",id)).setup()
+    }
+    @Test fun `workspace today`() {
+        workspaceFixture()
+        val activity=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(RuntimeEnvironment.getApplication(),"today")).setup()
+        shoot("workspace-today",activity.get().window.decorView)
+        activity.pause().stop().destroy()
+    }
+    @Test fun `workspace library`() {
+        workspaceFixture()
+        val activity=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(RuntimeEnvironment.getApplication(),"library")).setup()
+        shoot("workspace-library",activity.get().window.decorView)
+        activity.pause().stop().destroy()
+    }
+    @Test fun `workspace capture`() {
+        val id=workspaceFixture()
+        val activity=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(RuntimeEnvironment.getApplication(),"library",id)).setup()
         shoot("workspace-note",org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView)
-        edit.pause().stop().destroy()
+        activity.pause().stop().destroy()
     }
 
-    @Test @Config(qualifiers="w360dp-h800dp-xxhdpi-night") fun `workspace dark at large font`() {
+    @Test @Config(qualifiers="w320dp-h640dp-xxhdpi") fun `compact reader controls remain reachable`() {
+        WorkspaceStore(RuntimeEnvironment.getApplication()).use { it.put("reading-text","Make space for one thing at a time. Start with a small step.") }
+        val activity=Robolectric.buildActivity(ReadingActivity::class.java).setup()
+        shoot("workspace-reader-compact",activity.get().window.decorView,shotWidth=960,shotHeight=1920)
+        fun children(v:View):List<View> = listOf(v)+if(v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
+        for(title in listOf("Previous","Play","Next")) {
+            val button=children(activity.get().window.decorView).filterIsInstance<android.widget.TextView>().first { it.text==title }
+            val rect=android.graphics.Rect()
+            assertTrue(button.getGlobalVisibleRect(rect)); assertTrue(rect.height()>=activity.get().dp(48))
+        }
+        activity.pause().stop().destroy()
+    }
+
+    @Test @Config(qualifiers="w360dp-h800dp-night-xxhdpi") fun `workspace dark at large font`() {
         RuntimeEnvironment.setFontScale(1.5f)
         val activity=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(RuntimeEnvironment.getApplication(),"library")).setup()
         shoot("workspace-library-night",activity.get().window.decorView,shotWidth=1080,shotHeight=2400)

@@ -31,3 +31,11 @@ When changing prompts or the SDK, compare output quality on a fixed device promp
 ## Android AppFunctions
 
 AppFunctions is a promising future route for OS-level agent interoperability. Google's current documentation calls it experimental and limits the complete pipeline to selected apps/system agents. Exposing functions and being allowed to invoke other apps are different capabilities; cross-package execution requires the relevant permission/eligibility. This preview implements neither provider nor agent integration. A future milestone should first verify eligibility, then add typed schemas, user confirmation and device execution tests. [Official AppFunctions guidance](https://developer.android.com/ai/appfunctions).
+
+## Connected and source-aware AI
+
+The **AI** destination can attach up to five selected live records through `KnowledgeContext`; it requests numbered references and treats source text as untrusted data. Context is bounded, may be excerpted, and is not an automatic search of every saved record. The model cannot invoke tools or determine permissions.
+
+`ConnectedAI` is an optional framework HTTPS Chat Completions client with an explicitly configured model/endpoint and Keystore-encrypted key. It is used only when enabled for the typed/dictated composer or separately approved for a connected routine. No retry/fallback can silently move Nano input to a remote provider. The current connected response is non-streaming; hands-free Voice and selection actions retain Nano. Credentials and third-party behavior require owner/device verification.
+
+`RoutineJobService` durably claims an occurrence before a network request, stores results as linked notes, records completion/failure/interruption and schedules future recurrences. It never executes answer text as an action. Details, scope and spending limits: [everyday guide](everyday-workspace.md#connected-ai-and-routines).

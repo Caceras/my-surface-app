@@ -14,7 +14,7 @@ Library supports word search, type filters, pinning, Trash, restore and permanen
 
 Use New to create notes, tasks, people, projects, collections or routines. Link any saved item to another. Backlinks appear in both items. Long-press a linked item to remove the relationship. Trashing hides an item and its search entries; restoring preserves its relationships. Permanent deletion removes that item's links and property values, leaving other records intact.
 
-A **collection** groups existing records. Use Link to add members and Add a field to define text, number, ISO date (`YYYY-MM-DD`) or checkbox (`true`/`false`) properties. Table view shows the same records; swipe horizontally for columns and tap a row to edit values. Values are validated transactionally. Reopen the table after editing to refresh. Collection membership and general relationships are distinct.
+A **collection** groups existing records. Use Link to add members and Add a field to define text, number, ISO date (`YYYY-MM-DD`) or checkbox (`true`/`false`) properties. Table view shows the same records; swipe horizontally for columns and tap a row to edit values. Values are validated transactionally. Values refresh immediately. Filter across rows/values and choose a typed sort column; each collection remembers that view. Collection membership and general relationships are distinct.
 
 This first table implementation does not provide spreadsheet formulas, arbitrary joins, per-column saved filters or a visual graph. Stable identities and typed fields provide the foundation without creating duplicate copies of notes.
 
@@ -22,7 +22,7 @@ This first table implementation does not provide spreadsheet formulas, arbitrary
 
 Open a saved item and tap AI, or choose **AI Settings → AI sources**. Select up to five live records. The next request includes bounded excerpts, asks the model to treat them as reference data, and requests numbered source citations. You can inspect the selected records in Library. Citations are model-generated and must be checked; they are not a guarantee of factual grounding. Long sources are excerpted. There is no automatic scan of your whole phone or Library.
 
-Typing and dictation use the same editable AI composer. New clears its selected sources. Existing hands-free Voice shares conversation history, uses Nano, and retains its explicit foreground/Keep talking behavior. Connected AI applies to the typed/dictated AI composer; it does not silently change hands-free Voice or selection presets.
+Typing and dictation use the same editable AI composer. New clears its selected sources. Existing hands-free Voice shares conversation history and selected source context, uses Nano, and retains its explicit foreground/Keep talking behavior. Connected AI applies to the typed/dictated AI composer; it does not silently change hands-free Voice or selection presets.
 
 A routine opened through Run with AI stages its prompt for review. You still press Send. Successful routine answers are saved as linked notes, with run history; cancellation/failure remains visible.
 
@@ -38,7 +38,7 @@ Today gathers open tasks, selected-calendar events for the coming week, pinned i
 
 Reminders use inexact Android alarms: battery restrictions can delay them. Reboot, time changes and app updates reschedule pending records. Recurrences preserve the stored time zone/local time across daylight-saving changes and skip missed intervals. Force-stop prevents Android background work until the app is opened again. Notification permission is requested only when setting a reminder; denial preserves the task.
 
-Choose calendars only when you want agenda access. The app reads only selected calendars in its query and refreshes when returning to Today. Event taps open the calendar app; new events remain editable Android handoffs through AI → Actions. Revoking Calendar permission disconnects the view. Ægentica does not copy your calendar into its canonical database or perform silent calendar writes.
+Choose calendars only when you want agenda access. The app reads only selected calendars in its query and refreshes when returning to Today. Event taps offer Open in Calendar, Save as note or Save & use with AI; new events remain editable Android handoffs through AI → Actions. Revoking Calendar permission disconnects the view. Ægentica does not copy your calendar into its canonical database or perform silent calendar writes.
 
 ## Beeper
 

@@ -50,8 +50,18 @@ object CalendarAccess {
                     events.forEach { event ->
                         val whenText=if(event.allDay) java.time.Instant.ofEpochMilli(event.start).atZone(java.time.ZoneOffset.UTC).toLocalDate().toString()+" · All day" else java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT,java.text.DateFormat.SHORT).format(java.util.Date(event.start))
                         container.addView(activity.pill("$whenText\n${event.title}") {
-                            runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW,ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI,event.id)).putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME,event.start).putExtra(CalendarContract.EXTRA_EVENT_END_TIME,event.end)) }
-                                .onFailure { Toast.makeText(activity,"No calendar app could open this event.",Toast.LENGTH_LONG).show() }
+                            AlertDialog.Builder(activity).setTitle(event.title).setItems(arrayOf("Open in Calendar","Save as note","Save & use with AI")) { _,which ->
+                                if(which==0) runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW,ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI,event.id)).putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME,event.start).putExtra(CalendarContract.EXTRA_EVENT_END_TIME,event.end)) }
+                                    .onFailure { Toast.makeText(activity,"No calendar app could open this event.",Toast.LENGTH_LONG).show() }
+                                else {
+                                    val record=WorkspaceStore(activity).use { store ->
+                                        val saved=store.save(Record(title=event.title.take(200),body="$whenText\n${event.title}",source="Android Calendar event ${event.id} · $whenText"))
+                                        if(which==2) store.put("ai-context",saved.id)
+                                        saved
+                                    }
+                                    activity.startActivity(if(which==2) Intent(activity,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP) else WorkspaceActivity.intent(activity,"library",record.id))
+                                }
+                            }.showProtected(activity)
                         }.apply { gravity=android.view.Gravity.START })
                     }
                 }.onFailure { container.addView(activity.label("Calendar access changed. Choose calendars again.",13f,true)) }
