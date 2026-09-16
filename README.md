@@ -4,14 +4,14 @@
 
 A native Android workspace for **Today · AI · Library**: capture notes, connect ideas, plan your day, and think by typing or speaking. Gemini Nano, dictation, notes and local reminders need no account. Optional connected AI and scheduled generation use your own provider; calendar and Beeper access are explicit choices.
 
-**[Everyday guide](docs/everyday-workspace.md)** · [Implementation and limits](docs/everyday-assistant-plan.md)
+**[Everyday guide](docs/everyday-workspace.md)** · [Implementation and limits](docs/everyday-assistant-plan.md) · [Workspace acceptance](docs/audits/2026-09-16-workspace.md)
 
 [![Android checks](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg?branch=improve-pixel-assistant)](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-70CEFA.svg)](LICENSE)
 
 **[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [What changed](docs/preview-notes.md) · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Deep audit](docs/audits/2026-09-15.md) · [Test/process audit](docs/audits/iteration-efficiency.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribute](CONTRIBUTING.md)
 
-> This is the **Ægentica AI** app on `improve-pixel-assistant`. The main branch and `/releases/latest` may contain an older experience. This preview is not a Play Store release. Export your conversations before any reinstall.
+> This is the **Ægentica AI** app on `improve-pixel-assistant`. The main branch and `/releases/latest` may contain an older experience. This preview is not a Play Store release. Export your workspace before any reinstall (conversation export on older builds).
 
 ## The experience
 

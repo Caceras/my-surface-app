@@ -20,7 +20,8 @@ class RoutineJobService:JobService() {
                         if(stopped) break
                         val approval=ConnectedAI.routineApproval(store,this,record) ?: continue
                         val run="remote:${record.id}:${record.due}"
-                        if(!store.execution(run,record.id,"started","Connected AI · no automatic retry")) continue
+                        activeClaims.add(run)
+                        if(!store.execution(run,record.id,"started","Connected AI · no automatic retry")) { activeClaims.remove(run); continue }
                         try {
                             val sources=approval.optString("sources").split(",").mapNotNull(store::get).filterNot { it.deleted }.take(5)
                             val prompt=KnowledgeContext.withSources(record.body,sources)
@@ -47,14 +48,12 @@ class RoutineJobService:JobService() {
                                 val next=Reminders.nextDue(record,System.currentTimeMillis())
                                 store.save(latest.copy(due=next,enabled=next>0 && latest.enabled))
                             }
-                        } finally { connection=null }
+                        } finally { connection=null; activeClaims.remove(run) }
                     }
                 }
             } finally {
-                if(!stopped) {
-                    jobFinished(params,false)
-                    android.os.Handler(mainLooper).post { schedule(this) }
-                }
+                if(!stopped) jobFinished(params,false)
+                android.os.Handler(mainLooper).post { schedule(this) }
             }
         }.start()
         return true
@@ -69,11 +68,28 @@ class RoutineJobService:JobService() {
     override fun onStopJob(params:JobParameters):Boolean { stopped=true; connection?.disconnect(); return false }
     companion object {
         private const val JOB=8041
+        private val activeClaims=java.util.Collections.synchronizedSet(mutableSetOf<String>())
+        /** A killed occurrence is never resent; repeating routines can still reach their next date. */
+        internal fun recoverInterrupted(store:WorkspaceStore,now:Long=System.currentTimeMillis()) {
+            val db=store.writableDatabase
+            db.beginTransaction()
+            try {
+                for(record in store.scheduled().filter { it.kind=="routine" }) {
+                    val run="remote:${record.id}:${record.due}"
+                    if(activeClaims.contains(run)) continue
+                    val state=db.rawQuery("SELECT state FROM executions WHERE id=?",arrayOf(run)).use { if(it.moveToFirst()) it.getString(0) else null } ?: continue
+                    if(state=="started") store.executionState(run,"interrupted","The app stopped before completion. This occurrence was not retried.")
+                    val next=Reminders.nextDue(record,now)
+                    store.save(record.copy(due=next,enabled=next>0))
+                }
+                db.setTransactionSuccessful()
+            } finally { db.endTransaction() }
+        }
         private fun eligible(context:Context,store:WorkspaceStore):List<Record> = store.scheduled().filter { r ->
             r.kind=="routine" && ConnectedAI.routineApproval(store,context,r)!=null && store.readableDatabase.rawQuery("SELECT 1 FROM executions WHERE id=?",arrayOf("remote:${r.id}:${r.due}")).use { !it.moveToFirst() }
         }
         fun schedule(context:Context) {
-            val next=WorkspaceStore(context).use { eligible(context,it).minOfOrNull { r -> r.due } }
+            val next=WorkspaceStore(context).use { recoverInterrupted(it); eligible(context,it).minOfOrNull { r -> r.due } }
             val scheduler=context.getSystemService(JobScheduler::class.java)
             if(next==null) { scheduler.cancel(JOB); return }
             scheduler.schedule(JobInfo.Builder(JOB,ComponentName(context,RoutineJobService::class.java)).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)

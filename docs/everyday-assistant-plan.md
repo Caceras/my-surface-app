@@ -1,6 +1,6 @@
 # Ægentica AI: everyday assistant plan
 
-16 September 2026 · Implementation now underway; see the delivery status below and [everyday guide](everyday-workspace.md). Builds on the native Android preview and [capability inventory](android-native-plan.md).
+16 September 2026 · Implemented preview; see the delivery status below and [everyday guide](everyday-workspace.md). Builds on the native Android preview and [capability inventory](android-native-plan.md).
 
 ## Product promise
 
@@ -37,7 +37,7 @@ Capture is available everywhere through a shared composer and explicit **Save no
 | 5. Collections and relations | People/projects, custom typed fields, links, saved filters and table/list views | One record identity across views; rename/delete/restore preserve links; no inferred relationship represented as confirmed fact |
 | 6. Scheduled assistance | Explicit routine scope, cadence, model and delivery; run history, pause/disable and retry limits | Separate reminders from AI execution; missed/failed runs are visible; remote processing requires opt-in and approved data scope |
 
-Do not wait for every slice to ship value. Slice 1 is the next implementation recommendation. Stable signing and a tested export/restore path are prerequisites before trusting irreplaceable notes to repeated APK upgrades. Avoid calendar, messaging and automation permissions until their respective slices exist.
+All six areas now have an implemented preview path; the status section below distinguishes delivered behavior from longer-term intent. Stable signing and a tested export/restore path are prerequisites before trusting irreplaceable notes to repeated APK upgrades. Avoid calendar, messaging and automation permissions until their respective slices exist.
 
 ## Data foundation
 

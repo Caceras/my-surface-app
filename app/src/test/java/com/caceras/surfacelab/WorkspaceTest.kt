@@ -157,4 +157,21 @@ class WorkspaceTest {
             assertEquals("Imported thought",store.list().single().body)
         }
     }
+    @Test fun `interrupted connected occurrence is not replayed and does not strand a recurring routine`() {
+        WorkspaceStore(context).use { store ->
+            val now=java.time.Instant.parse("2026-09-16T12:00:00Z").toEpochMilli()
+            val daily=store.save(Record(kind="routine",body="Plan today",due=now-60000,cadence="daily",zone="UTC"))
+            val once=store.save(Record(kind="routine",body="One summary",due=now-60000,cadence="once",zone="UTC"))
+            for(record in listOf(daily,once)) assertTrue(store.execution("remote:${record.id}:${record.due}",record.id,"started"))
+            RoutineJobService.recoverInterrupted(store,now)
+            assertTrue(store.get(daily.id)!!.due>now); assertTrue(store.get(daily.id)!!.enabled)
+            assertFalse(store.get(once.id)!!.enabled)
+            assertTrue(store.runs(daily.id).single().contains("interrupted"))
+            assertFalse(store.execution("remote:${daily.id}:${daily.due}",daily.id,"started"))
+            val next=store.get(daily.id)!!.due
+            RoutineJobService.recoverInterrupted(store,now)
+            assertEquals(next,store.get(daily.id)!!.due)
+        }
+    }
+
 }

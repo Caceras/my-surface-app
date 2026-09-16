@@ -8,6 +8,7 @@
 - Added experimental on-phone Beeper browsing, explicit saved AI context and recipient/text-reviewed sends with separate permissions and no automatic retries.
 - Added optional owner-configured HTTPS connected AI and separately approved scheduled generation, with Keystore-protected keys and local run history.
 - Added whole-workspace export/merge, compact capture widget behavior, a Capture note launcher shortcut and an everyday usage guide.
+- Recovered interrupted scheduled occurrences without replaying a request or stranding the next recurrence.
 - Polished compact reader controls, editor dictation cancellation/recovery and disabled reminder-channel handling.
 - Added focused data/migration/lifecycle/integration regressions and native workspace captures. Fixed a preflight false positive for URL string literals.
 
