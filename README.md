@@ -88,6 +88,7 @@ APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots
 | Guide | Covers |
 |---|---|
 | [Test/process audit](docs/audits/iteration-efficiency.md) | Test necessity, measured CI costs, request-to-install gaps and fixes |
+| [Everyday assistant plan](docs/everyday-assistant-plan.md) | Proposed notes, unified voice, calendar, Beeper and linked knowledge roadmap |
 | [Iteration workflow](docs/iteration-workflow.md) | Pipeline audit, automated evidence, verified releases and feedback loop |
 | [Deep audit and fixes](docs/audits/2026-09-15.md) | Prioritized repair register, current flow evidence and open acceptance gates |
 | [Cohesion audit](docs/cohesion-audit.md) | Current cross-flow fixes, fresh baseline and remaining device gates |
