@@ -39,11 +39,14 @@ class WorkspaceActivity : Activity() {
             override fun onDown(e: MotionEvent) = true
             override fun onFling(first: MotionEvent?, last: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if(first==null || kotlin.math.abs(velocityX) < kotlin.math.abs(velocityY) * 1.25f || kotlin.math.abs(last.x-first.x) < dp(72)) return false
-                val order=listOf("today","calendar","tasks","library")
+                val order=listOf("today","calendar","ai","tasks","library")
                 val current=order.indexOf(destination).coerceAtLeast(0)
                 val next=(current + if(last.x < first.x) 1 else -1).coerceIn(0,order.lastIndex)
                 if(next==current) return false
-                destination=order[next]; filter=""; query=""; render(); return true
+                val target=order[next]
+                if(target=="ai") startActivity(Intent(this@WorkspaceActivity,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+                else { destination=target; filter=""; query=""; render() }
+                return true
             }
         })
         render(); loaded=true

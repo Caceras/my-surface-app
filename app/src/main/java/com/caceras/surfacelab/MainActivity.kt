@@ -18,6 +18,7 @@ import android.text.InputType
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.KeyEvent
+import android.view.GestureDetector
 import android.view.inputmethod.EditorInfo
 import android.provider.Settings
 import android.widget.Switch
@@ -488,12 +489,21 @@ class MainActivity : Activity() {
             visibility = View.GONE
             elevation = dp(4).toFloat()
         }
+        val pageGestures = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent) = true
+            override fun onFling(first: MotionEvent?, last: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if(first==null || kotlin.math.abs(velocityX) < kotlin.math.abs(velocityY) * 1.25f || kotlin.math.abs(last.x-first.x) < dp(72)) return false
+                pauseForNavigation()
+                startActivity(WorkspaceActivity.intent(this@MainActivity,if(last.x < first.x) "tasks" else "calendar"))
+                return true
+            }
+        })
         transcript.setOnTouchListener { _, event ->
             if (event.actionMasked == MotionEvent.ACTION_MOVE) {
                 followReply = false
                 latest.visibility = if (history.isNotEmpty() || busy) View.VISIBLE else View.GONE
             }
-            false
+            pageGestures.onTouchEvent(event)
         }
         transcript.setOnScrollChangeListener { _, _, y, _, oldY ->
             if (y < oldY) followReply = false
