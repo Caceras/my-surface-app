@@ -65,3 +65,7 @@ Android JobScheduler runs connected routines when network/system conditions perm
 Legacy **AI Settings → Export/Restore conversation** remains `surface-chat-v1`, with the existing 40 current-exchange/12 archive bounds and 4 MB limit. Workspace backups have a 32 MB/10,000-record import bound; no attachments or raw recordings are supported. Initial SQLite migration copies the old conversation preferences once; subsequent writes retire the old value so cleared content does not reappear.
 
 Use the exact build-specific Nano download in the handoff and verify its version in Settings. Private signing continuity still needs the documented owner-controlled secrets. If Android reports a signature conflict, export before uninstalling. No code change can recover the signing key of an already-installed ephemeral debug build.
+
+## Reading voice
+
+Choose **Listen**, then **Voice** to preview installed offline voices and save a preference. The default prioritizes the quality reported by the installed speech engine. Speech language remains the selection in voice setup. Upcoming sentences are queued to reduce gaps. An unavailable voice produces a visible error without switching to a network voice. The quality of installed voices varies; the app does not bundle a neural voice model or use a paid speech service.

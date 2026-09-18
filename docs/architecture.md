@@ -22,7 +22,7 @@
 | `AdaptiveFrame.kt` | Centered reading column capped at 720 dp |
 | `SpeechControls.kt` | Foreground MediaSession and headphone-disconnect handling |
 | `ReadingScrollView.kt` | Reader-controlled scrolling for voice and selection streams |
-| `StreamUpdates.kt` | Immediate first paint, then coalesced text updates at a minimum 48 ms interval |
+| `StreamUpdates.kt` | Immediate first paint, then at most one coalesced update per display frame |
 | `Chat.kt` | Current exchanges, draft, recent archives, backup validation |
 | `ResultStore.kt` | Last successful result used by the widget |
 | `Design.kt`, `Ui.kt`, `PresenceView.kt` | Shared view styling, insets/keyboard motion, state feedback |
@@ -38,7 +38,7 @@ All source paths above are relative to `app/src/main/java/com/caceras/surfacelab
 5. A final successful response replaces pending visual updates and is stored. Failed or cancelled partials are not recorded as completed exchanges.
 6. Stop, replacement, pause, and destruction invalidate callbacks and clear queued rendering work. Underlying system downloads may continue under Android's control.
 
-The 48 ms coalescing window is an implementation bound, not a measured frame-rate or device-latency guarantee. Speech and final responses do not wait for that window.
+`Choreographer` schedules visual updates on display frames. `ReplyRenderer` retains the editable text buffer and replaces changed paragraphs with native spans. This reduces scheduled redraw work but is not a measured frame-rate or device-latency guarantee. Speech and final responses do not wait for a visual frame.
 
 ## Voice lifecycle
 
@@ -91,3 +91,7 @@ Selection Ask stores prompt/cursor/modality for configuration recreation; blank 
 - `ConnectedAI`/`RoutineJobService`: opt-in HTTPS generation, Keystore credential custody, separately approved routine scope, network-constrained persisted jobs and execution history. No job runs Nano outside the foreground.
 
 All remain framework-only in main/core. Existing ML Kit stays in Nano; no Room, Compose or AndroidX runtime dependency was introduced. Provider keys are isolated from content backups. Full details: [everyday workspace](everyday-workspace.md).
+
+## Reading repair
+
+`SpeechVoices` shares quality-first installed/offline selection and an optional explicit preview picker across speech paths. `ReadingService` queues three sentences ahead with generation-fenced callbacks and persists unchanged document text only once. A failed initialization cannot present silent playback as running. The picker uses a fixed sample, never user notes, and stops preview audio on pause or dismissal. No network voice or external provider was added.

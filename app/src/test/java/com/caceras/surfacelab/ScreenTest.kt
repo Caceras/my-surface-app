@@ -166,13 +166,14 @@ class ScreenTest {
     }
 
     @Test
-    fun `starter cards stage complete requests and voice stays reachable in a chat`() {
+    fun `starter stages a request without sending and voice stays reachable in a chat`() {
         val activity = launchMain().get()
         val starter = descendants(content(activity)).first {
-            it.contentDescription?.toString()?.startsWith("Find the words") == true
+            it.tag == "write-message"
         }
         starter.performClick()
-        assertTrue(composer(activity).text.toString().startsWith("Help me write a thoughtful message."))
+        assertTrue(composer(activity).text.toString().isNotBlank())
+        assertEquals("a starter must not send without review", 0, bubbles(activity).size)
         button(activity, activity.getString(R.string.send)).performClick()
         assertTrue("starter is still visible", !showing(starter))
         val voice = descendants(content(activity)).first { it.tag == "voice-entry" }

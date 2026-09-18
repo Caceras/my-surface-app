@@ -17,7 +17,6 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.speech.tts.Voice as TtsVoice
 import java.util.Locale
 
 /** Offline recognition and playback through Android framework APIs. */
@@ -292,6 +291,7 @@ class Ears(private val context: Context) {
  * the answer, which is the single thing that makes this feel immediate.
  */
 class Mouth(context: Context) {
+    private val appContext = context.applicationContext
     private var engine: TextToSpeech? = null
     private var initialized = false
     private var ready = false
@@ -473,18 +473,9 @@ class Mouth(context: Context) {
 
     private fun pickVoice(): Boolean {
         val tts = engine ?: return false
-        // setLanguage AFTER setVoice silently replaces our checked voice.
-        // Select by locale and install state, then use only that exact voice.
-        return try {
-            val usable = tts.voices.orEmpty().filter { candidate ->
-                candidate.locale.language == locale.language &&
-                    !candidate.isNetworkConnectionRequired &&
-                    TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in candidate.features.orEmpty()
-            }.sortedWith(compareByDescending<TtsVoice> { it.locale == locale }
-                .thenByDescending { it.quality }.thenBy { it.name }).firstOrNull()
-            usable != null && tts.setVoice(usable) == TextToSpeech.SUCCESS
-        } catch (e: Exception) { false }
+        return SpeechVoices.apply(appContext, tts, locale)
     }
+
 }
 
 /** Sentence splitting, kept pure so it can be tested without a device. */

@@ -16,6 +16,8 @@ class ReadingService : Service() {
     private lateinit var session: MediaSession
     private var tts: TextToSpeech? = null
     private var ready = false
+    private var initialized = false
+    private var queuedUntil = 0
     private var generation = 0
     private val main = Handler(Looper.getMainLooper())
     private lateinit var audio: AudioManager
@@ -27,6 +29,9 @@ class ReadingService : Service() {
     private var text = ""
     private var playing = false
     private var error = ""
+    private var persistedText: String? = null
+    private var persistedIndex = -1
+    private var persistedSpeed = -1f
     private val noisy = object : BroadcastReceiver() { override fun onReceive(context: Context?, intent: Intent?) { pause() } }
     override fun onBind(intent: Intent?) = null
     override fun onCreate() {
@@ -49,15 +54,23 @@ class ReadingService : Service() {
         else { @Suppress("DEPRECATION") registerReceiver(noisy,IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)) }
         tts=TextToSpeech(applicationContext) { code -> main.post {
             if(active!==this@ReadingService) return@post
-            val locale=Ears(this).locale()
-            val voice=tts?.voices.orEmpty().filter { it.locale.language==locale.language && !it.isNetworkConnectionRequired && TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in it.features.orEmpty() }
-                .sortedByDescending { it.locale==locale }.firstOrNull()
-            if(code!=TextToSpeech.SUCCESS || voice==null) { error="Install an offline voice in Android Text-to-speech settings."; pause(); return@post }
-            tts?.setVoice(voice); tts?.setAudioAttributes(attributes); ready=true
-            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(id:String?) = Unit
-                override fun onDone(id:String?) { main.post { if(id=="$generation:$index" && playing) { index++; speak() } } }
-                @Deprecated("Framework callback") override fun onError(id:String?) { main.post { if(id=="$generation:$index") { error="Playback failed. Your text is safe."; pause() } } }
+            initialized=true
+            val client=tts
+            ready=code==TextToSpeech.SUCCESS && client!=null && SpeechVoices.apply(this,client,Ears(this).locale())
+            if(!ready) { error="Install an offline voice in Android Text-to-speech settings."; pause(); return@post }
+            client?.setAudioAttributes(attributes)
+            client?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(id:String?) { main.post {
+                    val position=utterancePosition(id) ?: return@post
+                    if(playing && position>=index) { index=position; publish() }
+                } }
+                override fun onDone(id:String?) { main.post {
+                    val position=utterancePosition(id) ?: return@post
+                    if(playing) { if(position>=index) index=position+1; speak() }
+                } }
+                @Deprecated("Framework callback") override fun onError(id:String?) { main.post {
+                    if(utterancePosition(id)!=null && playing) { error="Playback failed. Your text is safe."; pause() }
+                } }
             })
             if(playing) speak()
         } }
@@ -86,33 +99,63 @@ class ReadingService : Service() {
         }
         return START_NOT_STICKY
     }
+    private fun utterancePosition(id:String?):Int? {
+        val parts=id?.split(":",limit=2) ?: return null
+        if(parts.size!=2 || parts[0].toIntOrNull()!=generation) return null
+        return parts[1].toIntOrNull()?.takeIf { it in chunks.indices }
+    }
     private fun speak() {
         if(!playing) return
         if(index>=chunks.size) { index=0; pause(); return }
-        if(!ready) { publish(); return }
+        if(!ready) {
+            if(initialized) { error="Choose an installed offline voice before playing."; pause() }
+            else publish()
+            return
+        }
         tts?.setSpeechRate(speed)
-        if(tts?.speak(chunks[index],TextToSpeech.QUEUE_FLUSH,null,"$generation:$index")!=TextToSpeech.SUCCESS) { error="Could not start playback."; pause() }
-        else publish()
+        // Queue ahead instead of flushing/restarting the engine after every sentence.
+        val end=minOf(chunks.size,index+3)
+        while(playing && queuedUntil<end) {
+            val position=queuedUntil++
+            if(tts?.speak(chunks[position],TextToSpeech.QUEUE_ADD,null,"$generation:$position")!=TextToSpeech.SUCCESS) {
+                error="Could not start playback."; pause(); return
+            }
+        }
+        publish()
     }
     private fun resume() {
+        if(playing) return
         if(chunks.isEmpty()) { pause(); return }
+        if(initialized && !ready) { error="Choose an installed offline voice before playing."; pause(); return }
         focusHeld=audio.requestAudioFocus(focus)==AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         if(!focusHeld) { error="Audio is in use. Tap Play when it is free."; pause(); return }
-        error=""; generation++; playing=true; startForeground(42,notification()); speak()
+        error=""; generation++; queuedUntil=index; playing=true; startForeground(42,notification()); speak()
     }
     private fun pause() {
-        generation++; playing=false; tts?.stop()
+        generation++; playing=false; tts?.stop(); queuedUntil=index
         if(focusHeld) audio.abandonAudioFocusRequest(focus)
         focusHeld=false
         publish()
-        // Paused playback is no longer ongoing; Android may reclaim the service. Position is durable.
         stopForeground(STOP_FOREGROUND_DETACH)
     }
-    private fun move(delta:Int) { generation++; tts?.stop(); index=(index+delta).coerceIn(0,(chunks.size-1).coerceAtLeast(0)); if(playing) speak() else publish() }
-    private fun rate(value:Float) { speed=value.coerceIn(.5f,2f); generation++; tts?.stop(); if(playing) speak() else publish() }
+    private fun move(delta:Int) { generation++; tts?.stop(); index=(index+delta).coerceIn(0,(chunks.size-1).coerceAtLeast(0)); queuedUntil=index; if(playing) speak() else publish() }
+    private fun rate(value:Float) { speed=value.coerceIn(.5f,2f); generation++; tts?.stop(); queuedUntil=index; if(playing) speak() else publish() }
+    private fun refreshVoice() {
+        if(!initialized) return
+        val resumeAfter=playing
+        pause()
+        ready=tts?.let { SpeechVoices.apply(this,it,Ears(this).locale()) }==true
+        error=if(ready) "" else "Choose an installed offline voice before playing."
+        if(ready && resumeAfter) resume() else publish()
+    }
     private fun publish() {
         snapshot=ReadingSnapshot(text,index,chunks.size,playing,speed,error)
-        WorkspaceStore(this).use { it.put("reading-text",text); it.put("reading-index",index.toString()); it.put("reading-speed",speed.toString()) }
+        if(persistedText!=text || persistedIndex!=index || persistedSpeed!=speed) WorkspaceStore(this).use {
+            if(persistedText!=text) it.put("reading-text",text)
+            if(persistedIndex!=index) it.put("reading-index",index.toString())
+            if(persistedSpeed!=speed) it.put("reading-speed",speed.toString())
+            persistedText=text; persistedIndex=index; persistedSpeed=speed
+        }
         session.setPlaybackState(PlaybackState.Builder().setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_STOP or PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS)
             .setState(if(playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,PlaybackState.PLAYBACK_POSITION_UNKNOWN,if(playing) speed else 0f).build())
         getSystemService(NotificationManager::class.java).notify(42,notification())
@@ -142,6 +185,7 @@ class ReadingService : Service() {
         private var active:ReadingService?=null
         var snapshot=ReadingSnapshot(); private set
         fun pauseForCapture() { active?.pause() }
+        fun refreshVoice() { active?.refreshVoice() }
         fun speed(value:Float) { active?.rate(value) }
         fun toggle(context:Context) {
             active?.let { if(it.playing) it.pause() else it.resume(); return }
