@@ -166,16 +166,12 @@ class ScreenTest {
     }
 
     @Test
-    fun `starter stages a request without sending and voice stays reachable in a chat`() {
+    fun `minimal welcome keeps composer and voice directly reachable`() {
         val activity = launchMain().get()
-        val starter = descendants(content(activity)).first {
-            it.tag == "write-message"
-        }
-        starter.performClick()
-        assertTrue(composer(activity).text.toString().isNotBlank())
-        assertEquals("a starter must not send without review", 0, bubbles(activity).size)
+        assertTrue("composer is not visible", showing(composer(activity)))
+        assertTrue(descendants(content(activity)).none { it.tag == "write-message" })
+        composer(activity).setText("hello")
         button(activity, activity.getString(R.string.send)).performClick()
-        assertTrue("starter is still visible", !showing(starter))
         val voice = descendants(content(activity)).first { it.tag == "voice-entry" }
         assertTrue("voice disappeared in a conversation", showing(voice))
         voice.performClick()

@@ -182,7 +182,7 @@ class MainActivity : Activity() {
         val compact = resources.configuration.screenWidthDp < 380 || resources.configuration.fontScale > 1.2f
         val titles = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(label(getString(R.string.app_name), 23f).apply {
+            addView(label(getString(R.string.app_name), 21f).apply {
                 tag = "brand-title"; medium(); letterSpacing = -0.035f; isAccessibilityHeading = true
             })
             status = label("Your on-device assistant", 11f, true).apply {
@@ -200,7 +200,7 @@ class MainActivity : Activity() {
             tag = "chat-header"
             orientation = if (compact) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            padDp(20, 12, 20, 8)
+            padDp(20, 10, 20, 6)
             addView(titles, if (compact) wide() else LinearLayout.LayoutParams(0, -2, 1f))
             addView(actions, if (compact) wide() else LinearLayout.LayoutParams(-2, -2))
         }
@@ -274,6 +274,7 @@ class MainActivity : Activity() {
             brain.prepare(this) { if (!gone) { status.text = it.label; modelState.text = it.label } }
         })
 
+        panel.addView(label("Voice", 13f, true).apply { isAccessibilityHeading = true; letterSpacing = 0f; padDp(0, 24, 0, 6) })
         speakReplies = Chat.speakReplies(this)
         panel.addView(preferenceSwitch(getString(R.string.speak_replies), speakReplies) { checked ->
             speakReplies = checked
@@ -309,7 +310,7 @@ class MainActivity : Activity() {
             NativePrivacy.apply(this, settingsDialog?.window)
         })
         panel.addView(label("Hide app previews and block screenshots or screen sharing. Widgets have their own setting above.", 13f, true))
-        panel.addView(label("Android access", 13f, true).apply { isAccessibilityHeading = true; letterSpacing = 0f; padDp(0, 28, 0, 4) })
+        panel.addView(label("Android", 13f, true).apply { isAccessibilityHeading = true; letterSpacing = 0f; padDp(0, 28, 0, 4) })
         line("Home screen widget", "Type or Talk from your home screen.")
         panel.addView(flatButton("Add home screen widget") {
             val widgets = getSystemService(android.appwidget.AppWidgetManager::class.java)
@@ -349,7 +350,7 @@ class MainActivity : Activity() {
         })
         panel.addView(flatButton("Connected AI · optional") { ConnectedAI.settings(this) { updateSend(); status.text=if(ConnectedAI.enabled(this)) "Connected AI · " + ConnectedAI.host(this) else "Gemini Nano · On device" } })
         panel.addView(flatButton("AI sources") { KnowledgeContext.choose(this) { composeState.text=KnowledgeContext.label(this) } })
-        panel.addView(label("Conversations", 13f, true).apply { isAccessibilityHeading = true; letterSpacing = 0f; padDp(0, 28, 0, 8) })
+        panel.addView(label("Data", 13f, true).apply { isAccessibilityHeading = true; letterSpacing = 0f; padDp(0, 28, 0, 8) })
         panel.addView(label("Saved on this phone. Export before reinstalling to keep your conversation.", 14f, true))
         panel.addView(flatButton("Export conversation") {
             startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
@@ -428,7 +429,7 @@ class MainActivity : Activity() {
     private fun buildTranscript(): View {
         messages = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            padDp(20, 6, 20, 16)
+            padDp(20, 4, 20, 12)
             // Messages sit at the bottom, against the composer, the way every
             // chat does. Top-aligned they floated above a screenful of empty
             // grey -- the single thing that made this look unfinished.
@@ -504,16 +505,13 @@ class MainActivity : Activity() {
             tag = "welcome"
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            padDp(4, 24, 4, 24)
-            addView(presence(48), LinearLayout.LayoutParams(dp(48), dp(48)).apply { bottomMargin = dp(20) })
-            addView(label(getString(R.string.empty_title), 24f).apply {
-                minHeight = dp(48)
+            padDp(4, 18, 4, 18)
+            addView(presence(44), LinearLayout.LayoutParams(dp(44), dp(44)).apply { bottomMargin = dp(14) })
+            addView(label(getString(R.string.empty_title), 20f).apply {
+                minHeight = dp(44)
                 gravity = Gravity.CENTER
-                letterSpacing = -0.02f
+                letterSpacing = -0.015f
             }, wide())
-            addView(pill("Write a message") {
-                stagePrompt("Help me write a message.")
-            }.apply { tag = "write-message" }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(20) })
         }
         return blank
     }
@@ -561,7 +559,7 @@ class MainActivity : Activity() {
                 }
                 override fun afterTextChanged(s: Editable?) {}
             })
-            padDp(18, 16, 12, 16)
+            padDp(16, 12, 10, 12)
         }
 
         send = ImageButton(this).apply {
@@ -577,7 +575,7 @@ class MainActivity : Activity() {
 
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            padDp(4, 2, 6, 6)
+            padDp(4, 0, 6, 4)
             background = getDrawable(R.drawable.composer_bg)
             addView(input, wide())
         }
@@ -625,16 +623,16 @@ class MainActivity : Activity() {
         updateSend()
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            padDp(16, 0, 16, 8)
+            padDp(16, 0, 16, 4)
             followKeyboardMotion()
             addView(bar, wide())
             addView(LinearLayout(this@MainActivity).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 addView(flatButton("Voice") {
                     startActivity(Intent(this@MainActivity, VoiceActivity::class.java))
-                }.apply { tag = "voice-entry"; gravity = Gravity.CENTER; padDp(4, 12, 4, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(flatButton("History") { showConversations() }.apply { tag = "history-entry"; contentDescription = "Saved conversations"; textSize = 15f; gravity = Gravity.CENTER; padDp(2, 12, 2, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(flatButton("Actions") { showActions() }.apply { gravity = Gravity.CENTER; padDp(4, 12, 4, 12) }, LinearLayout.LayoutParams(0, -2, 1f))
+                }.apply { tag = "voice-entry"; gravity = Gravity.CENTER; padDp(4, 8, 4, 8) }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(flatButton("History") { showConversations() }.apply { tag = "history-entry"; contentDescription = "Saved conversations"; textSize = 14f; gravity = Gravity.CENTER; padDp(2, 8, 2, 8) }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(flatButton("Actions") { showActions() }.apply { gravity = Gravity.CENTER; padDp(4, 8, 4, 8) }, LinearLayout.LayoutParams(0, -2, 1f))
             }, wide())
             addView(playback, wide())
         }
@@ -1169,10 +1167,10 @@ class MainActivity : Activity() {
             isFocusable = true
             buttonSemantics()
             background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(color(R.color.outline)), null, surface(R.color.chip_bg, 16))
-            textSize = 15f
+            textSize = 14f
             medium()
             setTextColor(color(R.color.accent_text))
-            padDp(0, 12, 0, 4)
+            padDp(0, 9, 0, 3)
             setOnClickListener { onTap() }
         }
 

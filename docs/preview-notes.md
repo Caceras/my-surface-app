@@ -1,3 +1,11 @@
+## Current polish pass
+
+- Reduced oversized pills, fields, headers and chat chrome while preserving 48 dp touch targets.
+- Simplified Today to Tasks, Calendar, Pinned and Routines; removed promotional filler copy.
+- Tightened record cards, capture controls, the empty chat state and composer/navigation spacing.
+- Settings now separates AI, Voice, Privacy, Android and Data more clearly.
+- No storage, permission, model-provider or backup-format changes.
+
 # Reader and streaming repair
 
 - Replaced the slogan and oversized welcome cards with a plain question prompt and one writing shortcut. Settings labels and default AI instructions are more direct.

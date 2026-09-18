@@ -40,25 +40,25 @@ class WorkspaceActivity : Activity() {
     }
     private var editingId:String?=null
     private fun column()=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
-    private fun section(title:String) { rows.addView(label(title,19f).apply { medium(); isAccessibilityHeading=true; padDp(0,22,0,10) }) }
+    private fun section(title:String) { rows.addView(label(title,17f).apply { medium(); isAccessibilityHeading=true; padDp(0,18,0,8) }) }
     private fun note(text:String) { rows.addView(label(text,14f,true).apply { padDp(0,4,0,12) }) }
     private fun tools(vararg actions:Pair<String,()->Unit>)=HorizontalScrollView(this).apply {
         isHorizontalScrollBarEnabled=false
         addView(LinearLayout(this@WorkspaceActivity).apply { actions.forEach { (title,action) -> addView(pill(title) { stopDictation?.invoke(); action() },LinearLayout.LayoutParams(-2,-2).apply { marginEnd=dp(8) }) } })
     }
     private fun render() {
-        body=column().apply { setBackgroundColor(ink(R.color.chat_bg)); padDp(20,8,20,0) }
+        body=column().apply { setBackgroundColor(ink(R.color.chat_bg)); padDp(20,10,20,0) }
         body.addView(LinearLayout(this).apply {
             gravity=Gravity.CENTER_VERTICAL
             addView(column().apply {
-                addView(label("Ægentica AI",14f,true).apply { medium() })
-                addView(label(if(destination=="today") "Today" else "Library",30f).apply { medium(); isAccessibilityHeading=true })
+                addView(label("Ægentica AI",12f,true).apply { medium(); letterSpacing=.03f })
+                addView(label(if(destination=="today") "Today" else "Library",27f).apply { medium(); isAccessibilityHeading=true })
             },LinearLayout.LayoutParams(0,-2,1f))
             addView(pill("More") { menu() }.apply { contentDescription="Workspace options" })
         })
         if(destination=="library") {
             val search=EditText(this).apply { styleField(); hint="Search your knowledge"; setSingleLine(); setText(query); tag="workspace-search" }
-            body.addView(search,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(18); bottomMargin=dp(12) })
+            body.addView(search,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(14); bottomMargin=dp(10) })
             search.afterChange {
                 query=it; pendingSearch?.let(handler::removeCallbacks)
                 pendingSearch=Runnable { populate() }.also { task -> handler.postDelayed(task,160) }
@@ -71,7 +71,7 @@ class WorkspaceActivity : Activity() {
         body.addView(ScrollView(this).apply { isFillViewport=true; addView(rows) },LinearLayout.LayoutParams(-1,0,1f))
         body.addView(LinearLayout(this).apply {
             gravity=Gravity.CENTER_VERTICAL
-            addView(pill("＋  Capture a thought",true) { capture() },LinearLayout.LayoutParams(0,-2,1f))
+            addView(pill("Capture",true) { capture() }.apply { contentDescription="Capture a thought" },LinearLayout.LayoutParams(0,-2,1f))
             addView(pill("New") { newRecord() }.apply { contentDescription="Create task, project, person, collection or routine" },LinearLayout.LayoutParams(-2,-2).apply { marginStart=dp(8) })
         },LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8) })
         body.addView(workspaceNavigation(destination))
@@ -89,39 +89,37 @@ class WorkspaceActivity : Activity() {
             all.forEach(::card)
             if(all.size==200) note("Showing the latest 200 items. Search to find older records.")
         } else {
-            section(java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM")))
-            note("A little space for what matters today.")
+            rows.addView(label(java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM")),14f,true).apply { padDp(0,18,0,4) })
             val draft=store.value("capture")
             if(draft.isNotBlank()) rows.addView(pill("Continue your note") { capture() })
             val tasks=store.list(kind="task").filter { !it.done }.sortedWith(compareBy<Record> { if(it.due==0L) Long.MAX_VALUE else it.due }.thenBy { it.created })
-            section("Your next steps")
+            section("Tasks")
             if(tasks.isEmpty()) note("Nothing waiting. Capture an idea or add your next step.")
             tasks.take(8).forEach(::card)
             rows.addView(pill("Add a task") { edit(Record(kind="task")) })
-            section("Your calendar")
+            section("Calendar")
             rows.addView(pill("Choose calendars") { CalendarAccess.choose(this) { populate() } })
             val agenda=column(); rows.addView(agenda)
             CalendarAccess.showAgenda(this,agenda)
-            section("Keep close")
+            section("Pinned")
             val pinned=store.list().filter { it.pinned }.take(5)
             if(pinned.isEmpty()) note("Pin notes or projects to keep them within reach.")
             pinned.forEach(::card)
-            section("AI routines")
-            note("Choose a time and a prompt. A private reminder opens your routine; Nano runs while the app is open.")
+            section("Routines")
             store.list(kind="routine").take(6).forEach(::card)
             rows.addView(pill("Create a routine") { edit(Record(kind="routine")) })
         }
     }
     private fun card(record:Record) {
         val card=column().apply {
-            tag="record-${record.id}"; background=surface(R.color.bubble_ai,22,true); padDp(18,16,18,14)
-            addView(label(record.kind.replaceFirstChar { it.uppercase() } + if(record.pinned) " · Pinned" else "",11f,true).apply { letterSpacing=.04f })
-            addView(label(record.title.ifBlank { record.body.lineSequence().firstOrNull().orEmpty().take(80).ifBlank { "Untitled ${record.kind}" } },18f).apply { medium(); maxLines=2; ellipsize=TextUtils.TruncateAt.END; padDp(0,6,0,4) })
-            if(record.body.isNotBlank()) addView(label(record.body,14f,true).apply { maxLines=2; ellipsize=TextUtils.TruncateAt.END })
+            tag="record-${record.id}"; background=surface(R.color.bubble_ai,18,true); padDp(16,14,16,13)
+            addView(label(record.kind.replaceFirstChar { it.uppercase() } + if(record.pinned) " · Pinned" else "",11f,true).apply { letterSpacing=.03f })
+            addView(label(record.title.ifBlank { record.body.lineSequence().firstOrNull().orEmpty().take(80).ifBlank { "Untitled ${record.kind}" } },17f).apply { medium(); maxLines=2; ellipsize=TextUtils.TruncateAt.END; padDp(0,5,0,3) })
+            if(record.body.isNotBlank()) addView(label(record.body,13f,true).apply { maxLines=2; ellipsize=TextUtils.TruncateAt.END })
             if(record.due>0) addView(label((if(record.done) "Completed · " else if(!record.enabled) "Paused · " else "")+date(record.due),12f,true).apply { padDp(0,8,0,0) })
             isFocusable=true; buttonSemantics(); setOnClickListener { edit(record) }
         }
-        rows.addView(card,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(12) })
+        rows.addView(card,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(10) })
     }
     private fun newRecord() {
         val kinds=WorkspaceStore.KINDS
@@ -147,7 +145,7 @@ class WorkspaceActivity : Activity() {
         val status=label(if(capture) "Draft saved on this phone" else "Saved on this phone",12f,true).apply { accessibilityLiveRegion=View.ACCESSIBILITY_LIVE_REGION_POLITE; tag="note-save-state" }
         val title=EditText(this).apply { styleField(); hint="Title"; setSingleLine(); filters=arrayOf(InputFilter.LengthFilter(200)); setText(record.title); tag="note-title" }
         val input=EditText(this).apply {
-            styleField(); hint=if(record.kind=="routine") "What should AI help you with?" else "A thought, a plan, a little possibility…"
+            styleField(); hint=if(record.kind=="routine") "What should AI help you with?" else "Write something…"
             inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             minLines=6; gravity=Gravity.TOP; filters=arrayOf(InputFilter.LengthFilter(200000)); setText(record.body); tag="note-body"
         }
