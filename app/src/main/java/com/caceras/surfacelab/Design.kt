@@ -11,6 +11,7 @@ import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsetsController
+import android.graphics.Color
 import android.widget.ImageView
 import android.widget.TextView
 
@@ -58,6 +59,15 @@ fun View.arrive() {
 
 fun Activity.readableSystemBars(target: android.view.Window = window) {
     NativePrivacy.apply(this, target)
+    @Suppress("DEPRECATION")
+    run {
+        target.statusBarColor = ink(R.color.chat_bg)
+        target.navigationBarColor = ink(R.color.chat_bg)
+        if (Build.VERSION.SDK_INT >= 29) {
+            target.isStatusBarContrastEnforced = false
+            target.isNavigationBarContrastEnforced = false
+        }
+    }
     val light = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_YES
     if (Build.VERSION.SDK_INT >= 30) {
         val mask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS

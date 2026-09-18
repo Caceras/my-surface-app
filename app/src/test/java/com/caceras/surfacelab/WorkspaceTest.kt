@@ -101,6 +101,25 @@ class WorkspaceTest {
             assertFalse(store.get(r.id)!!.enabled)
         }
     }
+    @Test fun `workspace context follows tasks and pinned records without exposing unrelated notes`() {
+        context.deleteDatabase("aegentica.db")
+        WorkspaceStore(context).use { store ->
+            store.save(Record(kind="task",title="Call Lina",body="Tomorrow",done=false))
+            store.save(Record(title="Pinned brief",body="Launch notes",pinned=true))
+            store.save(Record(title="Private unrelated",body="Do not include by default"))
+        }
+        val prompt=KnowledgeContext.prompt(context,"What should I focus on?")
+        assertTrue(prompt.contains("Call Lina")); assertTrue(prompt.contains("Pinned brief"))
+        assertFalse(prompt.contains("Do not include by default"))
+        context.deleteDatabase("aegentica.db")
+    }
+
+    @Test fun `workspace page intents accept calendar and tasks and reject unknown pages`() {
+        assertEquals("calendar",WorkspaceActivity.intent(context,"calendar").getStringExtra("destination"))
+        assertEquals("tasks",WorkspaceActivity.intent(context,"tasks").getStringExtra("destination"))
+        assertEquals("today",WorkspaceActivity.intent(context,"unknown").getStringExtra("destination"))
+    }
+
     @Test fun `only selected live records enter AI context`() {
         WorkspaceStore(context).use { store ->
             val chosen=store.save(Record(title="Chosen",body="Known source")); store.save(Record(body="Do not include"))

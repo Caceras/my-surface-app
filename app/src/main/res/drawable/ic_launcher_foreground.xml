@@ -1,3 +1,6 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#072E44" android:fillType="evenOdd" android:pathData="M22,76L40,32H80V42H61V49H77V59H61V66H80V76H50V61H39L33,76Z M43,51H50V34Z" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- A quiet, custom Æ monogram: broad enough to survive adaptive-icon masking. -->
+    <path android:fillColor="#FFFFFF" android:pathData="M25,76 L43,32 L55,32 L55,39 L82,39 L82,47 L61,47 L61,50 L79,50 L79,58 L61,58 L61,68 L83,68 L83,76 L53,76 L53,62 L39,62 L34,76 Z M42,54 L53,54 L53,39 L48,39 Z" />
 </vector>

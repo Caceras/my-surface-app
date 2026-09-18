@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.*
 import android.text.*
 import android.view.*
+import android.view.GestureDetector
 import android.widget.*
 import java.text.DateFormat
 import java.util.*
@@ -28,11 +29,26 @@ class WorkspaceActivity : Activity() {
     private var pendingSearch:Runnable?=null
     private var loaded=false
     private var importRaw:String?=null
+    private lateinit var pageGestures: GestureDetector
 
     override fun onCreate(state:Bundle?) {
         super.onCreate(state); store=WorkspaceStore(this)
         destination=state?.getString("destination") ?: intent.getStringExtra("destination") ?: "today"
         filter=state?.getString("filter").orEmpty(); query=state?.getString("query").orEmpty()
+        pageGestures = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent) = true
+            override fun onFling(first: MotionEvent?, last: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if(first==null || kotlin.math.abs(velocityX) < kotlin.math.abs(velocityY) * 1.25f || kotlin.math.abs(last.x-first.x) < dp(72)) return false
+                val order=listOf("today","calendar","ai","tasks","library")
+                val current=order.indexOf(destination).coerceAtLeast(0)
+                val next=(current + if(last.x < first.x) 1 else -1).coerceIn(0,order.lastIndex)
+                if(next==current) return false
+                val target=order[next]
+                if(target=="ai") startActivity(Intent(this@WorkspaceActivity,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+                else { destination=target; filter=""; query=""; render() }
+                return true
+            }
+        })
         render(); loaded=true
         val record=state?.getString("editing") ?: intent.getStringExtra("record")
         if(record!=null) store.get(record)?.let { edit(it) }
@@ -55,7 +71,7 @@ class WorkspaceActivity : Activity() {
             gravity=Gravity.CENTER_VERTICAL
             addView(column().apply {
                 addView(label("Ægentica AI",12f,true).apply { medium(); letterSpacing=.03f })
-                addView(label(if(destination=="today") "Today" else "Library",27f).apply { medium(); isAccessibilityHeading=true })
+                addView(label(when(destination) { "calendar" -> "Calendar"; "tasks" -> "Tasks"; "library" -> "Notes"; else -> "Today" },27f).apply { medium(); isAccessibilityHeading=true })
             },LinearLayout.LayoutParams(0,-2,1f))
             addView(pill("More") { menu() }.apply { contentDescription="Workspace options" })
         })
@@ -71,8 +87,11 @@ class WorkspaceActivity : Activity() {
             }.toTypedArray()))
         }
         rows=column().apply { padDp(0,8,0,20) }
-        body.addView(ScrollView(this).apply { isFillViewport=true; addView(rows) },LinearLayout.LayoutParams(-1,0,1f))
-        body.addView(LinearLayout(this).apply {
+        body.addView(ScrollView(this).apply {
+            isFillViewport=true; addView(rows)
+            setOnTouchListener { _, event -> pageGestures.onTouchEvent(event); false }
+        },LinearLayout.LayoutParams(-1,0,1f))
+        if(destination=="today" || destination=="library") body.addView(LinearLayout(this).apply {
             gravity=Gravity.CENTER_VERTICAL
             addView(pill("Capture",true) { capture() }.apply { contentDescription="Capture a thought" },LinearLayout.LayoutParams(0,-2,1f))
             addView(pill("New") { newRecord() }.apply { contentDescription="Create task, project, person, collection or routine" },LinearLayout.LayoutParams(-2,-2).apply { marginStart=dp(8) })
@@ -83,38 +102,44 @@ class WorkspaceActivity : Activity() {
     }
     private fun populate() {
         rows.removeAllViews()
-        if(destination=="library") {
-            val all=store.list(query,if(filter=="trash") "" else filter,filter=="trash")
-            if(all.isEmpty()) {
-                section(if(query.isNotBlank()) "Nothing found" else if(filter=="trash") "Trash is empty" else "No items")
-                note(when {
-                    query.isNotBlank() -> "Try another word or change the filter."
-                    filter=="trash" -> "Deleted items appear here."
-                    else -> "Capture or create something to get started."
-                })
+        when(destination) {
+            "library" -> {
+                val all=store.list(query,if(filter=="trash") "" else filter,filter=="trash")
+                if(all.isEmpty()) {
+                    section(if(query.isNotBlank()) "Nothing found" else if(filter=="trash") "Trash is empty" else "No items")
+                    note(when {
+                        query.isNotBlank() -> "Try another word or change the filter."
+                        filter=="trash" -> "Deleted items appear here."
+                        else -> "Capture or create something to get started."
+                    })
+                }
+                all.forEach(::card)
+                if(all.size==200) note("Showing the latest 200 items. Search to find older records.")
             }
-            all.forEach(::card)
-            if(all.size==200) note("Showing the latest 200 items. Search to find older records.")
-        } else {
-            rows.addView(label(java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM")),14f,true).apply { padDp(0,18,0,4) })
-            val draft=store.value("capture")
-            if(draft.isNotBlank()) rows.addView(pill("Continue your note") { capture() })
-            val tasks=store.list(kind="task").filter { !it.done }.sortedWith(compareBy<Record> { if(it.due==0L) Long.MAX_VALUE else it.due }.thenBy { it.created })
-            section("Tasks")
-            if(tasks.isEmpty()) note("Nothing waiting. Capture an idea or add your next step.")
-            tasks.take(8).forEach(::card)
-            rows.addView(pill("Add a task") { edit(Record(kind="task")) })
-            section("Calendar")
-            rows.addView(pill("Choose calendars") { CalendarAccess.choose(this) { populate() } })
-            val agenda=column(); rows.addView(agenda)
-            CalendarAccess.showAgenda(this,agenda)
-            section("Pinned")
-            val pinned=store.list().filter { it.pinned }.take(5)
-            if(pinned.isEmpty()) note("Pin notes or projects to keep them within reach.")
-            pinned.forEach(::card)
-            section("Routines")
-            store.list(kind="routine").take(6).forEach(::card)
-            rows.addView(pill("Create a routine") { edit(Record(kind="routine")) })
+            "calendar" -> {
+                rows.addView(pill("Choose calendars") { CalendarAccess.choose(this) { populate() } })
+                val agenda=column(); rows.addView(agenda)
+                CalendarAccess.showAgenda(this,agenda)
+            }
+            "tasks" -> {
+                val tasks=store.list(kind="task").sortedWith(compareBy<Record> { it.done }.thenBy { if(it.due==0L) Long.MAX_VALUE else it.due }.thenByDescending { it.updated })
+                if(tasks.isEmpty()) note("No tasks yet.")
+                tasks.forEach(::card)
+                rows.addView(pill("Add task",true) { edit(Record(kind="task")) })
+            }
+            else -> {
+                rows.addView(label(java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM")),14f,true).apply { padDp(0,18,0,4) })
+                val draft=store.value("capture")
+                if(draft.isNotBlank()) rows.addView(pill("Continue note") { capture() })
+                val tasks=store.list(kind="task").filter { !it.done }.sortedWith(compareBy<Record> { if(it.due==0L) Long.MAX_VALUE else it.due }.thenBy { it.created })
+                section("Next")
+                if(tasks.isEmpty()) note("Nothing waiting.")
+                tasks.take(3).forEach(::card)
+                val pinned=store.list().filter { it.pinned }.take(4)
+                if(pinned.isNotEmpty()) { section("Pinned"); pinned.forEach(::card) }
+                val routines=store.list(kind="routine").filter { it.enabled }.take(3)
+                if(routines.isNotEmpty()) { section("Routines"); routines.forEach(::card) }
+            }
         }
     }
     private fun card(record:Record) {
@@ -404,7 +429,8 @@ class WorkspaceActivity : Activity() {
     private fun toast(text:String)=Toast.makeText(this,text,Toast.LENGTH_LONG).show()
     private fun date(value:Long)=DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(Date(value))
     companion object {
-        fun intent(context:Context,destination:String="today",id:String?=null)=Intent(context,WorkspaceActivity::class.java).putExtra("destination",destination).apply { if(id!=null) putExtra("record",id) }
+        val PAGES=listOf("today","calendar","tasks","library")
+        fun intent(context:Context,destination:String="today",id:String?=null)=Intent(context,WorkspaceActivity::class.java).putExtra("destination",destination.takeIf { it in PAGES } ?: "today").apply { if(id!=null) putExtra("record",id) }
     }
 }
 
@@ -415,12 +441,14 @@ internal fun EditText.afterChange(block:(String)->Unit) { addTextChangedListener
 }) }
 fun Activity.workspaceNavigation(selected:String):View = LinearLayout(this).apply {
     gravity=Gravity.CENTER_VERTICAL; padDp(0,8,0,4)
-    for((key,title) in listOf("today" to "Today","ai" to "AI","library" to "Library")) {
+    for((key,title) in listOf("today" to "Today","calendar" to "Calendar","ai" to "AI","tasks" to "Tasks","library" to "Notes")) {
         addView(pill(title,key==selected) {
             if(key!=selected) {
                 if(key=="ai") startActivity(Intent(this@workspaceNavigation,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-                else { startActivity(WorkspaceActivity.intent(this@workspaceNavigation,key)); if(this@workspaceNavigation is WorkspaceActivity) finish() }
+                else if(this@workspaceNavigation is WorkspaceActivity) {
+                    intent.putExtra("destination",key); recreate()
+                } else startActivity(WorkspaceActivity.intent(this@workspaceNavigation,key))
             }
-        }.apply { isSelected=key==selected; tag="nav-$key"; padDp(6,12,6,12) },LinearLayout.LayoutParams(0,-2,1f).apply { marginStart=dp(2); marginEnd=dp(2) })
+        }.apply { isSelected=key==selected; tag="nav-$key"; textSize=12f; padDp(3,10,3,10) },LinearLayout.LayoutParams(0,-2,1f).apply { marginStart=dp(1); marginEnd=dp(1) })
     }
 }

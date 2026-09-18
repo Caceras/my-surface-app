@@ -18,6 +18,7 @@ import android.text.InputType
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.KeyEvent
+import android.view.GestureDetector
 import android.view.inputmethod.EditorInfo
 import android.provider.Settings
 import android.widget.Switch
@@ -281,24 +282,16 @@ class MainActivity : Activity() {
             Chat.setSpeakReplies(this@MainActivity, checked)
             if (!checked) hushPlayback()
         })
-        panel.addView(pill("Set up voice & test playback") {
+        panel.addView(flatButton("Set up voice & test playback") {
             settingsDialog?.dismiss()
             startActivity(Intent(this, VoiceActivity::class.java).putExtra("setup", true))
         })
-        panel.addView(pill("Choose reading voice") { SpeechVoices.showPicker(this) })
+        panel.addView(flatButton("Choose reading voice") { SpeechVoices.showPicker(this) })
         panel.addView(flatButton(getString(R.string.voice_settings)) {
             runCatching { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                 .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
         })
-        panel.addView(flatButton(getString(R.string.default_assistant)) {
-            runCatching {
-                val roles = getSystemService(RoleManager::class.java)
-                if (roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && !roles.isRoleHeld(RoleManager.ROLE_ASSISTANT))
-                    startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT), 2)
-                else startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
-            }
-                .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
-        })
+        panel.addView(flatButton(getString(R.string.default_assistant)) { openAssistantSettings() })
         panel.addView(label("Privacy", 13f, true).apply { letterSpacing = 0f; padDp(0, 28, 0, 8); isAccessibilityHeading = true })
         panel.addView(preferenceSwitch("Show last answer on widget", NativePrivacy.widgetPreview(this)) { checked ->
             NativePrivacy.setWidgetPreview(this, checked)
@@ -368,6 +361,31 @@ class MainActivity : Activity() {
         panel.addView(label("Build, phone, Android and language only. No conversations or recordings.", 13f, true))
 
         return panel
+    }
+
+    private fun openAssistantSettings() {
+        val roles = getSystemService(RoleManager::class.java)
+        when {
+            roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && roles.isRoleHeld(RoleManager.ROLE_ASSISTANT) ->
+                Toast.makeText(this, "Ægentica AI is already your digital assistant.", Toast.LENGTH_LONG).show()
+            roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) -> runCatching {
+                startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT), 2)
+            }.onFailure { openDefaultAppsSettings() }
+            else -> openDefaultAppsSettings()
+        }
+    }
+
+    private fun openDefaultAppsSettings() {
+        val intents = listOf(
+            Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS)
+        )
+        val target = intents.firstOrNull { it.resolveActivity(packageManager) != null }
+        if (target != null) {
+            startActivity(target)
+            Toast.makeText(this, "In Android Settings, choose the Digital assistant app if it is shown.", Toast.LENGTH_LONG).show()
+        } else Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -471,11 +489,21 @@ class MainActivity : Activity() {
             visibility = View.GONE
             elevation = dp(4).toFloat()
         }
+        val pageGestures = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent) = true
+            override fun onFling(first: MotionEvent?, last: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if(first==null || kotlin.math.abs(velocityX) < kotlin.math.abs(velocityY) * 1.25f || kotlin.math.abs(last.x-first.x) < dp(72)) return false
+                pauseForNavigation()
+                startActivity(WorkspaceActivity.intent(this@MainActivity,if(last.x < first.x) "tasks" else "calendar"))
+                return true
+            }
+        })
         transcript.setOnTouchListener { _, event ->
             if (event.actionMasked == MotionEvent.ACTION_MOVE) {
                 followReply = false
                 latest.visibility = if (history.isNotEmpty() || busy) View.VISIBLE else View.GONE
             }
+            pageGestures.onTouchEvent(event)
             false
         }
         transcript.setOnScrollChangeListener { _, _, y, _, oldY ->
@@ -1162,15 +1190,17 @@ class MainActivity : Activity() {
 
     private fun flatButton(text: String, onTap: () -> Unit) =
         TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) }
             this.text = text
             minHeight = dp(48)
             isFocusable = true
             buttonSemantics()
-            background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(color(R.color.outline)), null, surface(R.color.chip_bg, 16))
+            background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(color(R.color.outline)), surface(R.color.chip_bg, 12), null)
             textSize = 14f
             medium()
             setTextColor(color(R.color.accent_text))
-            padDp(0, 9, 0, 3)
+            gravity = Gravity.CENTER_VERTICAL
+            padDp(12, 8, 12, 8)
             setOnClickListener { onTap() }
         }
 
