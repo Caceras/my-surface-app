@@ -86,8 +86,12 @@ class WorkspaceActivity : Activity() {
         if(destination=="library") {
             val all=store.list(query,if(filter=="trash") "" else filter,filter=="trash")
             if(all.isEmpty()) {
-                section(if(query.isNotBlank()) "Nothing found" else if(filter=="trash") "Trash is empty" else "A place for your thoughts")
-                note(if(query.isNotBlank()) "Try another word or change the filter." else "Capture a note now. Add people, projects and structure whenever they become useful.")
+                section(if(query.isNotBlank()) "Nothing found" else if(filter=="trash") "Trash is empty" else "No items")
+                note(when {
+                    query.isNotBlank() -> "Try another word or change the filter."
+                    filter=="trash" -> "Deleted items appear here."
+                    else -> "Capture or create something to get started."
+                })
             }
             all.forEach(::card)
             if(all.size==200) note("Showing the latest 200 items. Search to find older records.")
