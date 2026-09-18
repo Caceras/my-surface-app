@@ -1,40 +1,42 @@
 package com.caceras.surfacelab
 
-import android.os.Handler
-import android.os.Looper
-import android.os.SystemClock
+import android.view.Choreographer
 
-/** Paint the first chunk immediately, then coalesce bursts without delaying speech. */
+/** Immediate first paint, then at most one latest-value update per display frame. */
 class StreamUpdates(private val paint: (String) -> Unit) {
-    private val handler = Handler(Looper.getMainLooper())
+    private val frames = Choreographer.getInstance()
     private var next: String? = null
-    private var lastPaint: Long? = null
+    private var painted: String? = null
     private var scheduled = false
-    private val flush = Runnable {
+    private val flush = Choreographer.FrameCallback {
         scheduled = false
         val text = next
         next = null
-        if (text != null) {
-            lastPaint = SystemClock.uptimeMillis()
+        if (text != null && text != painted) {
+            painted = text
             paint(text)
         }
     }
 
     fun offer(text: String) {
+        if (text == (next ?: painted)) return
+        if (painted == null && !scheduled) {
+            painted = text
+            paint(text)
+            return
+        }
         next = text
-        val elapsed = lastPaint?.let { SystemClock.uptimeMillis() - it } ?: 48L
-        if (!scheduled && elapsed >= 48L) flush.run()
-        else if (!scheduled) {
+        if (!scheduled) {
             scheduled = true
-            handler.postDelayed(flush, (48L - elapsed).coerceAtLeast(0))
+            frames.postFrameCallback(flush)
         }
     }
 
-    /** Final, cancelled and replaced requests must never receive an older queued chunk. */
+    /** A finished, cancelled or replaced request must never paint a stale frame. */
     fun cancel() {
-        handler.removeCallbacks(flush)
+        frames.removeFrameCallback(flush)
         next = null
+        painted = null
         scheduled = false
-        lastPaint = null
     }
 }

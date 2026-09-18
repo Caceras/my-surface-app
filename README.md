@@ -1,120 +1,60 @@
 # Ægentica AI
 
-**A little clarity. A little possibility.**
+A native Android workspace for notes, AI chat, voice and planning.
 
-A native Android workspace for **Today · AI · Library**: capture notes, connect ideas, plan your day, and think by typing or speaking. Gemini Nano, dictation, notes and local reminders need no account. Optional connected AI and scheduled generation use your own provider; calendar and Beeper access are explicit choices.
+**[Preview releases](https://github.com/Caceras/my-surface-app/releases)** · [Everyday guide](docs/everyday-workspace.md) · [Phone setup](docs/getting-started.md) · [Current changes](docs/preview-notes.md)
 
-**[Everyday guide](docs/everyday-workspace.md)** · [Implementation and limits](docs/everyday-assistant-plan.md) · [Workspace acceptance](docs/audits/2026-09-16-workspace.md)
+The Today · AI · Library implementation from PR #7 is now merged into `main`. Releases are personal previews, not Play Store releases. Prefer the build-specific Nano download supplied with a verified release, rather than an old development-branch alias.
 
-[![Android checks](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg?branch=improve-pixel-assistant)](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-70CEFA.svg)](LICENSE)
+## Install
 
-**[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [What changed](docs/preview-notes.md) · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Deep audit](docs/audits/2026-09-15.md) · [Test/process audit](docs/audits/iteration-efficiency.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribute](CONTRIBUTING.md)
+Download `aegentica-ai-nano.apk` from the relevant build release and open it on the phone. Use **Update** when Android offers it. Check the build number in Settings. The `core` APK is a deterministic test/demo variant, not the AI assistant.
 
-> This is the **Ægentica AI** app on `improve-pixel-assistant`. The main branch and `/releases/latest` may contain an older experience. This preview is not a Play Store release. Export your workspace before any reinstall (conversation export on older builds).
+**Export your workspace before any uninstall.** Preview signing can differ between builds. If Android reports a signature conflict, preserve your data before uninstalling, then install and restore. [Signing and update guide](docs/delivery.md).
 
-## The experience
+For on-device AI, use **Check / prepare on-device model**. Initial model and speech downloads require a connection. Voice setup chooses the recognition/playback language and offers a speaker test. Runtime checks report unsupported devices or unavailable AICore; a passing CI build does not establish that Nano is ready on a particular phone.
 
-- **Capture and remember.** Autosaved notes, originals, full-text search, pinning, Trash/undo and whole-workspace backups.
-- **Connect ideas.** People, projects, linked tasks and collections with typed fields and a table view over the same records.
-- **Plan your day.** Selected-calendar agenda, reviewed reminders, local AI routines and separately approved connected routines.
-- **Read while walking.** Sentence highlighting, playback speed, pause/resume and native background media controls.
+## Workspace
 
-- **Write naturally.** A roomy composer, editable dictation, and conversation context for follow-up questions.
-- **Talk and listen.** Pause to send in Voice, hear sentences as they become available, and enable **Keep talking** for a continuous foreground session.
-- **Stay in control.** Stop generation, quiet playback, copy or share answers, and read earlier messages without chat pulling you to the bottom.
-- **Return to a thought.** New saves the conversation you leave. Search saved conversations, inspect previews, resume, or delete individual entries.
-- **Do the everyday.** Set a timer or alarm, draft a calendar event, find a place, or open the dialer through Android apps.
-- **Make it yours.** Pin Chat/Voice, resize the widget, choose answer previews, and enable Private screen.
-- **Feel at home.** Sky-blue light and dark themes, readable formatting, restrained motion, and a composer that follows the keyboard transition.
+**Today** contains linked tasks, reminders, routines and an optional selected-calendar agenda. **AI** contains typed chat, editable dictation, foreground voice conversations and explicitly selected reference records. **Library** contains autosaved notes, originals, search, pinning, Trash/undo, people/projects, backlinks, collections and typed table fields.
 
-<p>
-  <img src="docs/images/chat.png" alt="Ægentica AI chat with starters and a spacious composer" width="260">
-  <img src="docs/images/voice.png" alt="Voice response with quiet and stop controls" width="260">
-  <img src="docs/images/chat-night.png" alt="Ægentica AI chat in dark mode" width="260">
-</p>
+Read-aloud supports sentence position, speed, pause/resume and background media/headset controls. It selects a high-quality installed offline voice for the chosen language. This uses the phone's speech engine; it does not promise a new neural voice. The chat formatter supports bold, italics, lists and code, with display-frame-coalesced updates and no welcome slogans.
 
-Curated native framework illustrations from the original Ægentica AI branding pass (see the [audit](docs/quality-audit.md#evidence)), using the deterministic core test fixture. These are core test fixtures, not real Nano responses or Pixel system chrome. For current screens, download the release’s **aegentica-evidence.zip** and open **review.html**.
+Android entry points include the launcher, widget, Quick Settings tile, shortcuts, share sheet and text-selection actions. Explicit handoffs can open supported Clock, Calendar, Maps and Dialer actions. The app does not implement a wake word, autonomous phone control, web browsing or background Nano inference.
 
-## Try it on a Pixel
+## Connections
 
-1. Download **`aegentica-ai-nano.apk`** from the preview link above and open it on the phone. Allow installation from your browser if Android asks.
-2. Open **Ægentica AI**. Check the build number in **Settings** against the [preview release](https://github.com/Caceras/my-surface-app/releases/tag/preview-improve-pixel-assistant).
-3. Select **Check / prepare on-device model**. Initial model and speech downloads need an internet connection.
-4. Type a short question. Then open **Settings → Set up voice & test playback** to choose your language, download offline speech, and test the speaker.
-5. Tap **Voice**, speak, and pause. Use **Type** to return to the shared chat. Enable **Keep talking** only when you want the microphone to reopen after the reply.
+Notes, Gemini Nano and offline speech need no cloud account. Connected AI is separately configured with an HTTPS endpoint, model and encrypted credential. It is never a silent fallback. Scheduled connected generation requires separate routine approval and keeps a local execution ledger.
 
-If an update reports a package/signature conflict, **export first**, uninstall the existing Ægentica AI, install the new APK, then restore. Do not uninstall to troubleshoot before preserving the data you want. [Update and signing guide](docs/delivery.md).
+Calendar and experimental Beeper access are optional and permission-gated. Beeper sends require review of the exact recipient and text. Real provider requests, account compatibility and background timing require device/account validation. No new paid speech provider is introduced by the presentation repair.
 
-The Pixel 10 Pro XL is listed in Google's Prompt API support table. Availability still depends on the device configuration and AICore readiness. The app checks readiness at runtime. [Google's current device support](https://developers.google.com/ml-kit/genai#device_support).
+## Data
 
-## Within reach
+Notes, links, typed fields, chats and drafts are stored in app-private SQLite. Current chat/history retention is bounded; notes are not automatically evicted. Uninstalling removes local data. Whole-workspace JSON backups exclude credentials but can contain sensitive text, so choose their storage location carefully. Legacy conversation imports remain supported.
 
-| Entry point | What happens | Setup |
-|---|---|---|
-| App | Opens typed chat and the current draft | Open Ægentica AI |
-| Voice | Opens the foreground voice conversation | Chat → Voice |
-| Pixel Quick Tap | Opens chat with a back-of-phone double tap | Android Settings → System → Gestures → Quick Tap → Open app |
-| Assistant gesture | Opens Voice where Android supports the selected assistant | Settings → Set as digital assistant |
-| Quick Settings | Opens Voice, with setup and Type available | Add the app tile from Android's tile editor |
-| Home widget | Capture/Talk; pinned-note or last-answer preview only when enabled | Settings → Add home screen widget |
-| Launcher shortcuts | Chat, Voice, History and Capture note; Chat/Voice can be pinned | Long-press the launcher icon |
-| Share sheet | Stages shared **plain text** in the composer for review | Share text → Ægentica AI |
-| Text selection | Ask, Summarise, Proofread, or Make professional in the Nano build | Select text in a supporting app → overflow menu |
+Widget content previews are off by default. Private screen can hide Recents previews and block screenshots. No app analytics service is added. System services manage initial AI/speech downloads under their own policies. [Privacy and retention details](docs/privacy.md).
 
-Ægentica AI does not implement a wake word, autonomous phone automation, background Nano inference, web browsing, Wear OS, or Android Auto. Calendar and Beeper are optional permission-gated integrations. Background connected routines require explicit provider and routine approval. [Ægentica AI behavior and limits](docs/surfaces.md).
+## Build
 
-## Private, with clear boundaries
+Kotlin and Android framework views; no WebView or Compose replacement. Main/core have no third-party UI or AI runtime dependencies; Nano adds ML Kit. The project has no Gradle wrapper.
 
-Nano and speech use on-device APIs by default. Connected AI is explicitly configured and sends scoped input to your chosen provider; it is never a silent fallback. There is no app analytics service. System services manage initial downloads and have their own policies.
-
-Notes, relationships, typed fields, chats and drafts are stored in app-private SQLite. Settings and encrypted provider configuration are separate. Notes have no automatic archive eviction. Up to 40 completed exchanges are kept in the current chat, and up to 12 recent conversations are archived within a soft size budget. Uninstalling removes local data. Manual exports are readable JSON and can include sensitive text; the file location and any syncing are controlled by the document provider you choose. Widget content previews are off by default. Whole-workspace exports use a separate versioned JSON format; credentials are excluded. Private screen can hide Recents previews and block screenshots; clipboard copies carry sensitive-preview metadata. [Privacy and data guide](docs/privacy.md).
-
-## Build and test
-
-The project is Kotlin with Android framework views. `main` and `core` declare no third-party UI or AI libraries; `nano` adds ML Kit. There is no Gradle wrapper.
-
-**Pinned toolchain:** JDK 21, Gradle 9.7.1, Android SDK/build-tools 36, AGP 9.3.2. [Version reference](docs/versions.md).
+Pinned toolchain: JDK 21, Gradle 9.7.1, Android SDK/build-tools 36 and AGP 9.3.2. [Version reference](docs/versions.md).
 
 ```bash
-git clone --branch improve-pixel-assistant https://github.com/Caceras/my-surface-app.git
+git clone https://github.com/Caceras/my-surface-app.git
 cd my-surface-app
 python tools/check.py
 gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug --no-daemon
 ```
 
-| Variant | Purpose | Application ID |
-|---|---|---|
-| `nano` | The actual Gemini Nano assistant | `com.caceras.surface.nano` |
-| `core` | Deterministic demo and UI tests; uppercase output, no AI model | `com.caceras.surface` |
+The Nano package is `com.caceras.surface.nano`; core is `com.caceras.surface`. APKs appear under `app/build/outputs/apk/{core,nano}/debug/`.
 
-APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots appear under `app/build/screenshots/`. App/tooling candidates run one shared Android job for JVM tests, lint and both builds. Known documentation-only changes run preflight; canonical draft PRs defer duplicate merge checks until ready-for-review. Successful runs generate a source-linked evidence bundle and verified build-specific APK links; failed runs retain diagnostics. Tests exercise the core variant, so green CI does **not** establish Nano quality, real speech latency, or device gesture behavior. [Testing and device checklist](docs/testing.md).
+CI runs preflight, JVM tests, lint and both Android builds, verifies signatures and packages source-linked evidence. Eligible push runs publish build-specific links and compare uploaded/downloaded hashes. Tests and screenshots use core fixtures; they cannot certify real Nano output, voice quality, frame timing, battery or signing continuity on a phone.
 
-## Documentation
+## Development
 
-| Guide | Covers |
-|---|---|
-| [Test/process audit](docs/audits/iteration-efficiency.md) | Test necessity, measured CI costs, request-to-install gaps and fixes |
-| [Everyday guide](docs/everyday-workspace.md) | Notes, tables, sources, playback, calendar, Beeper, connected routines and backups |
-| [Everyday assistant plan](docs/everyday-assistant-plan.md) | Product direction, delivery status and remaining acceptance boundaries |
-| [Iteration workflow](docs/iteration-workflow.md) | Pipeline audit, automated evidence, verified releases and feedback loop |
-| [Deep audit and fixes](docs/audits/2026-09-15.md) | Prioritized repair register, current flow evidence and open acceptance gates |
-| [Cohesion audit](docs/cohesion-audit.md) | Current cross-flow fixes, fresh baseline and remaining device gates |
-| [Android capability plan](docs/android-native-plan.md) | 40+ capability areas, delivery contracts, follow-on priorities and gates |
-| [Native actions](docs/native-actions.md) | Clock, Calendar, Maps, Dialer and keyboard/shortcut behavior |
-| [Design system](docs/design-system.md) | Æ identity, sky-blue tokens, icon rules and accessibility |
-| [Getting started](docs/getting-started.md) | Installation, daily controls, speech setup, and common problems |
-| [Architecture](docs/architecture.md) | UI boundaries, generation lifecycle, streaming, and storage |
-| [Privacy](docs/privacy.md) | Permissions, retained data, exports, and deletion |
-| [Testing](docs/testing.md) | Reproducible checks and the physical-device release checklist |
-| [Quality audit](docs/quality-audit.md) | Evidence, fixed issues, and remaining risks |
-| [Delivery](docs/delivery.md) | Preview releases, updates, signing, and Play distribution limits |
-| [Voice](docs/voice.md) | Recognition, speech output, cancellation, and interruption |
-| [AI](docs/ai.md) | Prompt construction, AICore readiness, and model boundaries |
-| [Surfaces](docs/surfaces.md) | Android entry points and unsupported integrations |
+[Architecture](docs/architecture.md) · [Testing](docs/testing.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribution guide](CONTRIBUTING.md) · [Presentation repair](docs/audits/2026-09-18-presentation.md)
 
-The original surface generator remains available in `tools/scaffold.py`; it generates a minimal framework app, not this complete assistant. [Contributor guide](CONTRIBUTING.md).
+For feedback, use **Settings → Copy app info**, then provide the failed step and a redacted screenshot. The app does not upload a report or your conversations automatically.
 
-## Status
-
-An actively developed personal preview, not a claim of production readiness or guaranteed model accuracy. Hardware validation is required before wider distribution. Issues and focused contributions are welcome. Use **Settings → Help & feedback → Copy app info**, then include the steps to reproduce and redacted screenshots. **MIT licensed.**
+[MIT license](LICENSE).

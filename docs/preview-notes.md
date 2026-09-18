@@ -1,15 +1,15 @@
 # Current preview changes
 
-- Added **Today · AI · Library**, preserving the Æ identity and sky-blue native design.
-- Added SQLite-backed notes, editable dictation, autosave, originals, pinning, search, Trash/undo and source-linked answer saving. Existing chats migrate once; old conversation imports stay supported.
-- Added people, projects, collections, backlinks, typed custom fields and a native table view over shared records.
-- Added a sentence-based read-aloud player with pause/resume, speed, retained position, background media playback, headset/lock-screen controls and microphone interruption handling.
-- Added linked tasks, reviewed reminder times, recurring routines and optional selected-calendar agenda. Local Nano routines invite foreground execution.
-- Added experimental on-phone Beeper browsing, explicit saved AI context and recipient/text-reviewed sends with separate permissions and no automatic retries.
-- Added optional owner-configured HTTPS connected AI and separately approved scheduled generation, with Keystore-protected keys and local run history.
-- Added whole-workspace export/merge, compact capture widget behavior, a Capture note launcher shortcut and an everyday usage guide.
-- Recovered interrupted scheduled occurrences without replaying a request or stranding the next recurrence.
-- Polished compact reader controls, editor dictation cancellation/recovery and disabled reminder-channel handling.
-- Added focused data/migration/lifecycle/integration regressions and native workspace captures. Fixed a preflight false positive for URL string literals.
+- Removed the chat welcome slogans, subtitle and oversized starter cards. Settings uses direct labels rather than promotional headings.
+- Added single-asterisk/underscore emphasis, nested bold/italic, inline code and fenced code to the shared formatter. Speech and previews use the same plain-text interpretation.
+- Replaced the fixed 48 ms streaming timer with display-frame coalescing, skipped duplicate provider chunks and retained the chat text buffer while updating its changed final lines.
+- Reworked instruction-echo checking to index instruction fragments once and scan the growing answer, with exact verification of hash matches.
+- Read-aloud now selects by installed offline voice quality instead of accepting the first matching voice. It checks voice-selection success, queues a bounded sentence look-ahead and avoids rewriting an entire note at every sentence. Long chunks prefer word boundaries.
+- Voice initialization errors remain visible rather than presenting a Play action that silently does nothing. Cancellation, audio focus, headset controls and background playback remain in place.
+- Asked the assistant to use plain language, short paragraphs and fewer decorative headings.
 
-Notes and Nano work without a cloud account. Connected AI requires your provider setup; Beeper requires its compatible installed experimental API. Calendar, notifications and microphone ask at first use. Reminder/job timing is controlled by Android. Hardware Nano/speech, third-party provider compatibility and stable-signing update continuity require device/owner validation; CI does not certify them.
+The existing Today, AI and Library workspace from PR #7 is now merged into main. Notes, conversations, relationships, tables, calendar/Beeper options, connected AI, routines and backups are retained.
+
+This release improves the existing Android speech engine; it does not install a new neural voice or send text to a new cloud service. Actual voice naturalness and frame timing still require a Pixel check. No paid speech provider was added. Export your workspace before any uninstall; preview signing continuity is still not guaranteed.
+
+[Repair details and acceptance boundaries](audits/2026-09-18-presentation.md).

@@ -88,7 +88,7 @@ class MainActivity : Activity() {
     private var conversationsDialog: Dialog? = null
     private var actionsDialog: Dialog? = null
     private val streamed = StreamUpdates { text ->
-        pendingAnswer?.text = Markdown.render(text, dp(18))
+        pendingAnswer?.let { Markdown.update(it, text, dp(18)) }
         scrollToEnd()
     }
 
@@ -185,7 +185,7 @@ class MainActivity : Activity() {
             addView(label(getString(R.string.app_name), 23f).apply {
                 tag = "brand-title"; medium(); letterSpacing = -0.035f; isAccessibilityHeading = true
             })
-            status = label("Your on-device assistant", 11f, true).apply {
+            status = label("On device", 11f, true).apply {
                 tag = "assistant-status"
                 maxLines = 2; accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
             }
@@ -216,7 +216,7 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(color(R.color.chat_bg))
             padDp(24, 16, 24, 12)
-            addView(sheetHeader("Make it yours") { dialog.dismiss() })
+            addView(sheetHeader("Settings") { dialog.dismiss() })
             addView(ScrollView(this@MainActivity).apply {
                 tag = "settings"
                 addView(morePanel(brain), wide())
@@ -261,7 +261,7 @@ class MainActivity : Activity() {
             setTextColor(color(R.color.text_dim))
         })
 
-        panel.addView(label("YOUR ASSISTANT", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 22, 0, 8) })
+        panel.addView(label("AI", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 22, 0, 8) })
         val modelState = label(status.text.toString(), 14f, true).apply {
             tag = "model-state"
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -297,7 +297,7 @@ class MainActivity : Activity() {
             }
                 .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
         })
-        panel.addView(label("PRIVACY", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 8); isAccessibilityHeading = true })
+        panel.addView(label("Privacy", 11f, true).apply { letterSpacing = 0.12f; padDp(0, 28, 0, 8); isAccessibilityHeading = true })
         panel.addView(preferenceSwitch("Show last answer on widget", NativePrivacy.widgetPreview(this)) { checked ->
             NativePrivacy.setWidgetPreview(this, checked)
         })
@@ -308,7 +308,7 @@ class MainActivity : Activity() {
             NativePrivacy.apply(this, settingsDialog?.window)
         })
         panel.addView(label("Hide app previews and block screenshots or screen sharing. Widgets have their own setting above.", 13f, true))
-        panel.addView(label("EVERYWHERE YOU NEED IT", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 4) })
+        panel.addView(label("Shortcuts", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 4) })
         line("Home screen widget", "Type or Talk from your home screen.")
         panel.addView(flatButton("Add home screen widget") {
             val widgets = getSystemService(android.appwidget.AppWidgetManager::class.java)
@@ -348,7 +348,7 @@ class MainActivity : Activity() {
         })
         panel.addView(flatButton("Connected AI · optional") { ConnectedAI.settings(this) { updateSend(); status.text=if(ConnectedAI.enabled(this)) "Connected AI · " + ConnectedAI.host(this) else "Gemini Nano · On device" } })
         panel.addView(flatButton("AI sources") { KnowledgeContext.choose(this) { composeState.text=KnowledgeContext.label(this) } })
-        panel.addView(label("YOUR CONVERSATION", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
+        panel.addView(label("Conversation", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
         panel.addView(label("Saved on this phone. Export before reinstalling to keep your conversation.", 14f, true))
         panel.addView(flatButton("Export conversation") {
             startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
@@ -358,7 +358,7 @@ class MainActivity : Activity() {
             startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("application/json"), IMPORT_CHAT)
         })
-        panel.addView(label("HELP & FEEDBACK", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
+        panel.addView(label("Help", 11f, true).apply { isAccessibilityHeading = true; letterSpacing = 0.12f; padDp(0, 28, 0, 8) })
         panel.addView(flatButton("Copy app info") {
             NativePrivacy.copy(this, "Ægentica AI app info", AppInfo.summary(this))
             Toast.makeText(this, "App info copied. Paste it with the steps that went wrong.", Toast.LENGTH_LONG).show()
@@ -491,53 +491,16 @@ class MainActivity : Activity() {
         }
     }
 
-    /**
-     * What the screen says before anyone has said anything.
-     *
-     * It used to say nothing: header, then eight hundred pixels of grey, then
-     * the composer. An empty chat is the first thing anyone sees and it was
-     * the least finished screen in the app.
-     */
+    /** A quiet empty state: no slogan, subtitle or promotional starter cards. */
     private fun emptyState(): View {
         blank = LinearLayout(this).apply {
             tag = "welcome"
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             padDp(4, 24, 4, 24)
-            addView(presence(64), LinearLayout.LayoutParams(dp(64), dp(64)).apply { bottomMargin = dp(24) })
-            addView(label(getString(R.string.empty_title), 32f).apply {
+            addView(presence(48), LinearLayout.LayoutParams(dp(48), dp(48)).apply { bottomMargin = dp(16) })
+            addView(label("Type a message or use Voice.", 15f, true).apply {
                 gravity = Gravity.CENTER
-                letterSpacing = -0.04f
-                setLineSpacing(0f, 1.02f)
-            }, wide())
-            addView(label("Space to think. A hand with the words.", 15f, true).apply {
-                gravity = Gravity.CENTER
-                padDp(4, 16, 4, 28)
-            }, wide())
-            addView(LinearLayout(this@MainActivity).apply {
-                val options = listOf(
-                    Triple("Find the words", "Messages & ideas", "Help me write a thoughtful message. Ask me who it is for and what I want to say."),
-                    Triple("Think it through", "Clarity & next steps", "Help me think through a decision. Ask me one question at a time.")
-                )
-                options.forEachIndexed { index, (title, hint, prompt) ->
-                    addView(LinearLayout(this@MainActivity).apply {
-                        orientation = LinearLayout.VERTICAL
-                        gravity = Gravity.CENTER_VERTICAL
-                        minimumHeight = dp(96)
-                        padDp(16, 16, 12, 16)
-                        background = android.graphics.drawable.RippleDrawable(
-                            android.content.res.ColorStateList.valueOf(color(R.color.outline)),
-                            surface(if (index == 0) R.color.presence_bg else R.color.chip_bg, 22), null)
-                        addView(label(title, 16f).apply { medium() })
-                        addView(label(hint, 12f, true).apply { padDp(0, 6, 0, 0) })
-                        isFocusable = true
-                        contentDescription = "$title. $hint"
-                        setOnClickListener {
-                            performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
-                            stagePrompt(prompt)
-                        }
-                    }, LinearLayout.LayoutParams(0, -2, 1f).apply { if (index == 0) rightMargin = dp(10) })
-                }
             }, wide())
         }
         return blank
@@ -1075,7 +1038,7 @@ class MainActivity : Activity() {
      */
     private fun report(problem: VoiceProblem) {
         status.text = problem.message
-        AlertDialog.Builder(this).setTitle("Let’s get voice ready")
+        AlertDialog.Builder(this).setTitle("Voice setup")
             .setMessage(problem.message + " Your draft is safe. Open voice setup to choose a language, download speech or test the speaker.")
             .setPositiveButton("Voice setup") { _, _ ->
                 startActivity(Intent(this, VoiceActivity::class.java).putExtra("setup", true))

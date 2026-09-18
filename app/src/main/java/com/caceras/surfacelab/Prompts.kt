@@ -24,6 +24,8 @@ object Prompts {
         Task.ASK ->
             "You are a concise assistant running on the user's phone. Answer directly. " +
                 "Reply in the same language the user writes in. " +
+                "Use plain, specific language and short paragraphs. Avoid slogans, catchy titles " +
+                "and decorative headings. Use lists only when useful. " +
                 "You can help reason, plan, explain and write. You cannot browse, read other " +
                 "apps, send messages, set alarms or change phone settings. Do not claim " +
                 "to have performed actions or checked live information. Say when you are unsure."
@@ -60,27 +62,32 @@ object Prompts {
     }
 
     /**
-     * Did the model hand back its own instructions instead of an answer?
-     *
-     * On a device where isSystemPromptAvailable() is false the instruction is
-     * pasted in as ordinary text above the prompt, and a small model asked a
-     * contentless question -- "??" -- will happily continue by reciting it.
-     * That reached a phone: the whole system prompt, rendered as the reply.
-     *
-     * Any long run shared with the instruction is the tell. Nothing a person
-     * asks for legitimately comes back as fifty unbroken characters of it.
+     * Detect a 50-character instruction echo without repeatedly searching
+     * the entire growing answer for every instruction substring. Hash hits
+     * are verified against the actual text; collisions cannot hide a reply.
      */
     fun isEcho(answer: String, task: Task): Boolean {
-        val instruction = system(task).lowercase()
-        if (instruction.length < ECHO_RUN) return false
+        val index = echoIndexes.getValue(task)
+        if (index.instruction.length < ECHO_RUN || answer.length < ECHO_RUN) return false
         val text = answer.lowercase()
-        for (start in 0..instruction.length - ECHO_RUN) {
-            if (text.contains(instruction.substring(start, start + ECHO_RUN))) {
-                return true
-            }
+        if (text.length < ECHO_RUN) return false
+        var hash = text.substring(0, ECHO_RUN).hashCode()
+        for (start in 0..text.length - ECHO_RUN) {
+            if (hash in index.hashes && index.instruction.contains(text.substring(start, start + ECHO_RUN))) return true
+            if (start + ECHO_RUN < text.length)
+                hash = (hash - text[start].code * echoPower) * 31 + text[start + ECHO_RUN].code
         }
         return false
     }
+
+    private data class EchoIndex(val instruction: String, val hashes: Set<Int>)
+    private val echoIndexes by lazy {
+        Task.values().associateWith { task ->
+            val instruction = system(task).lowercase()
+            EchoIndex(instruction, instruction.windowed(ECHO_RUN).map { it.hashCode() }.toSet())
+        }
+    }
+    private val echoPower = (1 until ECHO_RUN).fold(1) { value, _ -> value * 31 }
 
     /**
      * An answer that stopped because it ran out of tokens rather than because
@@ -169,14 +176,6 @@ object Prompts {
     private const val MIN_REPLY = 40
 
     private val LABELS = listOf("Assistant: ", "AI: ", "Bot: ", THEM)
-
-    /**
-     * Two sets, because the two places that offer them are not the same
-     * place. "What is this actually saying?" is a fine thing to tap when you
-     * have just selected a paragraph, and nonsense on an empty chat screen
-     * where there is no "this" -- the model can only answer by asking what
-     * you meant, which is exactly what it did.
-     */
 
     /** Offered next to a selection. There is always material to refer to. */
     val ABOUT_SELECTION = listOf(
