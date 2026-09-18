@@ -10,56 +10,26 @@ import android.text.style.TypefaceSpan
 import android.widget.TextView
 import java.util.WeakHashMap
 
-/** Framework-only formatting for the Markdown used in assistant replies. */
+/** Android presentation of the shared, framework-independent Markdown parser. */
 object Markdown {
-    private val BULLET = Regex("""^\s*[*\-+]\s+""")
-    private val HEADING = Regex("""^\s*#{1,6}\s+""")
-    private val FENCE = Regex("""^\s*(`{3,}|~{3,})(.*)$""")
     private const val FLAGS = Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-    // UI-thread only. A correction must reformat earlier lines, even when their text is unchanged.
+    // UI-thread only; weak keys do not retain screens after navigation.
     private val streamSources = WeakHashMap<TextView, String>()
 
     fun render(source: String, bulletIndent: Int = 0): CharSequence {
-        val out = SpannableStringBuilder()
-        var fence = ""
-        var first = true
-        for (raw in source.split('\n')) {
-            val marker = FENCE.matchEntire(raw)
-            if (marker != null) {
-                val token = marker.groupValues[1]
-                if (fence.isEmpty()) {
-                    fence = token
-                    continue
+        val document = MarkdownParser.parse(source, bulletIndent)
+        return SpannableStringBuilder(document.text).apply {
+            for (span in document.spans) {
+                val style = when (span.style) {
+                    MarkdownParser.Style.BOLD -> StyleSpan(Typeface.BOLD)
+                    MarkdownParser.Style.ITALIC -> StyleSpan(Typeface.ITALIC)
+                    MarkdownParser.Style.BOLD_ITALIC -> StyleSpan(Typeface.BOLD_ITALIC)
+                    MarkdownParser.Style.CODE -> TypefaceSpan("monospace")
+                    MarkdownParser.Style.INDENT -> LeadingMarginSpan.Standard(0, span.indent)
                 }
-                if (token[0] == fence[0] && token.length >= fence.length && marker.groupValues[2].isBlank()) {
-                    fence = ""
-                    continue
-                }
-            }
-            if (!first) out.append('\n')
-            first = false
-            val start = out.length
-            if (fence.isNotEmpty()) {
-                out.append(raw)
-                if (out.length > start) out.setSpan(TypefaceSpan("monospace"), start, out.length, FLAGS)
-                continue
-            }
-            val heading = HEADING.find(raw)
-            val bullet = if (heading == null) BULLET.find(raw) else null
-            val line = when {
-                heading != null -> raw.substring(heading.value.length)
-                bullet != null -> "\u2022  " + raw.substring(bullet.value.length)
-                else -> raw
-            }
-            appendInline(out, line, 0)
-            if (out.length > start) {
-                if (bullet != null && bulletIndent > 0)
-                    out.setSpan(LeadingMarginSpan.Standard(0, bulletIndent), start, out.length, FLAGS)
-                if (heading != null)
-                    out.setSpan(StyleSpan(Typeface.BOLD), start, out.length, FLAGS)
+                setSpan(style, span.start, span.end, FLAGS)
             }
         }
-        return out
     }
 
     /** Keep the TextView buffer and completed lines instead of resetting the entire layout. */
@@ -84,80 +54,6 @@ object Markdown {
         current.replace(boundary, current.length, rendered, boundary, rendered.length)
     }
 
-    private fun appendInline(out: SpannableStringBuilder, line: String, depth: Int) {
-        if (depth >= 8) { out.append(line); return }
-        var i = 0
-        while (i < line.length) {
-            val char = line[i]
-            if (char == '\\' && i + 1 < line.length && line[i + 1] in "\\`*_{}[]()#+-.!>~") {
-                out.append(line[i + 1]); i += 2; continue
-            }
-            if (char == '`') {
-                val count = runLength(line, i, char)
-                val token = "`".repeat(count)
-                val end = line.indexOf(token, i + count)
-                if (end >= 0) {
-                    val start = out.length
-                    out.append(line.substring(i + count, end))
-                    if (out.length > start) out.setSpan(TypefaceSpan("monospace"), start, out.length, FLAGS)
-                    i = end + count
-                    continue
-                }
-                out.append(token); i += count; continue
-            }
-            if (char == '*' || char == '_') {
-                val run = runLength(line, i, char)
-                val count = minOf(run, 3)
-                val after = i + count
-                val intraword = char == '_' && i > 0 && line[i - 1].isLetterOrDigit()
-                if (!intraword && after < line.length && !line[after].isWhitespace()) {
-                    val end = closing(line, after, char, count)
-                    if (end > after) {
-                        val start = out.length
-                        appendInline(out, line.substring(after, end), depth + 1)
-                        val style = when (count) {
-                            1 -> Typeface.ITALIC
-                            2 -> Typeface.BOLD
-                            else -> Typeface.BOLD_ITALIC
-                        }
-                        if (out.length > start) out.setSpan(StyleSpan(style), start, out.length, FLAGS)
-                        i = end + count
-                        continue
-                    }
-                }
-                out.append(line, i, i + run); i += run; continue
-            }
-            out.append(char)
-            i++
-        }
-    }
-
-    private fun runLength(text: String, from: Int, char: Char): Int {
-        var end = from
-        while (end < text.length && text[end] == char) end++
-        return end - from
-    }
-
-    private fun closing(text: String, from: Int, char: Char, count: Int): Int {
-        var i = from
-        while (i < text.length) {
-            if (text[i] == '\\') { i += 2; continue }
-            if (text[i] == '`') {
-                val ticks = runLength(text, i, '`')
-                val close = text.indexOf("`".repeat(ticks), i + ticks)
-                if (close >= 0) { i = close + ticks; continue }
-            }
-            if (text[i] != char) { i++; continue }
-            val run = runLength(text, i, char)
-            val end = i + run
-            val boundary = char != '_' || end == text.length || !text[end].isLetterOrDigit()
-            val compatible = run >= count && (count != 1 || run % 2 == 1)
-            if (compatible && boundary && i > from && !text[i - 1].isWhitespace()) return end - count
-            i = end
-        }
-        return -1
-    }
-
-    /** Use the same parsing rules for speech, widgets and plain-text previews. */
-    fun strip(source: String): String = render(source).toString()
+    /** No Android calls: speech and pure JVM callers share the exact parser used by render. */
+    fun strip(source: String): String = MarkdownParser.parse(source).text
 }

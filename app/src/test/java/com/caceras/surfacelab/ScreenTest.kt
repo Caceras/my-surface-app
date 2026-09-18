@@ -347,6 +347,7 @@ class ScreenTest {
     }
 
     @Test
+    @org.robolectric.annotation.Config(qualifiers = "w411dp-h914dp-mdpi")
     fun `empty-state guidance and voice entry are fully visible at phone size`() {
         val activity = launchMain().get()
         val decor = activity.window.decorView

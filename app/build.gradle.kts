@@ -98,4 +98,6 @@ dependencies {
 // PNGs; otherwise evidence collection would see XML without the matching views.
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     if (name == "testCoreDebugUnitTest") outputs.dir(layout.buildDirectory.dir("screenshots"))
+    // CI logs must expose the actual assertion/cause, not only a failing line number.
+    testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
 }
