@@ -166,16 +166,16 @@ class ScreenTest {
     }
 
     @Test
-    fun `starter cards stage complete requests and voice stays reachable in a chat`() {
+    fun `voice stays reachable as the empty state becomes a conversation`() {
         val activity = launchMain().get()
-        val starter = descendants(content(activity)).first {
-            it.contentDescription?.toString()?.startsWith("Find the words") == true
-        }
-        starter.performClick()
-        assertTrue(composer(activity).text.toString().startsWith("Help me write a thoughtful message."))
+        val welcome = content(activity).findViewWithTag<View>("welcome")
+        val voice = content(activity).findViewWithTag<View>("voice-entry")
+        assertTrue("empty state is hidden", showing(welcome))
+        assertTrue("voice is missing before a conversation", showing(voice))
+        composer(activity).setText("Help me write a message.")
         button(activity, activity.getString(R.string.send)).performClick()
-        assertTrue("starter is still visible", !showing(starter))
-        val voice = descendants(content(activity)).first { it.tag == "voice-entry" }
+        assertEquals("message was not submitted", 2, bubbles(activity).size)
+        assertTrue("empty state is still visible", !showing(welcome))
         assertTrue("voice disappeared in a conversation", showing(voice))
         voice.performClick()
         assertEquals(VoiceActivity::class.java.name, shadowOf(activity).nextStartedActivity.component!!.className)
@@ -347,7 +347,7 @@ class ScreenTest {
     }
 
     @Test
-    fun `welcome has a visible greeting and direct voice entry at phone size`() {
+    fun `empty-state guidance and voice entry are fully visible at phone size`() {
         val activity = launchMain().get()
         val decor = activity.window.decorView
         val width = activity.dp(411)
@@ -355,12 +355,16 @@ class ScreenTest {
         decor.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
         decor.layout(0, 0, width, height)
-        val greeting = descendants(decor).filterIsInstance<TextView>()
-            .first { it.text == activity.getString(R.string.empty_title) }
+        val welcome = decor.findViewWithTag<View>("welcome")
+        val guidance = descendants(welcome).filterIsInstance<TextView>().single()
+        assertTrue("empty-state guidance is missing", guidance.text.isNotBlank())
         val bounds = android.graphics.Rect()
-        assertTrue("greeting is clipped or missing", greeting.getGlobalVisibleRect(bounds))
-        assertTrue("greeting has no measurable height", bounds.height() >= activity.dp(40))
-        descendants(decor).filterIsInstance<TextView>().first { it.text == "Voice" }.performClick()
+        assertTrue("guidance is clipped or missing", guidance.getGlobalVisibleRect(bounds))
+        assertTrue("guidance has no measurable height", guidance.height > 0)
+        assertEquals("guidance is vertically clipped", guidance.height, bounds.height())
+        val voice = decor.findViewWithTag<View>("voice-entry")
+        assertTrue("voice control is clipped or missing", voice.getGlobalVisibleRect(bounds))
+        voice.performClick()
         assertEquals(VoiceActivity::class.java.name, shadowOf(activity).nextStartedActivity.component!!.className)
     }
 
