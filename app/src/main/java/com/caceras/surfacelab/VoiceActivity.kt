@@ -47,7 +47,7 @@ class VoiceActivity : Activity() {
     private lateinit var language: TextView
     private var setupMode = false
     private val streamed = StreamUpdates { text ->
-        answer.text = Markdown.render(text, dp(18))
+        ReplyRenderer.paint(answer, text, dp(18))
         scrollToEnd()
     }
     private lateinit var setupTools: LinearLayout
@@ -149,7 +149,7 @@ class VoiceActivity : Activity() {
     // ------------------------------------------------------------- chrome
 
     private fun build(): View {
-        status = label("Ready when you are", 28f).apply {
+        status = label("Tap to talk", 28f).apply {
             gravity = Gravity.CENTER
             letterSpacing = -0.03f
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -494,7 +494,7 @@ class VoiceActivity : Activity() {
                     // Speech starts at the first finished sentence, not at
                     // the end of the answer. This is the whole difference
                     // between immediate and slow.
-                    voice.follow(Markdown.strip(Prompts.reply(partial)))
+                    voice.follow(Markdown.strip(Prompts.reply(partial), streaming = true))
                 }
             }
         ) { result ->

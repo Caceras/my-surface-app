@@ -242,7 +242,7 @@ class ProcessTextActivity : Activity() {
         NativePrivacy.apply(this, dialog?.window)
 
         streamed = StreamUpdates { text ->
-            stream.text = Markdown.render(text, dp(18))
+            ReplyRenderer.paint(stream, text, dp(18))
             scroll.contentChanged()
         }
         if (aloud) speaker().begin(ears.locale())
@@ -256,7 +256,7 @@ class ProcessTextActivity : Activity() {
                 if (gone || token != requestId) return@run
                 if (Prompts.isEcho(partial, task)) return@run
                 streamed?.offer(Prompts.reply(partial))
-                if (aloud) mouth?.follow(Markdown.strip(Prompts.reply(partial)))
+                if (aloud) mouth?.follow(Markdown.strip(Prompts.reply(partial), streaming = true))
             }
         ) { raw ->
             if (gone || token != requestId) return@run

@@ -463,4 +463,14 @@ class ShotTest {
         shoot("workspace-library-night",activity.get().window.decorView,shotWidth=1080,shotHeight=2400)
         activity.pause().stop().destroy()
     }
+    @Test fun `repaired reply formatting in the real chat`() {
+        Chat.save(RuntimeEnvironment.getApplication(), listOf(Turn("Show the formatting.",
+            "A **clear answer** with *emphasis*, plain sentences and `inline code`.\n\n" +
+            "* Keep the original note.\n* Review the next step.\n\n" +
+            "Literal values still work: 2 * 3 and snake_case.")))
+        val activity=Robolectric.buildActivity(MainActivity::class.java).setup()
+        shoot("reader-repair-chat",activity.get().window.decorView)
+        activity.pause().stop().destroy()
+    }
+
 }
