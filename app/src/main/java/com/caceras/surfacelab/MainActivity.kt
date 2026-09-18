@@ -1190,6 +1190,7 @@ class MainActivity : Activity() {
 
     private fun flatButton(text: String, onTap: () -> Unit) =
         TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) }
             this.text = text
             minHeight = dp(48)
             isFocusable = true
