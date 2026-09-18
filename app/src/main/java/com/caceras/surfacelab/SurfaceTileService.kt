@@ -6,7 +6,6 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import android.widget.Toast
 
 /**
  * Quick Settings tile. The system binds this service only while the shade is
@@ -32,38 +31,10 @@ class SurfaceTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
-        val brain = Brains.get()
-        brain.status(this) { status ->
-            when {
-                status.preparable -> {
-                    render(BrainStatus("Preparing", ready = false))
-                    brain.prepare(this) { render(it) }
-                }
-                status.ready && Ears(this).available() -> talk()
-                status.ready -> {
-                    val last = ResultStore.lastText(this)
-                    Toast.makeText(
-                        this,
-                        last ?: getString(R.string.voice_unavailable),
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-                else -> Toast.makeText(this, status.label, Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    /**
-     * A tile is tappable on the lock screen, and for this tile that means
-     * opening a microphone and writing the answer somewhere the home screen
-     * widget will show it. isSecure() and unlockAndRun() make the phone ask
-     * for the PIN first. Nothing else in this app has needed that, because
-     * nothing else in it starts a private session from the shade.
-     */
-    private fun talk() {
         if (isSecure) unlockAndRun { launch() } else launch()
     }
 
+    /** Open a foreground surface so permission and model setup remain visible. */
     private fun launch() {
         // A service is not an activity, so the intent inside needs
         // FLAG_ACTIVITY_NEW_TASK or the launch is refused outright.
@@ -76,20 +47,27 @@ class SurfaceTileService : TileService() {
             // which is the same trap the widget already stepped in.
             startActivityAndCollapse(
                 PendingIntent.getActivity(
-                    this, 0, intent, PendingIntent.FLAG_IMMUTABLE
+                    this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                 )
             )
         } else {
-            // Deprecated at 34, and the only overload that exists below it.
-            @Suppress("DEPRECATION")
-            startActivityAndCollapse(intent)
+            launchLegacy(intent)
         }
+    }
+
+    // PendingIntent overload does not exist below API 34. The runtime guard is
+    // intentional; this lint detector only considers targetSdk, not the branch.
+    @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated")
+    @Suppress("DEPRECATION")
+    private fun launchLegacy(intent: Intent) {
+        check(Build.VERSION.SDK_INT < 34)
+        startActivityAndCollapse(intent)
     }
 
     private fun render(status: BrainStatus) {
         val tile = qsTile ?: return
         tile.state = if (status.ready) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tile.label = getString(R.string.brain_name)
+        tile.label = getString(R.string.app_name)
         // Voice status belongs on the same line as the model status: both
         // answer "will a tap do anything", and there is only one line.
         // Tile.setSubtitle landed in API 29, which is this app's minSdk.

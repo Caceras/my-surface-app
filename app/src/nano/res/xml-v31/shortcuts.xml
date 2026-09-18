@@ -31,29 +31,25 @@
         <intent
             android:action="android.intent.action.VIEW"
             android:targetClass="com.caceras.surfacelab.VoiceActivity"
-            android:targetPackage="com.caceras.surfacelab.nano" />
+            android:targetPackage="com.caceras.surface.nano" />
     </shortcut>
 
     <shortcut
         android:enabled="true"
-        android:icon="@drawable/ic_surface"
+        android:icon="@mipmap/ic_launcher"
         android:shortcutId="alpha"
         android:shortcutShortLabel="@string/shortcut_alpha">
         <intent
             android:action="android.intent.action.VIEW"
             android:targetClass="com.caceras.surfacelab.MainActivity"
-            android:targetPackage="com.caceras.surfacelab.nano" />
+            android:targetPackage="com.caceras.surface.nano" />
     </shortcut>
 
-    <shortcut
-        android:enabled="true"
-        android:icon="@drawable/ic_surface"
-        android:shortcutId="beta"
-        android:shortcutShortLabel="@string/shortcut_beta">
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:targetClass="com.caceras.surfacelab.MainActivity"
-            android:targetPackage="com.caceras.surfacelab.nano" />
-    </shortcut>
 
+    <shortcut android:shortcutId="history" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/shortcut_history">
+        <intent android:action="com.caceras.surfacelab.OPEN_HISTORY" android:targetClass="com.caceras.surfacelab.MainActivity" android:targetPackage="com.caceras.surface.nano" />
+    </shortcut>
+    <shortcut android:shortcutId="capture" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="@string/shortcut_capture">
+        <intent android:action="com.caceras.surfacelab.OPEN_CAPTURE" android:targetClass="com.caceras.surfacelab.MainActivity" android:targetPackage="com.caceras.surface.nano" />
+    </shortcut>
 </shortcuts>

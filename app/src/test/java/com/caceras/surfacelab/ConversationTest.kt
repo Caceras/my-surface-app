@@ -49,6 +49,115 @@ class ConversationTest {
         Chat.clear(app)
     }
 
+    @Test
+    fun `new saves a recoverable conversation and switching preserves the next draft`() {
+        val activity = launch().get()
+        exchange(activity, "Plan a weekend", "Take a walk.")
+        descendants(content(activity)).filterIsInstance<TextView>().first { it.text == "New" }.performClick()
+        val saved = Chat.archives(activity).single()
+        assertTrue(Chat.load(activity).isEmpty())
+        Chat.saveDraft(activity, "A different thought")
+        assertTrue(Chat.openArchive(activity, saved.id))
+        assertEquals(listOf(Turn("Plan a weekend", "Take a walk.")), Chat.load(activity))
+        assertEquals("A different thought", Chat.archives(activity).single().draft)
+    }
+
+    @Test
+    fun `backup includes archived conversations and remains compatible with older backups`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        Chat.save(context, listOf(Turn("Earlier", "Answer")))
+        Chat.archiveCurrent(context, "Follow up")
+        Chat.clear(context)
+        Chat.saveDraft(context, "Current draft")
+        val backup = Chat.backup(context)
+        assertEquals("Current draft", Chat.readBackup(backup).second)
+        Chat.clearArchives(context)
+        Chat.restoreArchives(context, backup)
+        assertEquals("Follow up", Chat.archives(context).single().draft)
+        assertEquals(emptyList<Turn>(), Chat.readBackup("""{"format":"surface-chat-v1","turns":[],"draft":""}""").first)
+    }
+
+    @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun `streaming leaves the reading position alone until latest reply is requested`() {
+        val activity = launch().get()
+        exchange(activity, "Earlier question", "Earlier answer. ".repeat(400))
+        val decor = activity.window.decorView
+        fun layout() {
+            decor.measure(View.MeasureSpec.makeMeasureSpec(activity.dp(411), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(activity.dp(914), View.MeasureSpec.EXACTLY))
+            decor.layout(0, 0, activity.dp(411), activity.dp(914))
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        }
+        layout()
+        composer(activity).setText("Continue")
+        send(activity)
+        layout()
+        val scroll = descendants(content(activity)).filterIsInstance<ScrollView>().first { it.tag == "conversation" }
+        assertTrue("native text must extend below the viewport", scroll.getChildAt(0).height > scroll.height + 30)
+        scroll.scrollTo(0, scroll.getChildAt(0).height)
+        assertTrue("fixture needs a scrollable conversation", scroll.scrollY > 30)
+        scroll.scrollTo(0, 30)
+        val before = scroll.scrollY
+        assertEquals("scrolling up must detach from the latest reply", View.VISIBLE,
+            descendants(content(activity)).first { it.tag == "latest-reply" }.visibility)
+        brain.emit("A new paragraph. ".repeat(100))
+        layout()
+        brain.complete("A new paragraph. ".repeat(100))
+        layout()
+        assertEquals("streaming moved the reader", before, scroll.scrollY)
+        val latest = descendants(content(activity)).first { it.tag == "latest-reply" }
+        assertEquals(View.VISIBLE, latest.visibility)
+        latest.performClick()
+        assertEquals(View.GONE, latest.visibility)
+    }
+
+    @Test
+    fun `a final answer cannot be overwritten by a queued streaming update`() {
+        val activity = launch().get()
+        composer(activity).setText("Help me think")
+        send(activity)
+        brain.emit("First")
+        brain.emit("An older unfinished response")
+        brain.complete("The finished response.")
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(100))
+        assertTrue(bubbles(activity).contains("The finished response."))
+        assertFalse(bubbles(activity).contains("An older unfinished response"))
+    }
+
+    @Test
+    fun `backup limits count encoded bytes and oversized exports fail before writing`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val draft = "界".repeat(1_400_000)
+        Chat.saveDraft(context, draft)
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { Chat.backup(context) }
+        val raw = org.json.JSONObject().put("format", "surface-chat-v1")
+            .put("turns", org.json.JSONArray()).put("draft", draft).toString()
+        assertTrue(raw.length < Chat.MAX_BACKUP_BYTES)
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { Chat.readBackup(raw) }
+        assertEquals(draft, Chat.draft(context))
+    }
+
+    @Test
+    fun `conversation browser searches previews and resumes without losing the current draft`() {
+        val activity = launch().get()
+        Chat.save(activity, listOf(Turn("Weekend", "Walk by the lake.")))
+        Chat.archiveCurrent(activity, "")
+        Chat.save(activity, listOf(Turn("Dinner", "Roast vegetables.")))
+        Chat.archiveCurrent(activity, "")
+        Chat.clear(activity)
+        composer(activity).setText("Keep my current thought")
+        descendants(content(activity)).filterIsInstance<TextView>().first { it.text == "History" }.performClick()
+        val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog()
+        val root = dialog.window!!.decorView
+        root.findViewWithTag<EditText>("conversation-search").setText("lake")
+        val buttons = descendants(root).filterIsInstance<TextView>().filter { it.text == "Resume" }
+        assertEquals(1, buttons.size)
+        buttons.single().performClick()
+        assertEquals("Weekend", Chat.load(activity).single().you)
+        assertTrue(Chat.archives(activity).any { it.draft == "Keep my current thought" })
+    }
+
     // --------------------------------------------------------------- rig
 
     private fun launch(): ActivityController<MainActivity> =
@@ -70,14 +179,7 @@ class ConversationTest {
             .first { it.contentDescription == activity.getString(R.string.send) }
             .performClick()
 
-    private fun bubbles(activity: android.app.Activity): List<String> {
-        val scroll = descendants(content(activity)).filterIsInstance<ScrollView>().first()
-        val column = scroll.getChildAt(0) as ViewGroup
-        return (0 until column.childCount)
-            .map { column.getChildAt(it) }
-            .filterIsInstance<TextView>()
-            .map { it.text.toString() }
-    }
+    private fun bubbles(activity: android.app.Activity): List<String> = chatMessages(content(activity))
 
     /** Ask, and let the stand-in finish the answer. */
     private fun exchange(activity: android.app.Activity, question: String, answer: String) {
@@ -226,4 +328,77 @@ class ConversationTest {
         send(activity)
         assertEquals("a failure was sent back as context", "again", brain.instruction)
     }
+    @Test
+    fun `New during streaming cannot resurrect cleared history`() {
+        val activity = launch().get()
+        composer(activity).setText("old question")
+        send(activity)
+        descendants(content(activity)).filterIsInstance<TextView>()
+            .first { it.text == activity.getString(R.string.new_chat) }.performClick()
+        brain.emit("late partial")
+        brain.complete("late answer")
+        assertTrue(bubbles(activity).isEmpty())
+        assertTrue(Chat.load(activity).isEmpty())
+        assertEquals(null, ResultStore.lastText(activity))
+        composer(activity).setText("new question")
+        send(activity)
+        assertEquals("new question", brain.instruction)
+    }
+
+    @Test
+    fun `stopping restores a question and ignores later callbacks`() {
+        val activity = launch().get()
+        composer(activity).setText("please explain")
+        send(activity)
+        brain.emit("Partial")
+        descendants(content(activity)).filterIsInstance<android.widget.ImageButton>()
+            .first { it.contentDescription == activity.getString(R.string.stop_response) }
+            .performClick()
+        brain.complete("Should not be saved")
+        assertEquals("please explain", composer(activity).text.toString())
+        assertTrue(Chat.load(activity).isEmpty())
+        assertFalse(bubbles(activity).contains("Should not be saved"))
+    }
+
+    @Test
+    fun `failed request restores the prompt without destroying a newer draft`() {
+        val activity = launch().get()
+        composer(activity).setText("first prompt")
+        send(activity)
+        composer(activity).setText("next draft")
+        brain.fail("Unavailable")
+        assertEquals("next draft", composer(activity).text.toString())
+    }
+
+    @Test
+    fun `draft survives leaving the app`() {
+        val controller = launch()
+        composer(controller.get()).setText("unfinished thought")
+        controller.pause().stop().destroy()
+        assertEquals("unfinished thought", composer(launch().get()).text.toString())
+    }
+
+    @Test
+    fun `shared text is staged and does not send or replace a draft`() {
+        val controller = launch()
+        val activity = controller.get()
+        composer(activity).setText("my draft")
+        controller.newIntent(android.content.Intent(android.content.Intent.ACTION_SEND)
+            .putExtra(android.content.Intent.EXTRA_TEXT, "selected material"))
+        assertEquals("my draft\n\nselected material", composer(activity).text.toString())
+        assertEquals(0, brain.runs)
+    }
+
+    @Test
+    fun `backups round trip conversation and draft and reject unrelated JSON`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        Chat.save(context, listOf(Turn("Hello", "Hi there")))
+        Chat.saveDraft(context, "Next thought")
+        val restored = Chat.readBackup(Chat.backup(context))
+        assertEquals(listOf(Turn("Hello", "Hi there")), restored.first)
+        assertEquals("Next thought", restored.second)
+        org.junit.Assert.assertThrows(Exception::class.java) { Chat.readBackup("{}") }
+        assertEquals(listOf(Turn("Hello", "Hi there")), Chat.load(context))
+    }
+
 }

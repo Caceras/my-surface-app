@@ -1,362 +1,120 @@
-<p align="center">
-  <img src="assets/banner.png" alt="Pixel Surface Lab" width="100%">
+# Ægentica AI
+
+**A little clarity. A little possibility.**
+
+A native Android workspace for **Today · AI · Library**: capture notes, connect ideas, plan your day, and think by typing or speaking. Gemini Nano, dictation, notes and local reminders need no account. Optional connected AI and scheduled generation use your own provider; calendar and Beeper access are explicit choices.
+
+**[Everyday guide](docs/everyday-workspace.md)** · [Implementation and limits](docs/everyday-assistant-plan.md) · [Workspace acceptance](docs/audits/2026-09-16-workspace.md)
+
+[![Android checks](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg?branch=improve-pixel-assistant)](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-70CEFA.svg)](LICENSE)
+
+**[Download the Nano preview APK](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant/aegentica-ai-nano.apk)** · [What changed](docs/preview-notes.md) · [Phone setup](docs/getting-started.md) · [Android plan](docs/android-native-plan.md) · [Deep audit](docs/audits/2026-09-15.md) · [Test/process audit](docs/audits/iteration-efficiency.md) · [Iteration workflow](docs/iteration-workflow.md) · [Contribute](CONTRIBUTING.md)
+
+> This is the **Ægentica AI** app on `improve-pixel-assistant`. The main branch and `/releases/latest` may contain an older experience. This preview is not a Play Store release. Export your workspace before any reinstall (conversation export on older builds).
+
+## The experience
+
+- **Capture and remember.** Autosaved notes, originals, full-text search, pinning, Trash/undo and whole-workspace backups.
+- **Connect ideas.** People, projects, linked tasks and collections with typed fields and a table view over the same records.
+- **Plan your day.** Selected-calendar agenda, reviewed reminders, local AI routines and separately approved connected routines.
+- **Read while walking.** Sentence highlighting, playback speed, pause/resume and native background media controls.
+
+- **Write naturally.** A roomy composer, editable dictation, and conversation context for follow-up questions.
+- **Talk and listen.** Pause to send in Voice, hear sentences as they become available, and enable **Keep talking** for a continuous foreground session.
+- **Stay in control.** Stop generation, quiet playback, copy or share answers, and read earlier messages without chat pulling you to the bottom.
+- **Return to a thought.** New saves the conversation you leave. Search saved conversations, inspect previews, resume, or delete individual entries.
+- **Do the everyday.** Set a timer or alarm, draft a calendar event, find a place, or open the dialer through Android apps.
+- **Make it yours.** Pin Chat/Voice, resize the widget, choose answer previews, and enable Private screen.
+- **Feel at home.** Sky-blue light and dark themes, readable formatting, restrained motion, and a composer that follows the keyboard transition.
+
+<p>
+  <img src="docs/images/chat.png" alt="Ægentica AI chat with starters and a spacious composer" width="260">
+  <img src="docs/images/voice.png" alt="Voice response with quiet and stop controls" width="260">
+  <img src="docs/images/chat-night.png" alt="Ægentica AI chat in dark mode" width="260">
 </p>
 
-<p align="center">
-  <a href="https://github.com/Caceras/my-surface-app/actions/workflows/build.yml">
-    <img src="https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg" alt="Build debug APKs">
-  </a>
-  <a href="https://github.com/Caceras/my-surface-app/releases/latest">
-    <img src="https://img.shields.io/badge/download-debug--latest.apk-38BDF8" alt="Download APK">
-  </a>
-  <img src="https://img.shields.io/badge/AI-on--device%20only-2DD4BF" alt="On-device only">
-  <img src="https://img.shields.io/badge/minSdk-29-152B3C" alt="minSdk 29">
-  <img src="https://img.shields.io/badge/license-MIT-6B6B6B" alt="MIT">
-</p>
+Curated native framework illustrations from the original Ægentica AI branding pass (see the [audit](docs/quality-audit.md#evidence)), using the deterministic core test fixture. These are core test fixtures, not real Nano responses or Pixel system chrome. For current screens, download the release’s **aegentica-evidence.zip** and open **review.html**.
 
----
+## Try it on a Pixel
 
-## What this is
+1. Download **`aegentica-ai-nano.apk`** from the preview link above and open it on the phone. Allow installation from your browser if Android asks.
+2. Open **Ægentica AI**. Check the build number in **Settings** against the [preview release](https://github.com/Caceras/my-surface-app/releases/tag/preview-improve-pixel-assistant).
+3. Select **Check / prepare on-device model**. Initial model and speech downloads need an internet connection.
+4. Type a short question. Then open **Settings → Set up voice & test playback** to choose your language, download offline speech, and test the speaker.
+5. Tap **Voice**, speak, and pause. Use **Type** to return to the shared chat. Enable **Keep talking** only when you want the microphone to reopen after the reply.
 
-Select text in any app on your Pixel, tap **Ask Nano**, and type — or say —
-whatever you want to ask about it. The answer streams back from a model running
-on the phone itself — no account, no API key, no network. Turn off wifi and
-mobile data and it still works.
+If an update reports a package/signature conflict, **export first**, uninstall the existing Ægentica AI, install the new APK, then restore. Do not uninstall to troubleshoot before preserving the data you want. [Update and signing guide](docs/delivery.md).
 
-Speech goes the same way. The recogniser is the on-device one or there is no
-microphone at all, and the answer is read back by a voice that does not need
-the radios. Ask out loud and you hear the answer; type and you do not. There is
-no voice mode to turn on, because modality is inherited rather than
-configured.
+The Pixel 10 Pro XL is listed in Google's Prompt API support table. Availability still depends on the device configuration and AICore readiness. The app checks readiness at runtime. [Google's current device support](https://developers.google.com/ml-kit/genai#device_support).
 
-It is a prompt box, not a fixed menu. Summarise, Proofread and Make professional
-are there too, but they are ordinary prompts with a system instruction, defined
-in one small file you can edit.
+## Within reach
 
-Getting there normally means Android Studio, an SDK install, a Gradle fight and
-a pile of AICore boilerplate. Here it is one script and a push. Roughly five
-minutes end to end, most of it waiting for CI.
-
-The repo is also the template underneath: **five real Android system surfaces**,
-generated for your own package name, with a static checker that catches the
-failures which would otherwise cost you a CI round trip each.
-
-<p align="center">
-  <img src="assets/pipeline.gif" alt="Scaffold, verify, push, install" width="720">
-</p>
-
----
-
-## Two builds of the same app
-
-| | `core` | `nano` |
+| Entry point | What happens | Setup |
 |---|---|---|
-| Dependencies | **none** | one: `com.google.mlkit:genai-prompt` |
-| Text-selection actions | Uppercase | **Ask** + Summarise, Proofread, Make professional |
-| Prompting | — | **free-form**, streaming, with system instructions |
-| Voice in and out | yes | yes |
-| Model | none | Gemini Nano, via Android AICore |
-| APK size | ~2.5 MB | ~12 MB |
-| Runs on | any Android 10+ device | supported Pixels with AICore |
-| Network | never | **never** |
+| App | Opens typed chat and the current draft | Open Ægentica AI |
+| Voice | Opens the foreground voice conversation | Chat → Voice |
+| Pixel Quick Tap | Opens chat with a back-of-phone double tap | Android Settings → System → Gestures → Quick Tap → Open app |
+| Assistant gesture | Opens Voice where Android supports the selected assistant | Settings → Set as digital assistant |
+| Quick Settings | Opens Voice, with setup and Type available | Add the app tile from Android's tile editor |
+| Home widget | Capture/Talk; pinned-note or last-answer preview only when enabled | Settings → Add home screen widget |
+| Launcher shortcuts | Chat, Voice, History and Capture note; Chat/Voice can be pinned | Long-press the launcher icon |
+| Share sheet | Stages shared **plain text** in the composer for review | Share text → Ægentica AI |
+| Text selection | Ask, Summarise, Proofread, or Make professional in the Nano build | Select text in a supporting app → overflow menu |
 
-They install side by side (`nano` carries an `applicationIdSuffix`), so you can
-put both on the phone and compare. `core` exists to prove the plumbing works
-before a model is anywhere near it — and because a template that builds first
-time on a machine with nothing installed is worth protecting.
+Ægentica AI does not implement a wake word, autonomous phone automation, background Nano inference, web browsing, Wear OS, or Android Auto. Calendar and Beeper are optional permission-gated integrations. Background connected routines require explicit provider and routine approval. [Ægentica AI behavior and limits](docs/surfaces.md).
 
-Every surface talks to a single `SurfaceBrain` interface. The activities, the
-tile and the widget have no idea which implementation they got.
+## Private, with clear boundaries
 
----
+Nano and speech use on-device APIs by default. Connected AI is explicitly configured and sends scoped input to your chosen provider; it is never a silent fallback. There is no app analytics service. System services manage initial downloads and have their own policies.
 
-## The five surfaces
+Notes, relationships, typed fields, chats and drafts are stored in app-private SQLite. Settings and encrypted provider configuration are separate. Notes have no automatic archive eviction. Up to 40 completed exchanges are kept in the current chat, and up to 12 recent conversations are archived within a soft size budget. Uninstalling removes local data. Manual exports are readable JSON and can include sensitive text; the file location and any syncing are controlled by the document provider you choose. Widget content previews are off by default. Whole-workspace exports use a separate versioned JSON format; credentials are excluded. Private screen can hide Recents previews and block screenshots; clipboard copies carry sensitive-preview metadata. [Privacy and data guide](docs/privacy.md).
 
-<p align="center">
-  <img src="assets/surfaces.png" alt="Where each surface appears on a Pixel" width="100%">
-</p>
+## Build and test
 
-| Surface | `--surface` key | Where it appears | API |
-|---|---|---|---|
-| Quick Settings tile | `tile` | Shade → Edit tiles → *From apps that you installed* | 24+ |
-| Home screen widget | `widget` | Long-press home → Widgets | 26+ |
-| App shortcuts | `shortcuts` | Long-press the app icon | 25+ |
-| Share sheet target | `share` | Share anything → app row | all |
-| Text selection action | `processtext` | Select text → popup overflow | 23+ |
+The project is Kotlin with Android framework views. `main` and `core` declare no third-party UI or AI libraries; `nano` adds ML Kit. There is no Gradle wrapper.
 
-In the `nano` build these stop being demos: the launcher screen is a working
-prompt box, the tile reports whether Nano is present and downloads it on tap,
-the widget shows the last answer, and anything shared into the app arrives as
-material for a prompt.
-
-Once the model is ready, the tile, the widget and a **Talk** app shortcut all
-open the same hands-free screen: tap, talk, hear the answer — which is then on
-the home screen widget, because every surface saves through the same store.
-
-**One activity, several menu items.** The text-selection popup shows one entry
-per exported `<activity-alias>`, so three actions cost three manifest entries
-and zero extra classes — the activity reads back which alias was tapped. The
-aliases live in the flavour manifests, which is what makes the menu differ
-between builds.
-
-Not generated but documented in [`docs/surfaces.md`](docs/surfaces.md):
-notification listener, live wallpaper, accessibility service, direct share,
-deep links — plus the surfaces that **aren't** extensible (Now Playing, At a
-Glance, Quick Share), which saves you going looking.
-
----
-
-## Voice, without breaking the offline promise
-
-The whole feature is one rule: **how you asked decides how you are answered.**
-Speak and the reply is spoken as well as printed; type and it is only printed.
-No toggle, no settings screen, no preference to persist.
-
-The offline promise is the hard part, and it is where the easy path quietly
-breaks it:
-
-- `createOnDeviceSpeechRecognizer()` only, gated on
-  `isOnDeviceRecognitionAvailable()`. Never `createSpeechRecognizer()`, whose
-  own documentation says it "is likely to stream audio to remote servers", and
-  never a cloud fallback. **No on-device recogniser means no microphone at
-  all** — not a button that quietly ships your voice somewhere.
-- `EXTRA_PREFER_OFFLINE` is a hint the service may ignore. A hint is not a
-  promise.
-- The text-to-speech voice has to be one that neither needs the network nor
-  still needs downloading. If nothing qualifies, the answer is printed and the
-  phone stays quiet rather than half-succeeding.
-- Missing a language pack is the Swedish case, and the only speech failure
-  with anything to do about it: from API 33 the app offers
-  `triggerModelDownload()` and re-checks, rather than guessing. Below that it
-  says so and points at the system's voice-input settings.
-- Nothing is recorded to disk, ever.
-
-Speech starts at the **first finished sentence**, not at the end of the answer,
-so the time to the first spoken word is one clause rather than the whole reply.
-Any touch stops it dead — and mutes the rest of the answer, since the model is
-usually still streaming.
-
-`RECORD_AUDIO` is the first runtime permission this app has ever asked for. It
-is requested on the first microphone tap, never at launch. Below API 31 there
-is no on-device recogniser API, so there is no microphone and no **Talk**
-shortcut — that entry lives in `res/xml-v31/` and older devices never load it.
-
-The reasoning, the traps and the parts deliberately not built (a wake word,
-continuous conversation, a settings screen) are in
-[`docs/voice.md`](docs/voice.md).
-
----
-
-## Why the Prompt API and not the task APIs
-
-ML Kit also ships `genai-summarization`, `genai-proofreading` and
-`genai-rewriting`: one narrow client per task. They are easier to reach for and
-they are a trap — each is **capped at English, Japanese and Korean** (four more
-European languages for proofread and rewrite) and cannot be asked anything
-outside its one job.
-
-`genai-prompt` is the same model with the lid off: any prompt, any language,
-system instructions, temperature, streaming, and multimodal input. This repo
-uses it exclusively, which is also why `nano` has exactly one dependency.
-
-That is not a promise of quality in every language. Nano is a small model
-trained mostly on English, and it will answer Swedish fluently enough to be
-misleading. The app notes that once, on likely Nordic input, and gets out of the
-way. If Swedish output quality actually matters, the path is a bundled
-open-weights model through MediaPipe or LiteRT-LM — see [`docs/ai.md`](docs/ai.md).
-
-Gemini Nano needs a supported Pixel with a **locked bootloader** and a current
-Android AICore. On anything else the app degrades to a clear message instead of
-a crash.
-
----
-
-## Quickstart
-
-### Use this repo as-is
+**Pinned toolchain:** JDK 21, Gradle 9.7.1, Android SDK/build-tools 36, AGP 9.3.2. [Version reference](docs/versions.md).
 
 ```bash
-git clone https://github.com/Caceras/my-surface-app.git my-surface-app
+git clone --branch improve-pixel-assistant https://github.com/Caceras/my-surface-app.git
 cd my-surface-app
-./ship.sh          # creates your own repo and pushes
+python tools/check.py
+gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug --no-daemon
 ```
 
-### Or generate a fresh, smaller app
+| Variant | Purpose | Application ID |
+|---|---|---|
+| `nano` | The actual Gemini Nano assistant | `com.caceras.surface.nano` |
+| `core` | Deterministic demo and UI tests; uppercase output, no AI model | `com.caceras.surface` |
 
-```bash
-python tools/scaffold.py \
-  --out ../my-tile \
-  --package com.example.mytile \
-  --app-name "My Tile" \
-  --surface tile
+APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots appear under `app/build/screenshots/`. App/tooling candidates run one shared Android job for JVM tests, lint and both builds. Known documentation-only changes run preflight; canonical draft PRs defer duplicate merge checks until ready-for-review. Successful runs generate a source-linked evidence bundle and verified build-specific APK links; failed runs retain diagnostics. Tests exercise the core variant, so green CI does **not** establish Nano quality, real speech latency, or device gesture behavior. [Testing and device checklist](docs/testing.md).
 
-python tools/verify.py ../my-tile
-```
+## Documentation
 
-The generator produces the zero-dependency app. The AI flavour is demonstrated
-here, in `app/src/nano/`.
+| Guide | Covers |
+|---|---|
+| [Test/process audit](docs/audits/iteration-efficiency.md) | Test necessity, measured CI costs, request-to-install gaps and fixes |
+| [Everyday guide](docs/everyday-workspace.md) | Notes, tables, sources, playback, calendar, Beeper, connected routines and backups |
+| [Everyday assistant plan](docs/everyday-assistant-plan.md) | Product direction, delivery status and remaining acceptance boundaries |
+| [Iteration workflow](docs/iteration-workflow.md) | Pipeline audit, automated evidence, verified releases and feedback loop |
+| [Deep audit and fixes](docs/audits/2026-09-15.md) | Prioritized repair register, current flow evidence and open acceptance gates |
+| [Cohesion audit](docs/cohesion-audit.md) | Current cross-flow fixes, fresh baseline and remaining device gates |
+| [Android capability plan](docs/android-native-plan.md) | 40+ capability areas, delivery contracts, follow-on priorities and gates |
+| [Native actions](docs/native-actions.md) | Clock, Calendar, Maps, Dialer and keyboard/shortcut behavior |
+| [Design system](docs/design-system.md) | Æ identity, sky-blue tokens, icon rules and accessibility |
+| [Getting started](docs/getting-started.md) | Installation, daily controls, speech setup, and common problems |
+| [Architecture](docs/architecture.md) | UI boundaries, generation lifecycle, streaming, and storage |
+| [Privacy](docs/privacy.md) | Permissions, retained data, exports, and deletion |
+| [Testing](docs/testing.md) | Reproducible checks and the physical-device release checklist |
+| [Quality audit](docs/quality-audit.md) | Evidence, fixed issues, and remaining risks |
+| [Delivery](docs/delivery.md) | Preview releases, updates, signing, and Play distribution limits |
+| [Voice](docs/voice.md) | Recognition, speech output, cancellation, and interruption |
+| [AI](docs/ai.md) | Prompt construction, AICore readiness, and model boundaries |
+| [Surfaces](docs/surfaces.md) | Android entry points and unsupported integrations |
 
-### Get it on the phone
+The original surface generator remains available in `tools/scaffold.py`; it generates a minimal framework app, not this complete assistant. [Contributor guide](CONTRIBUTING.md).
 
-1. Open the repo's **Releases** page on the Pixel.
-2. Tap `pixel-surface-lab-nano.apk`.
-3. Allow installs from Chrome when prompted.
-4. Open the app and press **Check / prepare on-device model**. First run
-   downloads the feature; after that it is offline forever.
-5. Type something in the **Ask** box to confirm it answers.
-6. Tap the microphone and ask the same thing out loud. The answer should be
-   spoken back.
-7. Then select text anywhere in any app and look in the popup overflow.
+## Status
 
-> **Why the release and not the artifact?** GitHub always serves workflow
-> artifacts as a `.zip`, and Android will not install a zip. A release asset is
-> a direct `.apk` URL. This is the single most common place this workflow dies.
-
-The rolling `debug-latest` tag is reused on every build, so **the download URL
-never changes** — bookmark `/releases/latest` on your phone once and re-use it
-forever.
-
-**Trying a branch before it merges.** Every push to a branch publishes its own
-prerelease at `/releases/tag/preview-<branch>`, with both APKs attached and the
-same rolling-tag trick, so a branch keeps one URL for as long as it exists. It
-is marked as a prerelease, which is what keeps `/releases/latest` meaning "the
-build from `main`". Same debug key as everything else here, so it installs
-straight over whatever is already on the phone.
-
----
-
-## Verify before you push
-
-```bash
-python tools/verify.py .        # two seconds, no Android SDK needed
-python tools/test_verify.py     # proves the checker still checks
-gradle testCoreDebugUnitTest    # renders the real screens on the JVM
-```
-
-A CI round trip costs about three minutes. `verify.py` needs no Android SDK and
-catches the failures that would otherwise burn that trip:
-
-- dangling `@drawable/…` / `R.string.…` references
-- manifest components with no matching Kotlin source
-- an `<activity-alias>` pointing at an activity that doesn't exist
-- an `intent-filter` with no `android:exported` (a hard AGP error)
-- a resource used from `src/main` that only some flavours define — the failure
-  mode where one variant is green and the other cannot compile
-- imports that need a dependency the `core` source set deliberately refuses
-- Kotlin that uses `SpeechRecognizer` with no `RECORD_AUDIO` in the manifest
-- speech code with no matching `<queries>` entry — package visibility stops
-  the recogniser or the TTS engine binding at all, silently
-- a shortcut pointing at another app's `applicationId`, in `res/xml/` or in a
-  qualified copy like `res/xml-v31/`
-- a workflow missing `contents: write` (releases fail with a silent 403)
-
-Exit code is non-zero on failure, so it chains: `python tools/verify.py . && git push`
-
-CI runs all three before it will start a build.
-
-**The JVM tests render the actual activities**, via Robolectric, because three
-layout bugs shipped that a compile and a static check both waved through:
-padding set in pixels rather than dp (so the app got *tighter* as screen density
-rose), no window-insets handling on an edge-to-edge target (so the title sat
-under the status bar), and a row of prompt suggestions that was written and
-never added to a view. Each of those now has a test that fails without the fix.
-
-They run against the `core` flavour, whose brain is deterministic. The `nano`
-brain needs AICore, which exists on no CI runner and no emulator — the AI path
-can only be exercised on a real Pixel. That gap is real, and worth naming rather
-than papering over.
-
----
-
-## Repo layout
-
-```
-├── app/
-│   └── src/
-│       ├── main/         surfaces, SurfaceBrain interface, Prompts.kt, storage
-│       ├── core/         zero-dependency brain + its manifest entry
-│       └── nano/         Prompt API brain + its four manifest entries
-├── tools/
-│   ├── scaffold.py       generates a new surface app
-│   ├── verify.py         static pre-flight checks
-│   ├── test_verify.py    tests for the checker
-│   └── make_assets.py    regenerates the branded images
-├── docs/
-│   ├── ai.md             on-device AI: availability, languages, alternatives
-│   ├── voice.md          on-device speech in and out, and its traps
-│   ├── surfaces.md       every surface, its gotchas and constraints
-│   ├── versions.md       toolchain matrix + error→fix mapping
-│   └── delivery.md       signing, install prompts, private repos
-├── assets/               banner, social card, diagram, GIF, fonts
-└── .github/workflows/    verify → build both flavours → publish
-```
-
----
-
-## Design decisions
-
-**The dependency-free core is load-bearing.** Dependency resolution is the most
-common source of mystery build failures. `core` and `main` are held to framework
-APIs only, and `verify.py` enforces it, so a stray `import androidx.…` fails
-locally in two seconds rather than in CI in three minutes. Every dependency in
-this project lives in exactly one place: the `nano` flavour.
-
-**No model in the APK.** The Prompt API calls Android AICore, a system service.
-Nothing is bundled and nothing is downloaded by this app — which is why `nano`
-is 12 MB rather than several hundred.
-
-**Presets are data, not features.** Every built-in action is a system
-instruction in `Prompts.kt`. Adding one is an enum entry, a line of prompt text
-and a manifest alias. No new classes, no changes to any surface.
-
-**No Gradle wrapper.** The workflow installs Gradle directly via
-`gradle/actions/setup-gradle`, avoiding a committed binary `gradle-wrapper.jar`.
-Android Studio will offer to add a wrapper if you open the project locally.
-
-**Debug signing.** Correct for a personal test, wrong for distribution. An APK
-signed with a different key cannot upgrade over an existing install — switching
-between a local build and a CI build hits `INSTALL_FAILED_UPDATE_INCOMPATIBLE`,
-and the fix is to uninstall first. See [`docs/delivery.md`](docs/delivery.md).
-
-**Generated assets.** Images are produced by `tools/make_assets.py` from brand
-tokens rather than checked in as opaque blobs, so the whole set re-themes by
-changing a few constants.
-
----
-
-## Re-theming
-
-Edit the theme tokens at the top of `tools/make_assets.py`. To add a logo, drop
-a transparent `wordmark.png` into `assets/`. Then re-run:
-
-```bash
-python tools/make_assets.py
-```
-
-The app's own colours live in `app/src/main/res/values/colors.xml` and the
-launcher icon in `res/drawable/ic_launcher_foreground.xml`.
-
----
-
-## When the build fails
-
-Nearly always toolchain version skew, not broken code — Gradle, AGP, the JDK and
-`compileSdk` all constrain each other, and AGP 9 changed two rules that break
-every older project.
-[`docs/versions.md`](docs/versions.md) maps the exact error strings to the thing
-to bump. Read the Actions log first; the build runs with `--stacktrace`.
-
----
-
-## Scope
-
-These are prototypes for your own device. Play Store distribution, background
-execution, or anything reading other apps' content (notification listeners,
-accessibility services) is a different problem with policy constraints —
-`docs/surfaces.md` flags which surfaces carry them.
-
----
-
-<p align="center">
-  <sub>MIT licensed · Illustrations in this README are diagrams, not device screenshots</sub>
-</p>
+An actively developed personal preview, not a claim of production readiness or guaranteed model accuracy. Hardware validation is required before wider distribution. Issues and focused contributions are welcome. Use **Settings → Help & feedback → Copy app info**, then include the steps to reproduce and redacted screenshots. **MIT licensed.**

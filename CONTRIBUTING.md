@@ -1,52 +1,45 @@
 # Contributing
 
-## Before you open a PR
+Ægentica AI is a native personal-assistant preview. Focus contributions on an observable user problem and keep changes small enough to review.
+
+## Set up
+
+See [README](README.md#build-and-test) and the [pinned versions](docs/versions.md). Use the branch containing the experience you intend to change. The project has no Gradle wrapper; CI installs its pinned Gradle version directly.
 
 ```bash
-python tools/verify.py .
-python tools/test_verify.py
-gradle testCoreDebugUnitTest
-gradle assembleCoreDebug assembleNanoDebug
+python tools/check.py
+gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug --no-daemon
 ```
 
-CI runs the first two before it will start a build, so a failure there costs you
-a round trip for no reason.
+## Boundaries
 
-## The one rule
+- `app/src/main` and `app/src/core` use framework APIs only. No AndroidX/Compose/coroutine runtime imports there. Nano-specific SDK dependencies belong in `app/src/nano`; test dependencies are exempt.
+- Preserve offline-only recognition/playback behavior and explicit user consent for sharing. Do not add a quiet remote fallback.
+- Every asynchronous activity update must belong to the active request and lifecycle. Cancel queued rendering on final/stop/pause/destruction.
+- Behavioral layout regressions need a focused test; reversible copy/style edits use existing native captures and visual review. Use native graphics for text wrapping/scroll geometry and inspect fresh screenshots.
+- Do not persist failed partial answers as successful exchanges or destroy a newer draft when restoring an interrupted question.
+- Never commit signing keys, credentials, personal chat exports, or unredacted user screenshots.
 
-`app/src/main/` and `app/src/core/` use **framework APIs only**. No AndroidX, no
-Compose, no Material, no Kotlin coroutines. `verify.py` enforces it.
+## Review checklist
 
-This is not minimalism for its own sake. Dependency resolution is the single
-biggest source of first-run build failures in Android projects, and keeping the
-default path free of it is why this template builds on a machine with nothing
-installed. Anything that needs a dependency goes in `app/src/nano/`, or in a new
-flavour beside it.
+Describe the problem, resulting behavior, tests run and device-only checks still outstanding. Update the user guide when controls change and the architecture/privacy guide when contracts change. Keep product copy distinct from implementation notes. Avoid tests that only repeat the implementation's constants; exercise the failure being prevented.
 
-## Test dependencies are exempt
+Use [testing.md](docs/testing.md) for the hardware checklist. UI test output belongs in `app/build/`; only reviewed, non-private screenshots intended for documentation belong in `docs/images/`.
 
-`testImplementation` does not reach an APK, so Robolectric and JUnit live
-alongside the zero-dependency rule rather than breaking it. `verify.py` skips
-any source set whose name starts with `test` or `androidTest`.
+## Extend
 
-If you touch a layout, add a test that fails without your change. Everything in
-this app is built in code, where the compiler checks nothing about spacing,
-insets or whether a view was ever attached.
+Tasks: add the enum/prompt definition and flavor alias, then test selected-text and chat behavior. Surfaces: reuse existing foreground flows and document permissions, supported Android versions, and launcher constraints. `tools/scaffold.py` is an independent minimal generator; changes there do not automatically update the full assistant.
 
-## Adding a surface
+## Reports
 
-`tools/scaffold.py` has one builder function per surface and a `BUILDERS` map.
-Add a function, register it, extend `SURFACES`, and document the gotcha in
-`docs/surfaces.md` — the gotcha is the valuable half.
+Include installed build number, Android/device details, reproduction steps, and redacted screenshots. Do not upload a private conversation export to a public issue. For security-sensitive concerns, avoid publishing exploit details or private data while seeking a suitable private contact route; this preview does not claim a response SLA.
 
-## Adding an AI task
+## Close the loop
 
-See [`docs/ai.md`](docs/ai.md). It is one manifest alias, one enum entry and one
-branch.
+Use [the iteration workflow](docs/iteration-workflow.md): reproduce a scoped defect, run `python tools/check.py`, inspect native evidence, verify the exact build-specific APK and document device limits. Successful screenshots do not mean visual approval. Keep behavior, tests and current guides coherent in the same batch.
 
-## Style
+Update [current preview changes](docs/preview-notes.md) before the final push; release descriptions include it automatically. For phone reports, paste **Settings → Help & feedback → Copy app info** with the minimal reproduction. See the [iteration concurrency and publication contracts](docs/iteration-workflow.md).
 
-- Comments explain *why*, especially when the code looks odd. Most of the odd
-  code here is working around a documented Android trap; say which one.
-- No commented-out code, no `TODO` without a linked issue.
-- Keep `verify.py` dependency-free apart from optional PyYAML.
+## Keep iterations lean
+
+Read the [test and process audit](docs/audits/iteration-efficiency.md). Use `gradle testCoreDebugUnitTest --tests 'com.caceras.surfacelab.ConversationTest' --no-daemon` for focused chat work; the final candidate still runs the full release gate. Test count is not a target. Pure documentation changes receive preflight without a new APK. Preview draft PRs defer duplicate merge validation until ready-for-review; forks and non-preview branches retain PR checks. To force capture of unchanged source, dispatch the workflow manually (validation only).

@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Pixel Surface Lab"
+rootProject.name = "Aegentica AI"
 include(":app")

@@ -1,37 +1,47 @@
 name: On-device AI problem
-description: Gemini Nano is unavailable, or a result is wrong
+description: Gemini Nano readiness, response quality or cancellation
 labels: ["ai"]
 body:
   - type: markdown
     attributes:
       value: |
-        Check [docs/ai.md](../../blob/main/docs/ai.md) first. The two most common
-        answers: the language is not supported (there is no Swedish), or the
-        device has an unlocked bootloader.
+        Check the [AI guide](https://github.com/Caceras/my-surface-app/blob/improve-pixel-assistant/docs/ai.md).
+        Model readiness, recognition packs and TTS voices are separate. Language quality depends on the API/model and device; do not infer it from a speech-pack download.
+        Remove private content before reporting a prompt or response.
+  - type: input
+    id: build
+    attributes:
+      label: Installed build from Settings
+      placeholder: "3.0.102-nano"
+    validations:
+      required: true
   - type: input
     id: status
     attributes:
-      label: What the tile subtitle or the app's status line says
-      placeholder: "Model not downloaded - tap to fetch it"
+      label: Exact status or error
     validations:
       required: true
   - type: input
     id: device
     attributes:
-      label: Device
-      placeholder: "Pixel 10 Pro XL"
+      label: Phone, Android and AICore version
     validations:
       required: true
   - type: dropdown
     id: task
     attributes:
       label: Task
-      options: ["Summarise", "Proofread", "Make professional", "All of them"]
+      options: ["Chat / follow-up", "Voice conversation", "Summarise", "Proofread", "Make professional", "Model setup", "Multiple tasks"]
     validations:
       required: true
   - type: input
     id: language
     attributes:
-      label: Language of the selected text
+      label: Prompt language and selected speech language
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps, expected behavior and actual result
+      description: Include a short non-private prompt if needed to reproduce.
     validations:
       required: true

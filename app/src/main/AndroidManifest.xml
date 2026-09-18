@@ -4,6 +4,16 @@
     <!-- Asked for at the moment the microphone is first tapped, never on
          launch. Audio is transcribed on this phone and never written down. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="com.beeper.android.permission.READ_PERMISSION" />
+    <uses-permission android:name="com.beeper.android.permission.SEND_PERMISSION" />
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
     <!--
         Package visibility, from Android 11. Without these the speech
@@ -11,6 +21,7 @@
         fail to bind, silently, with nothing in the log worth reading.
     -->
     <queries>
+        <provider android:authorities="com.beeper.api" />
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
@@ -21,13 +32,33 @@
 
     <application
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:usesCleartextTraffic="false"
+        android:enableOnBackInvokedCallback="true"
+        android:resizeableActivity="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Chat">
 
+        <activity android:name=".WorkspaceActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".ReadingActivity" android:exported="false" />
+        <service android:name=".ReadingService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
+        <service android:name=".RoutineJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
+        <receiver android:name=".ReminderReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
         <activity
             android:name=".MainActivity"
+            android:theme="@style/Launch"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -53,7 +84,16 @@
             android:exported="true"
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+            android:theme="@style/VoiceOverlay">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".SurfaceTileService"
@@ -68,7 +108,7 @@
 
         <receiver
             android:name=".SurfaceWidgetProvider"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.caceras.surfacelab.WIDGET_REFRESH" />
@@ -88,7 +128,7 @@
             android:name=".ProcessTextActivity"
             android:exported="false"
             android:excludeFromRecents="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+            android:theme="@style/VoiceOverlay" />
 
     </application>
 

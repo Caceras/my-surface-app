@@ -7,16 +7,16 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.caceras.surfacelab"
+        applicationId = "com.caceras.surface"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
+        versionCode = (project.findProperty("buildNumber")?.toString()?.toIntOrNull() ?: 3)
 
         // The build number comes from CI (-PbuildNumber=<run number>) and
         // falls back to "dev" for a local build. The launcher screen shows
         // it, which is the whole point: after a change is pushed you can
         // tell at a glance whether the APK on the phone is the new one.
-        versionName = "2.0." + (project.findProperty("buildNumber") ?: "dev")
+        versionName = "3.0." + (project.findProperty("buildNumber") ?: "dev")
     }
 
     // Two builds of the same app. "core" is the original zero-dependency
@@ -36,7 +36,22 @@ android {
         }
     }
 
+    // A private, persistent key makes future personal-preview updates keep data.
+    // CI supplies this only when the owner has configured signing secrets.
+    val personalKey = System.getenv("SURFACE_KEYSTORE_FILE")
+    if (!personalKey.isNullOrBlank()) {
+        signingConfigs.create("personal") {
+            storeFile = file(personalKey)
+            storePassword = System.getenv("SURFACE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("SURFACE_KEY_ALIAS")
+            keyPassword = System.getenv("SURFACE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
+        debug {
+            if (!personalKey.isNullOrBlank()) signingConfig = signingConfigs.getByName("personal")
+        }
         release {
             isMinifyEnabled = false
         }
@@ -77,4 +92,10 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.test:core:1.7.0")
     testImplementation("androidx.test.ext:junit:1.3.0")
+}
+
+// Native renders are test outputs too. A cached test result must restore its
+// PNGs; otherwise evidence collection would see XML without the matching views.
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    if (name == "testCoreDebugUnitTest") outputs.dir(layout.buildDirectory.dir("screenshots"))
 }

@@ -4,3 +4,8 @@ local.properties
 .idea/
 *.iml
 .DS_Store
+
+# Python verification tools
+__pycache__/
+*.pyc
+dist/

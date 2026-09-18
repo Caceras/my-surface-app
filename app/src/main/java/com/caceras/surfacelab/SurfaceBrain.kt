@@ -13,6 +13,9 @@ import android.content.Context
  */
 interface SurfaceBrain {
 
+    /** Cancel foreground inference when a surface is stopped or replaced. */
+    fun cancel() {}
+
     /** Which tasks this brain can actually perform. */
     val tasks: List<Task>
 
