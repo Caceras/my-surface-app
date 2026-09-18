@@ -44,7 +44,10 @@ class WorkspaceActivity : Activity() {
     private fun note(text:String) { rows.addView(label(text,14f,true).apply { padDp(0,4,0,12) }) }
     private fun tools(vararg actions:Pair<String,()->Unit>)=HorizontalScrollView(this).apply {
         isHorizontalScrollBarEnabled=false
-        addView(LinearLayout(this@WorkspaceActivity).apply { actions.forEach { (title,action) -> addView(pill(title) { stopDictation?.invoke(); action() },LinearLayout.LayoutParams(-2,-2).apply { marginEnd=dp(8) }) } })
+        addView(LinearLayout(this@WorkspaceActivity).apply { actions.forEach { (title,action) ->
+            val selected=title.startsWith("• ")
+            addView(pill(title.removePrefix("• "),selected) { stopDictation?.invoke(); action() },LinearLayout.LayoutParams(-2,-2).apply { marginEnd=dp(8) })
+        } })
     }
     private fun render() {
         body=column().apply { setBackgroundColor(ink(R.color.chat_bg)); padDp(20,10,20,0) }
