@@ -34,7 +34,7 @@ Notes, links, typed fields, chats and drafts are stored in app-private SQLite. C
 
 Widget content previews are off by default. Private screen can hide Recents previews and block screenshots. No app analytics service is added. System services manage initial AI/speech downloads under their own policies. [Privacy and retention details](docs/privacy.md).
 
-## Build
+## Build and test
 
 Kotlin and Android framework views; no WebView or Compose replacement. Main/core have no third-party UI or AI runtime dependencies; Nano adds ML Kit. The project has no Gradle wrapper.
 

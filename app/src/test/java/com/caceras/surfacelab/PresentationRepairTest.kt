@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.Typeface
 import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import android.text.Spanned
 import android.text.style.StyleSpan
@@ -99,12 +100,17 @@ class PresentationRepairTest {
             val service = controller.get()
             // Isolate queue/lifecycle behavior from real engine installation and acoustics.
             ReflectionHelpers.setField(service, "ready", true)
+            val engine = ShadowTextToSpeech.getLastTextToSpeechInstance()
+            val progress = ReflectionHelpers.getField<UtteranceProgressListener>(service, "progress")
+            engine.setOnUtteranceProgressListener(progress)
             service.onStartCommand(Intent(service, ReadingService::class.java).putExtra("text",
                 "First sentence. Second sentence. Third sentence. Fourth sentence."), 0, 1)
-            val engine = ShadowTextToSpeech.getLastTextToSpeechInstance()
             assertEquals(3, shadowOf(engine).spokenTextList.size)
+            val generation = ReflectionHelpers.getField<Int>(service, "generation")
             ReadingService.pauseForCapture()
             val position = ReadingService.snapshot.index
+            progress.onStart("$generation:2")
+            progress.onDone("$generation:2")
             shadowOf(Looper.getMainLooper()).idle()
             assertFalse(ReadingService.snapshot.playing)
             assertEquals(position, ReadingService.snapshot.index)
