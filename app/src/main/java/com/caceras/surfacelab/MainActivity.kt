@@ -290,15 +290,7 @@ class MainActivity : Activity() {
             runCatching { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                 .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
         })
-        panel.addView(flatButton(getString(R.string.default_assistant)) {
-            runCatching {
-                val roles = getSystemService(RoleManager::class.java)
-                if (roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && !roles.isRoleHeld(RoleManager.ROLE_ASSISTANT))
-                    startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT), 2)
-                else startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
-            }
-                .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
-        })
+        panel.addView(flatButton(getString(R.string.default_assistant)) { openAssistantSettings() })
         panel.addView(label("Privacy", 13f, true).apply { letterSpacing = 0f; padDp(0, 28, 0, 8); isAccessibilityHeading = true })
         panel.addView(preferenceSwitch("Show last answer on widget", NativePrivacy.widgetPreview(this)) { checked ->
             NativePrivacy.setWidgetPreview(this, checked)
@@ -368,6 +360,31 @@ class MainActivity : Activity() {
         panel.addView(label("Build, phone, Android and language only. No conversations or recordings.", 13f, true))
 
         return panel
+    }
+
+    private fun openAssistantSettings() {
+        val roles = getSystemService(RoleManager::class.java)
+        when {
+            roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) && roles.isRoleHeld(RoleManager.ROLE_ASSISTANT) ->
+                Toast.makeText(this, "Ægentica AI is already your digital assistant.", Toast.LENGTH_LONG).show()
+            roles.isRoleAvailable(RoleManager.ROLE_ASSISTANT) -> runCatching {
+                startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT), 2)
+            }.onFailure { openDefaultAppsSettings() }
+            else -> openDefaultAppsSettings()
+        }
+    }
+
+    private fun openDefaultAppsSettings() {
+        val intents = listOf(
+            Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS)
+        )
+        val target = intents.firstOrNull { it.resolveActivity(packageManager) != null }
+        if (target != null) {
+            startActivity(target)
+            Toast.makeText(this, "In Android Settings, choose the Digital assistant app if it is shown.", Toast.LENGTH_LONG).show()
+        } else Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

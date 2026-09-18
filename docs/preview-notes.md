@@ -15,3 +15,12 @@
 - The reader queues upcoming sentences rather than restarting speech after each sentence, and no longer rewrites the entire saved document for every playback update. Initialization failure remains visibly stopped.
 
 The previous workspace PR has been merged into main. This is still a personal preview. Voice naturalness depends on installed voices, and actual Pixel audio/frame timing still needs device use; no human-sounding or frame-rate guarantee is claimed. Export your workspace before any uninstall because signing continuity is not yet provisioned.
+
+## Cohesive workspace shell
+
+- Today, Calendar, AI, Tasks and Notes now share one compact navigation model; workspace pages can be swiped horizontally as well as tapped.
+- Calendar and Tasks are first-class pages instead of sections buried inside Today. Today becomes a concise overview.
+- AI automatically receives a bounded private snapshot of open tasks and pinned workspace items, while explicit Sources still control deeper reference material.
+- Android system bars now match the app surface instead of exposing a black navigation strip.
+- Digital assistant setup now gives visible feedback and falls back to Android default-app settings when the assistant role picker is unavailable.
+- Launcher and splash identity use the same sky-blue field and white Æ monogram.

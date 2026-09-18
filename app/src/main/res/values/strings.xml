@@ -52,7 +52,7 @@
     <string name="shortcut_voice">Talk</string>
     <string name="speak_replies">Read every reply aloud</string>
     <string name="voice_settings">Text-to-speech settings</string>
-    <string name="default_assistant">Set as digital assistant</string>
+    <string name="default_assistant">Digital assistant settings</string>
     <string name="settings_unavailable">Open Android Settings to change this option.</string>
     <string name="open_voice">Start voice conversation</string>
     <string name="read_last">Read last answer aloud</string>
