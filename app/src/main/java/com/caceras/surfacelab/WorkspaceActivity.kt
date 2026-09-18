@@ -89,7 +89,7 @@ class WorkspaceActivity : Activity() {
         rows=column().apply { padDp(0,8,0,20) }
         body.addView(ScrollView(this).apply {
             isFillViewport=true; addView(rows)
-            setOnTouchListener { _, event -> pageGestures.onTouchEvent(event) }
+            setOnTouchListener { _, event -> pageGestures.onTouchEvent(event); false }
         },LinearLayout.LayoutParams(-1,0,1f))
         if(destination=="today" || destination=="library") body.addView(LinearLayout(this).apply {
             gravity=Gravity.CENTER_VERTICAL

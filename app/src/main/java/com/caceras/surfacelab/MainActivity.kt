@@ -504,6 +504,7 @@ class MainActivity : Activity() {
                 latest.visibility = if (history.isNotEmpty() || busy) View.VISIBLE else View.GONE
             }
             pageGestures.onTouchEvent(event)
+            false
         }
         transcript.setOnScrollChangeListener { _, _, y, _, oldY ->
             if (y < oldY) followReply = false
