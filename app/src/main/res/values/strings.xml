@@ -29,7 +29,7 @@
     <string name="mic_denied">Microphone access is off. You can enable it in app settings, or keep typing.</string>
     <string name="more">Settings</string>
     <string name="new_chat">New</string>
-    <string name="empty_title">Ask a question</string>
+    <string name="empty_title">Ask anything</string>
     <string name="empty_body">Type a question or use the microphone.</string>
     <string name="echoed">Nano recited its own instructions instead of answering. That happens on a short or empty question -- try asking it in a sentence, or tap New to start over.</string>
     <string name="truncated">Nano stopped here: it has a hard output limit of a few hundred words, so a long piece gets cut off rather than finished.</string>

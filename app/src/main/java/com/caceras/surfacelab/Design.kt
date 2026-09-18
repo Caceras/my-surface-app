@@ -30,14 +30,14 @@ fun Context.label(value: String, size: Float = 16f, dim: Boolean = false) = Text
     setLineSpacing(dp(2).toFloat(), 1.08f)
 }
 fun TextView.medium() { typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
-fun Context.pill(value: String, primary: Boolean = false, onClick: () -> Unit) = label(value, 15f).apply {
+fun Context.pill(value: String, primary: Boolean = false, onClick: () -> Unit) = label(value, 14f).apply {
     medium()
     gravity = Gravity.CENTER
-    minHeight = dp(52)
+    minHeight = dp(48)
     minWidth = dp(48)
-    padDp(20, 12, 20, 12)
+    padDp(16, 10, 16, 10)
     setTextColor(ink(if (primary) R.color.on_accent else R.color.text_primary))
-    val shape = surface(if (primary) R.color.accent else R.color.chip_bg, 28)
+    val shape = surface(if (primary) R.color.accent else R.color.chip_bg, 18)
     background = RippleDrawable(ColorStateList.valueOf(ink(R.color.outline)), shape, null)
     isFocusable = true
     buttonSemantics()
@@ -99,7 +99,7 @@ fun Context.sheetHeader(title: String, close: () -> Unit) = android.widget.Linea
     layoutParams = android.widget.LinearLayout.LayoutParams(-1, -2)
     tag = "sheet-header"
     gravity = Gravity.CENTER_VERTICAL
-    addView(label(title, 24f).apply { medium(); isAccessibilityHeading = true },
+    addView(label(title, 22f).apply { medium(); isAccessibilityHeading = true },
         android.widget.LinearLayout.LayoutParams(0, -2, 1f))
     addView(pill("Done", onClick = close), android.widget.LinearLayout.LayoutParams(-2, -2))
 }
@@ -109,9 +109,9 @@ fun android.widget.EditText.styleField() {
     textSize = 16f
     setTextColor(context.ink(R.color.text_primary))
     setHintTextColor(context.ink(R.color.text_dim))
-    background = context.surface(R.color.composer_bg, 18, true)
-    padDp(16, 14, 16, 14)
-    minHeight = context.dp(52)
+    background = context.surface(R.color.composer_bg, 16, true)
+    padDp(16, 12, 16, 12)
+    minHeight = context.dp(48)
     imeOptions = imeOptions or android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
 }
 
