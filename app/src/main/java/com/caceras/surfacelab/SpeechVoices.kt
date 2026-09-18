@@ -55,7 +55,7 @@ object SpeechVoices {
             padDp(20, 8, 20, 0)
             addView(info)
             addView(list, LinearLayout.LayoutParams(-1, activity.dp(240)))
-            addView(activity.flatButton("Android voice settings") {
+            addView(activity.pill("Android voice settings") {
                 runCatching { activity.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                     .onFailure { info.text = activity.getString(R.string.settings_unavailable) }
             })
