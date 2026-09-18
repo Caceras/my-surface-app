@@ -9,6 +9,9 @@ package com.caceras.surfacelab
  */
 object Prompts {
 
+    /** Characters shared with the instruction before it counts as an echo. */
+    private const val ECHO_RUN = 50
+
     /** Sent as a system instruction where the device supports one. */
     fun system(task: Task): String = when (task) {
         Task.SUMMARIZE ->
@@ -155,9 +158,6 @@ object Prompts {
     private const val CONTEXT_OPEN = "Earlier in this conversation:\n\n"
     private const val CONTEXT_CLOSE = "\nAnswer this, using the above only " +
         "to resolve what I am referring to:\n"
-
-    /** Characters shared with the instruction before it counts as an echo. */
-    private const val ECHO_RUN = 50
 
     /** A sentence that ended on purpose ends with one of these. */
     private val FINISHED = charArrayOf('.', '!', '?', ':', '"', ')', ']', '\u2019', '\u201d')
