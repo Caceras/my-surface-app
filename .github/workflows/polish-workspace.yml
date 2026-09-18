@@ -1,0 +1,21 @@
+name: Polish workspace snapshot
+on:
+  push:
+    branches: [polish-everyday-experience]
+    paths: [.github/workflows/polish-workspace.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: git archive --format=zip HEAD > "$RUNNER_TEMP/source.zip"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: polish-source
+          path: ${{ runner.temp }}/source.zip
+          retention-days: 1
