@@ -282,11 +282,11 @@ class MainActivity : Activity() {
             Chat.setSpeakReplies(this@MainActivity, checked)
             if (!checked) hushPlayback()
         })
-        panel.addView(pill("Set up voice & test playback") {
+        panel.addView(flatButton("Set up voice & test playback") {
             settingsDialog?.dismiss()
             startActivity(Intent(this, VoiceActivity::class.java).putExtra("setup", true))
         })
-        panel.addView(pill("Choose reading voice") { SpeechVoices.showPicker(this) })
+        panel.addView(flatButton("Choose reading voice") { SpeechVoices.showPicker(this) })
         panel.addView(flatButton(getString(R.string.voice_settings)) {
             runCatching { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                 .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
@@ -1194,11 +1194,12 @@ class MainActivity : Activity() {
             minHeight = dp(48)
             isFocusable = true
             buttonSemantics()
-            background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(color(R.color.outline)), null, surface(R.color.chip_bg, 16))
+            background = android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(color(R.color.outline)), surface(R.color.chip_bg, 12), null)
             textSize = 14f
             medium()
             setTextColor(color(R.color.accent_text))
-            padDp(0, 9, 0, 3)
+            gravity = Gravity.CENTER_VERTICAL
+            padDp(12, 8, 12, 8)
             setOnClickListener { onTap() }
         }
 
