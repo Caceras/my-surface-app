@@ -120,6 +120,7 @@ class MainActivity : Activity() {
         root.addView(workspaceNavigation("ai"), wide())
 
         setContentView(AdaptiveFrame(this, root).apply { padForSystemBars() })
+        root.pageEnter(0)
         root.isFocusableInTouchMode = true
         root.requestFocus()
         readableSystemBars()
@@ -494,7 +495,9 @@ class MainActivity : Activity() {
             override fun onFling(first: MotionEvent?, last: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if(first==null || kotlin.math.abs(velocityX) < kotlin.math.abs(velocityY) * 1.25f || kotlin.math.abs(last.x-first.x) < dp(72)) return false
                 pauseForNavigation()
-                startActivity(WorkspaceActivity.intent(this@MainActivity,if(last.x < first.x) "tasks" else "calendar"))
+                val direction=if(last.x < first.x) 1 else -1
+                startActivity(WorkspaceActivity.intent(this@MainActivity,if(direction > 0) "tasks" else "calendar"))
+                smoothPageTransition(direction)
                 return true
             }
         })
