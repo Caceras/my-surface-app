@@ -53,8 +53,27 @@ fun Context.presence(size: Int = 88) = PresenceView(this, size)
 fun View.arrive() {
     if (!isAttachedToWindow || !android.animation.ValueAnimator.areAnimatorsEnabled()) return
     translationY = context.dp(6).toFloat()
-    animate().translationY(0f).setDuration(180)
+    alpha = 0.92f
+    animate().translationY(0f).alpha(1f).setDuration(170)
         .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+}
+
+/** Short directional motion for workspace page changes. */
+fun View.pageEnter(direction: Int = 0) {
+    if (!android.animation.ValueAnimator.areAnimatorsEnabled()) return
+    val shift = context.dp(14).toFloat() * direction.coerceIn(-1, 1)
+    translationX = shift
+    alpha = 0.88f
+    animate().translationX(0f).alpha(1f).setDuration(165)
+        .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+}
+
+/** Match activity-to-activity navigation to the in-place workspace motion. */
+fun Activity.smoothPageTransition(direction: Int) {
+    if (!android.animation.ValueAnimator.areAnimatorsEnabled()) return
+    @Suppress("DEPRECATION")
+    if (direction >= 0) overridePendingTransition(R.anim.page_in_right, R.anim.page_out_left)
+    else overridePendingTransition(R.anim.page_in_left, R.anim.page_out_right)
 }
 
 fun Activity.readableSystemBars(target: android.view.Window = window) {

@@ -44,8 +44,11 @@ class WorkspaceActivity : Activity() {
                 val next=(current + if(last.x < first.x) 1 else -1).coerceIn(0,order.lastIndex)
                 if(next==current) return false
                 val target=order[next]
-                if(target=="ai") startActivity(Intent(this@WorkspaceActivity,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-                else { destination=target; filter=""; query=""; render() }
+                val direction=if(last.x < first.x) 1 else -1
+                if(target=="ai") {
+                    startActivity(Intent(this@WorkspaceActivity,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+                    smoothPageTransition(direction)
+                } else switchDestination(target,direction)
                 return true
             }
         })
@@ -65,7 +68,16 @@ class WorkspaceActivity : Activity() {
             addView(pill(title.removePrefix("• "),selected) { stopDictation?.invoke(); action() },LinearLayout.LayoutParams(-2,-2).apply { marginEnd=dp(8) })
         } })
     }
-    private fun render() {
+    internal fun switchDestination(target:String, direction:Int=0) {
+        if(target==destination) return
+        destination=target
+        filter=""
+        query=""
+        intent.putExtra("destination",target)
+        render(direction)
+    }
+
+    private fun render(direction:Int=0) {
         body=column().apply { setBackgroundColor(ink(R.color.chat_bg)); padDp(20,10,20,0) }
         body.addView(LinearLayout(this).apply {
             gravity=Gravity.CENTER_VERTICAL
@@ -98,6 +110,7 @@ class WorkspaceActivity : Activity() {
         },LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8) })
         body.addView(workspaceNavigation(destination))
         setContentView(AdaptiveFrame(this,body).apply { padForSystemBars() }); readableSystemBars()
+        body.pageEnter(direction)
         populate()
     }
     private fun populate() {
@@ -441,13 +454,20 @@ internal fun EditText.afterChange(block:(String)->Unit) { addTextChangedListener
 }) }
 fun Activity.workspaceNavigation(selected:String):View = LinearLayout(this).apply {
     gravity=Gravity.CENTER_VERTICAL; padDp(0,8,0,4)
+    val order=listOf("today","calendar","ai","tasks","library")
     for((key,title) in listOf("today" to "Today","calendar" to "Calendar","ai" to "AI","tasks" to "Tasks","library" to "Notes")) {
         addView(pill(title,key==selected) {
             if(key!=selected) {
-                if(key=="ai") startActivity(Intent(this@workspaceNavigation,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-                else if(this@workspaceNavigation is WorkspaceActivity) {
-                    intent.putExtra("destination",key); recreate()
-                } else startActivity(WorkspaceActivity.intent(this@workspaceNavigation,key))
+                val direction=if(order.indexOf(key) > order.indexOf(selected)) 1 else -1
+                if(key=="ai") {
+                    startActivity(Intent(this@workspaceNavigation,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+                    smoothPageTransition(direction)
+                } else if(this@workspaceNavigation is WorkspaceActivity) {
+                    this@workspaceNavigation.switchDestination(key,direction)
+                } else {
+                    startActivity(WorkspaceActivity.intent(this@workspaceNavigation,key))
+                    smoothPageTransition(direction)
+                }
             }
         }.apply { isSelected=key==selected; tag="nav-$key"; textSize=12f; padDp(3,10,3,10) },LinearLayout.LayoutParams(0,-2,1f).apply { marginStart=dp(1); marginEnd=dp(1) })
     }
