@@ -81,7 +81,7 @@ class WorkspaceActivity : Activity() {
 
     private fun render(direction:Int=0) {
         val previous = if (::body.isInitialized) body else null
-        body=column().apply { setBackgroundColor(Color.TRANSPARENT); padDp(18,12,18,0) }
+        body=column().apply { setBackgroundColor(android.graphics.Color.TRANSPARENT); padDp(18,12,18,0) }
         body.addView(LinearLayout(this).apply {
             gravity=Gravity.CENTER_VERTICAL
             addView(column().apply {
