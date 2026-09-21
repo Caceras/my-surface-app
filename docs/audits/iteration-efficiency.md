@@ -96,3 +96,19 @@ Actual build 116 costs: preflight 9 s, Android quality 200 s (161 s Gradle), pub
 [Draft PR run 117](https://github.com/Caceras/my-surface-app/actions/runs/34950876570) passed preflight and skipped Android/publication as intended. Superseded run 114 cancelled and retained `android-diagnostics`, exercising the failure/cancellation artifact path. Full successful run 116 retained only the complete evidence bundle, 15,274,875 bytes.
 
 [Install Nano 3.0.116](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant-build-116/aegentica-ai-nano.apk) · [Evidence ZIP](https://github.com/Caceras/my-surface-app/releases/download/preview-improve-pixel-assistant-build-116/aegentica-evidence.zip). Published Nano SHA-256: `2f425b87f37438dd343e55fde302b694c3213a661ec1b7b6523431386d0bde06`. Signing mode is **ephemeral-debug**; do not assume in-place update compatibility. The later documentation-only acceptance commit intentionally keeps this same APK; its CI result is recorded in PR #7, avoiding another binary merely to record acceptance.
+
+
+## 2026-09-22 pipeline simplification
+
+The CI pipeline now has two explicit lanes.
+
+- Pull requests run preflight, core JVM tests and one Nano debug compile. They do not lint both flavors, package release evidence or publish.
+- Main/manual release validation runs the complete two-flavor test/lint/build/signature/evidence gate.
+- PR-description edits no longer trigger Android builds.
+- Workflow-level concurrency cancels an entire superseded candidate instead of leaving stale per-job queues.
+- The fast lane fails immediately rather than using Gradle `--continue`.
+- Release builds may use a trusted self-hosted runner through the `ANDROID_RUNNER` repository variable. Pull-request code is always kept on GitHub-hosted runners.
+- Legacy duplicate `pixel-surface-lab-*.apk` aliases are no longer packaged.
+- The immutable build-specific release is uploaded and downloaded once. The rolling release is metadata pointing to that verified build instead of a second copy of every asset.
+
+A HostUp runner is intentionally opt-in: the repository workflow is ready for it, but a runner must first be registered with GitHub and given the exact label stored in `ANDROID_RUNNER`. Until then, main safely falls back to `ubuntu-latest`.
