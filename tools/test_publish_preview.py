@@ -35,7 +35,6 @@ class PublicationTests(unittest.TestCase):
         os.chdir(self.tmp.name)
         folder = Path('dist/evidence'); folder.mkdir(parents=True)
         for name in ('aegentica-ai-core.apk', 'aegentica-ai-nano.apk',
-                     'pixel-surface-lab-core.apk', 'pixel-surface-lab-nano.apk',
                      'release-evidence.json', 'SHA256SUMS'):
             (folder / name).write_text(name)
         self.meta = dict(source_sha='a' * 40, repository='owner/repo', run_id='123', build=12, attempt=1, tests=dict(tests=140))
@@ -78,7 +77,7 @@ class PublicationTests(unittest.TestCase):
         publisher.main()
         self.assertEqual(self.download.call_count, 2)
         for call in self.download.call_args_list:
-            self.assertEqual(len(call.args[2]), 7)
+            self.assertEqual(len(call.args[2]), 5)
         self.assertEqual(self.commands()[0][:3], ('release', 'create', 'preview-feature-build-12'))
         self.assertIn('--draft', self.commands()[0])
 
