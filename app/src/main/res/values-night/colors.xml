@@ -12,7 +12,10 @@
     <color name="accent">#70CEFA</color>
     <color name="accent_text">#91DAFF</color>
     <color name="on_accent">#072E44</color>
-    <color name="outline">#344F60</color>
+    <color name="outline">#456071</color>
+    <color name="glass_surface">#B3182A36</color>
+    <color name="glass_surface_strong">#DB1A2C38</color>
+    <color name="glass_outline">#334F7184</color>
     <color name="presence_bg">#173E55</color>
     <color name="scrim">#F20C1720</color>
     <color name="listening">#91DAFF</color>
