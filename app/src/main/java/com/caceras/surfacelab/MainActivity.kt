@@ -448,7 +448,7 @@ class MainActivity : Activity() {
     private fun buildTranscript(): View {
         messages = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            padDp(20, 4, 20, 12)
+            padDp(18, 6, 18, 14)
             // Messages sit at the bottom, against the composer, the way every
             // chat does. Top-aligned they floated above a screenful of empty
             // grey -- the single thing that made this look unfinished.
@@ -606,8 +606,9 @@ class MainActivity : Activity() {
 
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            padDp(4, 0, 6, 4)
-            background = getDrawable(R.drawable.composer_bg)
+            padDp(4, 1, 6, 5)
+            background = glassSurface(28, true)
+            elevation = dp(4).toFloat()
             addView(input, wide())
         }
 
@@ -654,7 +655,7 @@ class MainActivity : Activity() {
         updateSend()
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            padDp(16, 0, 16, 4)
+            padDp(16, 2, 16, 8)
             followKeyboardMotion()
             addView(bar, wide())
             addView(LinearLayout(this@MainActivity).apply {
