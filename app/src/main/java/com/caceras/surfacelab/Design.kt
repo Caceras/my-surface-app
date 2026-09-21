@@ -23,6 +23,18 @@ fun Context.surface(fill: Int, radius: Int = 24, stroke: Boolean = false) =
         cornerRadius = dp(radius).toFloat()
         if (stroke) setStroke(dp(1), ink(R.color.outline))
     }
+
+fun Context.glassSurface(radius: Int = 24, strong: Boolean = false) =
+    GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        intArrayOf(
+            ink(if (strong) R.color.glass_surface_strong else R.color.glass_surface),
+            ink(R.color.glass_surface)
+        )
+    ).apply {
+        cornerRadius = dp(radius).toFloat()
+        setStroke(dp(1), ink(R.color.glass_outline))
+    }
 fun Context.label(value: String, size: Float = 16f, dim: Boolean = false) = TextView(this).apply {
     text = value
     textSize = size
@@ -38,8 +50,9 @@ fun Context.pill(value: String, primary: Boolean = false, onClick: () -> Unit) =
     minWidth = dp(48)
     padDp(16, 10, 16, 10)
     setTextColor(ink(if (primary) R.color.on_accent else R.color.text_primary))
-    val shape = surface(if (primary) R.color.accent else R.color.chip_bg, 18)
+    val shape = if (primary) surface(R.color.accent, 18) else glassSurface(18)
     background = RippleDrawable(ColorStateList.valueOf(ink(R.color.outline)), shape, null)
+    elevation = dp(if (primary) 2 else 1).toFloat()
     isFocusable = true
     buttonSemantics()
     setOnClickListener {
@@ -138,8 +151,9 @@ fun android.widget.EditText.styleField() {
     textSize = 16f
     setTextColor(context.ink(R.color.text_primary))
     setHintTextColor(context.ink(R.color.text_dim))
-    background = context.surface(R.color.composer_bg, 16, true)
-    padDp(16, 12, 16, 12)
+    background = context.glassSurface(18, true)
+    elevation = context.dp(1).toFloat()
+    padDp(16, 13, 16, 13)
     minHeight = context.dp(48)
     imeOptions = imeOptions or android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
 }
