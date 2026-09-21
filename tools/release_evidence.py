@@ -183,7 +183,6 @@ def collect(destination, root=Path(".")):
         validate_identity(identity, flavor, number)
         name = f"aegentica-ai-{flavor}.apk"
         shutil.copy2(src, destination / name)
-        shutil.copy2(src, destination / f"pixel-surface-lab-{flavor}.apk")
         meta["apks"][name] = identity
     signatures = [build / f"reports/apk-signature-{flavor}.txt" for flavor in ("core", "nano")]
     if any(not p.is_file() or "Signer #1 certificate SHA-256 digest:" not in p.read_text() for p in signatures):
@@ -232,7 +231,7 @@ def verify(folder):
         raise ValueError("Invalid provenance")
     if set(meta.get("apks", {})) != {"aegentica-ai-core.apk", "aegentica-ai-nano.apk"}:
         raise ValueError("Both branded APK identities are required")
-    required = {f"{prefix}-{flavor}.apk" for prefix in ("aegentica-ai", "pixel-surface-lab") for flavor in ("core", "nano")}
+    required = {f"aegentica-ai-{flavor}.apk" for flavor in ("core", "nano")}
     required |= {f"screenshots/{name}.png" for name in REQUIRED_SHOTS}
     required |= {"review.html", "reports/apk-signature-core.txt", "reports/apk-signature-nano.txt"}
     if not required <= set(meta["files"]):
@@ -249,8 +248,6 @@ def verify(folder):
         if apk_identity(folder / name) != identity:
             raise ValueError(f"APK identity mismatch: {name}")
         validate_identity(identity, name.removeprefix("aegentica-ai-").removesuffix(".apk"), meta["build"])
-        if digest(folder / name) != digest(folder / name.replace("aegentica-ai", "pixel-surface-lab")):
-            raise ValueError("Compatibility alias differs from branded APK")
     checks = dict(meta["files"])
     checks["release-evidence.json"] = digest(folder / "release-evidence.json")
     expected = "".join(f"{value}  {name}\n" for name, value in sorted(checks.items()))
