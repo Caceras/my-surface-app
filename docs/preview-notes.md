@@ -24,3 +24,11 @@ The previous workspace PR has been merged into main. This is still a personal pr
 - Android system bars now match the app surface instead of exposing a black navigation strip.
 - Digital assistant setup now gives visible feedback and falls back to Android default-app settings when the assistant role picker is unavailable.
 - Launcher and splash identity use the same sky-blue field and white Æ monogram.
+
+
+### Polished motion and surfaces
+- Workspace swipes now animate the outgoing and incoming pages together instead of replacing one page before the next appears.
+- AI-to-workspace transitions use the same full-width horizontal motion so the app reads as one connected space.
+- Cards, fields, pills and the composer use restrained translucent surfaces, softer outlines and consistent low elevation.
+- Page/card spacing was normalized for a calmer rhythm without reducing touch targets.
+- Android's reduced-motion preference still disables decorative movement.

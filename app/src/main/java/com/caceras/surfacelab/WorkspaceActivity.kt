@@ -17,6 +17,8 @@ class WorkspaceActivity : Activity() {
     private lateinit var store: WorkspaceStore
     private lateinit var body: LinearLayout
     private lateinit var rows: LinearLayout
+    private lateinit var pageHost: FrameLayout
+    private var pageShell: AdaptiveFrame? = null
     private var destination="today"
     private var filter=""
     private var query=""
@@ -78,7 +80,8 @@ class WorkspaceActivity : Activity() {
     }
 
     private fun render(direction:Int=0) {
-        body=column().apply { setBackgroundColor(ink(R.color.chat_bg)); padDp(20,10,20,0) }
+        val previous = if (::body.isInitialized) body else null
+        body=column().apply { setBackgroundColor(android.graphics.Color.TRANSPARENT); padDp(18,12,18,0) }
         body.addView(LinearLayout(this).apply {
             gravity=Gravity.CENTER_VERTICAL
             addView(column().apply {
@@ -109,8 +112,37 @@ class WorkspaceActivity : Activity() {
             addView(pill("New") { newRecord() }.apply { contentDescription="Create task, project, person, collection or routine" },LinearLayout.LayoutParams(-2,-2).apply { marginStart=dp(8) })
         },LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8) })
         body.addView(workspaceNavigation(destination))
-        setContentView(AdaptiveFrame(this,body).apply { padForSystemBars() }); readableSystemBars()
-        body.pageEnter(direction)
+        val next = body
+        if (pageShell == null) {
+            pageHost = FrameLayout(this).apply {
+                clipChildren = false
+                clipToPadding = false
+                setBackgroundColor(ink(R.color.chat_bg))
+                addView(next, FrameLayout.LayoutParams(-1,-1))
+            }
+            pageShell = AdaptiveFrame(this,pageHost).apply { padForSystemBars() }
+            setContentView(pageShell)
+            readableSystemBars()
+        } else if (previous != null && previous !== next) {
+            pageHost.addView(next, FrameLayout.LayoutParams(-1,-1))
+            val width = pageHost.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+            if (direction == 0 || !android.animation.ValueAnimator.areAnimatorsEnabled()) {
+                pageHost.removeView(previous)
+            } else {
+                val distance = width.toFloat()
+                next.translationX = direction * distance
+                next.alpha = 0.96f
+                next.animate().translationX(0f).alpha(1f).setDuration(240)
+                    .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
+                previous.animate().translationX(-direction * distance).alpha(0.96f).setDuration(240)
+                    .setInterpolator(android.view.animation.DecelerateInterpolator())
+                    .withEndAction {
+                        pageHost.removeView(previous)
+                        previous.translationX = 0f
+                        previous.alpha = 1f
+                    }.start()
+            }
+        }
         populate()
     }
     private fun populate() {
@@ -157,14 +189,14 @@ class WorkspaceActivity : Activity() {
     }
     private fun card(record:Record) {
         val card=column().apply {
-            tag="record-${record.id}"; background=surface(R.color.bubble_ai,18,true); padDp(16,14,16,13)
+            tag="record-${record.id}"; background=glassSurface(20); elevation=dp(2).toFloat(); padDp(16,15,16,14)
             addView(label(record.kind.replaceFirstChar { it.uppercase() } + if(record.pinned) " · Pinned" else "",11f,true).apply { letterSpacing=.03f })
             addView(label(record.title.ifBlank { record.body.lineSequence().firstOrNull().orEmpty().take(80).ifBlank { "Untitled ${record.kind}" } },17f).apply { medium(); maxLines=2; ellipsize=TextUtils.TruncateAt.END; padDp(0,5,0,3) })
             if(record.body.isNotBlank()) addView(label(record.body,13f,true).apply { maxLines=2; ellipsize=TextUtils.TruncateAt.END })
             if(record.due>0) addView(label((if(record.done) "Completed · " else if(!record.enabled) "Paused · " else "")+date(record.due),12f,true).apply { padDp(0,8,0,0) })
             isFocusable=true; buttonSemantics(); setOnClickListener { edit(record) }
         }
-        rows.addView(card,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(10) })
+        rows.addView(card,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(12) })
     }
     private fun newRecord() {
         val kinds=WorkspaceStore.KINDS
