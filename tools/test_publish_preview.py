@@ -35,7 +35,6 @@ class PublicationTests(unittest.TestCase):
         os.chdir(self.tmp.name)
         folder = Path('dist/evidence'); folder.mkdir(parents=True)
         for name in ('aegentica-ai-core.apk', 'aegentica-ai-nano.apk',
-                     'pixel-surface-lab-core.apk', 'pixel-surface-lab-nano.apk',
                      'release-evidence.json', 'SHA256SUMS'):
             (folder / name).write_text(name)
         self.meta = dict(source_sha='a' * 40, repository='owner/repo', run_id='123', build=12, attempt=1, tests=dict(tests=140))
@@ -74,11 +73,10 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(self.download.call_count, 1)
         self.assertIn('rolling preview left unchanged', Path('summary.md').read_text())
 
-    def test_all_assets_verified_for_both_links(self):
+    def test_assets_verified_once_on_immutable_release(self):
         publisher.main()
-        self.assertEqual(self.download.call_count, 2)
-        for call in self.download.call_args_list:
-            self.assertEqual(len(call.args[2]), 7)
+        self.assertEqual(self.download.call_count, 1)
+        self.assertEqual(len(self.download.call_args.args[2]), 5)
         self.assertEqual(self.commands()[0][:3], ('release', 'create', 'preview-feature-build-12'))
         self.assertIn('--draft', self.commands()[0])
 
@@ -94,11 +92,11 @@ class PublicationTests(unittest.TestCase):
         self.assertFalse(any(c[:3] == ('release', 'upload', 'preview-feature-build-12') for c in self.commands()))
         self.assertFalse(any(c[:3] == ('release', 'create', 'preview-feature-build-12') for c in self.commands()))
 
-    def test_draft_repair_and_rolling_update_verify_all_assets(self):
+    def test_draft_repair_verifies_assets_once_and_rolling_is_metadata_only(self):
         self.release.return_value = dict(isDraft=True, targetCommitish='a' * 40)
         publisher.main()
-        self.assertEqual(sum(c[:2] == ('release', 'upload') for c in self.commands()), 2)
-        self.assertEqual(self.download.call_count, 2)
+        self.assertEqual(sum(c[:2] == ('release', 'upload') for c in self.commands()), 1)
+        self.assertEqual(self.download.call_count, 1)
 
     def test_retry_has_distinct_download(self):
         self.meta['attempt'] = 2
