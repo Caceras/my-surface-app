@@ -32,3 +32,6 @@ The previous workspace PR has been merged into main. This is still a personal pr
 - Cards, fields, pills and the composer use restrained translucent surfaces, softer outlines and consistent low elevation.
 - Page/card spacing was normalized for a calmer rhythm without reducing touch targets.
 - Android's reduced-motion preference still disables decorative movement.
+
+
+- Unified mobile shell candidate retriggered for fresh Android validation.
