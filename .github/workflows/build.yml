@@ -48,6 +48,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
       - name: Ensure pinned Android SDK
         shell: bash
         run: |
@@ -75,9 +77,9 @@ jobs:
     name: Release Android validation
     needs: verify
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.verify.outputs.android == 'true'
-    # Optional trusted self-hosted runner: set repository variable ANDROID_RUNNER
-    # to its label. PR code never runs there.
-    runs-on: ${{ (github.event_name == 'push' && vars.ANDROID_RUNNER) || 'ubuntu-latest' }}
+    # Main releases use the private HostUp runner. Manual runs stay on GitHub-hosted
+    # Ubuntu. Pull-request code never runs on the private runner.
+    runs-on: ${{ github.event_name == 'push' && 'hostup' || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
