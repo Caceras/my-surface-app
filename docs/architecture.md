@@ -24,6 +24,10 @@
 | `ReadingScrollView.kt` | Reader-controlled scrolling for voice and selection streams |
 | `StreamUpdates.kt` | Immediate first paint, then at most one coalesced update per display frame |
 | `Chat.kt` | Current exchanges, draft, recent archives, backup validation |
+| `Transcription.kt`, `TranscriptionService.kt`, `TranscribeActivity.kt` | Verbatim transcript append, continuous platform recogniser, explicit microphone foreground service and its screen |
+| `core/…/SpeechEngineProvider.kt`, `nano/…/SpeechEngineProvider.kt` | Transcription engine choice: platform only (core); ML Kit GenAI Advanced with platform fallback (Nano) |
+| `Polish.kt` | Chunked foreground polish of a copy for review |
+| `MarkdownVault.kt` | One-way Obsidian-compatible Markdown export to a user-chosen folder |
 | `ResultStore.kt` | Last successful result used by the widget |
 | `Design.kt`, `Ui.kt`, `PresenceView.kt` | Shared view styling, insets/keyboard motion, state feedback |
 
@@ -95,3 +99,7 @@ All remain framework-only in main/core. Existing ML Kit stays in Nano; no Room, 
 ## Reading repair
 
 `SpeechVoices` shares quality-first installed/offline selection and an optional explicit preview picker across speech paths. `ReadingService` queues three sentences ahead with generation-fenced callbacks and persists unchanged document text only once. A failed initialization cannot present silent playback as running. The picker uses a fixed sample, never user notes, and stops preview audio on pause or dismissal. No network voice or external provider was added.
+
+## Transcription and second-brain boundaries
+
+Transcripts are ordinary notes whose source begins with `Transcript`. `WorkspaceStore.appendVerbatim` is the only path that grows an original after creation, and it is used only by an active capture; `save()` still preserves an existing original. `TranscriptionService` publishes an in-process snapshot polled by `TranscribeActivity`, finishes the in-flight words on Stop, and is `START_NOT_STICKY`. ML Kit speech is confined to the Nano source set; main/core remain framework-only. Recall (`WorkspaceStore.recall`) uses FTS4 OR-prefix queries over lowercase letter/digit terms. `MarkdownVault` writes through `DocumentsContract`, records file names and content hashes per record, and only rewrites or deletes files it wrote. Details: [second brain](second-brain.md).

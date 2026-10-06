@@ -10,7 +10,7 @@ The provider checks AICore feature status, prepares a downloadable model, and re
 
 Successful output is saved only after the final request succeeds. Echoed instructions and failed streams are not treated as completed answers. `Prompts.kt` supplies the tasks and a bounded subset of conversation history; the on-screen retained history can be longer than the context sent to a model.
 
-The app currently accepts text. Although the underlying Prompt API offers other input/output capabilities, image input and structured tool execution are not implemented here. Summarise, Proofread and Make professional are prompt-defined operations, not separate ML Kit task clients.
+The app currently accepts text. Although the underlying Prompt API offers other input/output capabilities, image input and structured tool execution are not implemented here. Summarise, Proofread, Make professional and Polish dictation are prompt-defined operations, not separate ML Kit task clients. Polish runs over a copy in chunks of about 1,800 characters on Nano (6,000 with a connected provider); the record's verbatim original is never an input to storage changes.
 
 ## Device and service constraints
 
@@ -36,6 +36,10 @@ AppFunctions is a promising future route for OS-level agent interoperability. Go
 
 The **AI** destination can attach up to five selected live records through `KnowledgeContext`; it requests numbered references and treats source text as untrusted data. Context is bounded, may be excerpted, and is not an automatic search of every saved record. The model cannot invoke tools or determine permissions.
 
-`ConnectedAI` is an optional framework HTTPS Chat Completions client with an explicitly configured model/endpoint and Keystore-encrypted key. It is used only when enabled for the typed/dictated composer or separately approved for a connected routine. No retry/fallback can silently move Nano input to a remote provider. The current connected response is non-streaming; hands-free Voice and selection actions retain Nano. Credentials and third-party behavior require owner/device verification.
+`ConnectedAI` is an optional framework HTTPS Chat Completions client with an explicitly configured model/endpoint and Keystore-encrypted key. It is used only when enabled for the typed/dictated composer and Polish, or separately approved for a connected routine. Each request carries the task's own system instruction and up to 4,096 completion tokens. The *Use Google Gemini* preset fills `https://generativelanguage.googleapis.com/v1beta/openai/chat/completions` and `gemini-3.8-flash`; for that host the request adds `reasoning_effort: low`, because Gemini 3 models always reason and reasoning shares the completion budget. No retry/fallback can silently move Nano input to a remote provider. The current connected response is non-streaming; hands-free Voice and selection actions retain Nano. Credentials and third-party behavior require owner/device verification.
 
 `RoutineJobService` durably claims an occurrence before a network request, stores results as linked notes, records completion/failure/interruption and schedules future recurrences. It never executes answer text as an action. Details, scope and spending limits: [everyday guide](everyday-workspace.md#connected-ai-and-routines).
+
+## Recall from your notes
+
+`KnowledgeContext` adds up to four Library records that match the distinctive words of the current question (full-text search with English/Swedish stop words, best term coverage then recency) as numbered excerpts after any explicitly selected sources. Trash and routines are excluded. Recall is on by default for on-device Nano and requires the separate *Include matching Library excerpts* opt-in before excerpts go to a connected provider. The home answer card lists the recalled titles so citations can be checked. This is word search, not semantic retrieval; embeddings remain a measured future step. See [second brain](second-brain.md).

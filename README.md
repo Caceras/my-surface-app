@@ -1,8 +1,8 @@
 # Ægentica AI
 
-A native Android workspace for **Today · AI · Library**: capture notes, connect ideas, plan your day, and think by typing or speaking. Gemini Nano, dictation, notes and local reminders need no account. Optional connected AI and scheduled generation use your own provider; calendar and Beeper access are explicit choices.
+A native Kotlin Android workspace for **Today · AI · Library**, now **transcription first**: capture spoken words verbatim, let AI polish a copy, connect ideas, plan your day, and think by typing or speaking. Gemini Nano, dictation, notes and local reminders need no account. Optional connected AI and scheduled generation use your own provider; calendar and Beeper access are explicit choices.
 
-**[Everyday guide](docs/everyday-workspace.md)** · [Implementation and limits](docs/everyday-assistant-plan.md) · [Workspace acceptance](docs/audits/2026-09-16-workspace.md)
+**[Second-brain guide](docs/second-brain.md)** · [Research, Oct 2026](docs/research/2026-10-second-brain.md) · [Everyday guide](docs/everyday-workspace.md) · [Implementation and limits](docs/everyday-assistant-plan.md) · [Workspace acceptance](docs/audits/2026-09-16-workspace.md)
 
 [![Android checks](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml/badge.svg?branch=improve-pixel-assistant)](https://github.com/Caceras/my-surface-app/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-70CEFA.svg)](LICENSE)
@@ -13,7 +13,8 @@ A native Android workspace for **Today · AI · Library**: capture notes, connec
 
 ## The experience
 
-- **Capture and remember.** Autosaved notes, originals, full-text search, pinning, Trash/undo and whole-workspace backups.
+- **Transcribe verbatim.** One tap starts on-device, time-stamped transcription that keeps going with the screen locked; the original stays untouched while **Polish** cleans a copy.
+- **Capture and remember.** Autosaved notes, originals, full-text search, pinning, Trash/undo and whole-workspace backups. Questions recall matching notes with citations; an optional Markdown vault mirrors everything for Obsidian or Git.
 - **Connect ideas.** People, projects, linked tasks and collections with typed fields and a table view over the same records.
 - **Plan your day.** Selected-calendar agenda, reviewed reminders, local AI routines and separately approved connected routines.
 - **Read while walking.** Sentence highlighting, playback speed, pause/resume and native background media controls.
@@ -56,15 +57,16 @@ The Pixel 10 Pro XL is listed in Google's Prompt API support table. Availability
 | Assistant gesture | Opens Voice where Android supports the selected assistant | Settings → Set as digital assistant |
 | Quick Settings | Opens Voice, with setup and Type available | Add the app tile from Android's tile editor |
 | Home widget | Capture/Talk; pinned-note or last-answer preview only when enabled | Settings → Add home screen widget |
-| Launcher shortcuts | Chat, Voice, History and Capture note; Chat/Voice can be pinned | Long-press the launcher icon |
+| Launcher shortcuts | Transcribe, Voice, History and Capture note; Chat/Voice can be pinned | Long-press the launcher icon |
+| Transcribe | Long-form verbatim transcription with a Pause / Stop & save notification | Today or Notes → Transcribe |
 | Share sheet | Stages shared **plain text** in the composer for review | Share text → Ægentica AI |
-| Text selection | Ask, Summarise, Proofread, or Make professional in the Nano build | Select text in a supporting app → overflow menu |
+| Text selection | Ask, Summarise, Proofread, Make professional or Polish dictation in the Nano build | Select text in a supporting app → overflow menu |
 
 Ægentica AI does not implement a wake word, autonomous phone automation, background Nano inference, web browsing, Wear OS, or Android Auto. Calendar and Beeper are optional permission-gated integrations. Background connected routines require explicit provider and routine approval. [Ægentica AI behavior and limits](docs/surfaces.md).
 
 ## Private, with clear boundaries
 
-Nano and speech use on-device APIs by default. Connected AI is explicitly configured and sends scoped input to your chosen provider; it is never a silent fallback. There is no app analytics service. System services manage initial downloads and have their own policies.
+Nano and speech use on-device APIs by default. Transcribe runs a microphone service only after you start it, with a persistent notification; it stores recognised text, not audio. Connected AI (including the Gemini preset) is explicitly configured and sends scoped input to your chosen provider; it is never a silent fallback. There is no app analytics service. System services manage initial downloads and have their own policies.
 
 Notes, relationships, typed fields, chats and drafts are stored in app-private SQLite. Settings and encrypted provider configuration are separate. Notes have no automatic archive eviction. Up to 40 completed exchanges are kept in the current chat, and up to 12 recent conversations are archived within a soft size budget. Uninstalling removes local data. Manual exports are readable JSON and can include sensitive text; the file location and any syncing are controlled by the document provider you choose. Widget content previews are off by default. Whole-workspace exports use a separate versioned JSON format; credentials are excluded. Private screen can hide Recents previews and block screenshots; clipboard copies carry sensitive-preview metadata. [Privacy and data guide](docs/privacy.md).
 
@@ -92,6 +94,8 @@ APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots
 
 | Guide | Covers |
 |---|---|
+| [Second brain](docs/second-brain.md) | Transcribe, verbatim originals, Polish, recall, Gemini preset, Markdown vault, limits and roadmap |
+| [Research, Oct 2026](docs/research/2026-10-second-brain.md) | Latest Android, Gemini Nano, Gemini API, knowledge-store, cost and legal findings |
 | [Test/process audit](docs/audits/iteration-efficiency.md) | Test necessity, measured CI costs, request-to-install gaps and fixes |
 | [Everyday guide](docs/everyday-workspace.md) | Notes, tables, sources, playback, calendar, Beeper, connected routines and backups |
 | [Everyday assistant plan](docs/everyday-assistant-plan.md) | Product direction, delivery status and remaining acceptance boundaries |

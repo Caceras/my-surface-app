@@ -11,6 +11,7 @@ object NativeShortcuts {
     const val CAPTURE = "com.caceras.surfacelab.OPEN_CAPTURE"
     const val HISTORY = "com.caceras.surfacelab.OPEN_HISTORY"
     const val ACTIONS = "com.caceras.surfacelab.OPEN_ACTIONS"
+    const val TRANSCRIBE = "com.caceras.surfacelab.OPEN_TRANSCRIBE"
     fun pin(activity: Activity, voice: Boolean) {
         val manager = activity.getSystemService(ShortcutManager::class.java)
         if (manager?.isRequestPinShortcutSupported != true) {

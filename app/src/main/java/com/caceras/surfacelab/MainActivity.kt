@@ -344,8 +344,13 @@ class MainActivity : Activity() {
         })
         panel.addView(flatButton("Connected AI · optional") { ConnectedAI.settings(this) { updateSend(); status.text=if(ConnectedAI.enabled(this)) "Connected AI · " + ConnectedAI.host(this) else "Gemini Nano · On device" } })
         panel.addView(flatButton("AI sources") { KnowledgeContext.choose(this) { composeState.text=KnowledgeContext.label(this) } })
+        panel.addView(preferenceSwitch("Recall matching notes when I ask", KnowledgeContext.recallEnabled(this)) { KnowledgeContext.setRecall(this, it) }.apply { tag = "recall-switch" })
+        panel.addView(label("Searches your own notes and transcripts for words in your question and cites them. Stays on this phone with Nano; connected AI needs its own opt-in.", 13f, true))
         panel.addView(label("Data", 13f, true).apply { isAccessibilityHeading = true; letterSpacing = 0f; padDp(0, 28, 0, 8) })
         panel.addView(label("Saved on this phone. Export before reinstalling to keep your conversation.", 14f, true))
+        panel.addView(flatButton("Markdown vault · Obsidian, Git or Drive sync") {
+            startActivity(WorkspaceActivity.intent(this, "library").putExtra(WorkspaceActivity.VAULT, true))
+        })
         panel.addView(flatButton("Export conversation") {
             startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("application/json").putExtra(Intent.EXTRA_TITLE, "aegentica-conversation.json"), EXPORT_CHAT)
@@ -813,7 +818,7 @@ class MainActivity : Activity() {
             context = this,
             task = Task.ASK,
             input = "",
-            instruction = KnowledgeContext.prompt(this, Prompts.conversation(history, text)),
+            instruction = KnowledgeContext.prompt(this, Prompts.conversation(history, text), text, brain === ConnectedAI.brain),
             onPartial = { partial ->
                 if (gone || token != requestId) return@run
                 // Never paint the instruction. On a device that cannot take a

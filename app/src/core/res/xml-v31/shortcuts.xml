@@ -36,11 +36,11 @@
 
     <shortcut
         android:enabled="true"
-        android:icon="@mipmap/ic_launcher"
-        android:shortcutId="alpha"
-        android:shortcutShortLabel="@string/shortcut_alpha">
+        android:icon="@drawable/ic_mic"
+        android:shortcutId="transcribe"
+        android:shortcutShortLabel="@string/shortcut_transcribe">
         <intent
-            android:action="android.intent.action.VIEW"
+            android:action="com.caceras.surfacelab.OPEN_TRANSCRIBE"
             android:targetClass="com.caceras.surfacelab.HomeActivity"
             android:targetPackage="com.caceras.surface" />
     </shortcut>

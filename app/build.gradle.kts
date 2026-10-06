@@ -85,6 +85,12 @@ dependencies {
     // No model ships inside the APK; nothing leaves the device.
     "nanoImplementation"("com.google.mlkit:genai-prompt:1.0.0-beta4")
 
+    // Alpha, Nano-only: Google's on-device "Advanced" recogniser is the only
+    // first-party on-device speech engine that documents Swedish (sv-SE) on
+    // Pixel 10. Transcribe falls back to Android's recogniser whenever it is
+    // unavailable, still downloading, or refused while the app is off screen.
+    "nanoImplementation"("com.google.mlkit:genai-speech-recognition:1.0.0-alpha1")
+
     // Test-only, so nothing here reaches an APK and the zero-dependency
     // invariant is untouched. Robolectric runs the activities on the JVM,
     // which is the only way this project sees its own UI without a phone.

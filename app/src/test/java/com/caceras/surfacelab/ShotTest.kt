@@ -473,4 +473,28 @@ class ShotTest {
         activity.pause().stop().destroy()
     }
 
+
+    @Test fun `transcribe live verbatim lines`() {
+        val app=RuntimeEnvironment.getApplication()
+        org.robolectric.shadows.ShadowSpeechRecognizer.setIsOnDeviceRecognitionAvailable(true)
+        org.robolectric.Shadows.shadowOf(app).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        val service=Robolectric.buildService(TranscriptionService::class.java).create()
+        service.get().onStartCommand(android.content.Intent(app,TranscriptionService::class.java),0,1)
+        fun say(text:String) { org.robolectric.Shadows.shadowOf(org.robolectric.shadows.ShadowSpeechRecognizer.getLatestSpeechRecognizer()).triggerOnResults(android.os.Bundle().apply { putStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION,arrayListOf(text)) }); org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(1)) }
+        say("okej så idén för onboardingen är att vi visar tre exempel"); say("och jag vill att Lina tittar på det innan fredag")
+        org.robolectric.Shadows.shadowOf(org.robolectric.shadows.ShadowSpeechRecognizer.getLatestSpeechRecognizer()).triggerOnPartialResults(android.os.Bundle().apply { putStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION,arrayListOf("sen behöver vi")) })
+        val activity=Robolectric.buildActivity(TranscribeActivity::class.java).setup()
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(300))
+        shoot("transcribe-live",activity.get().window.decorView)
+        activity.pause().stop().destroy(); service.destroy()
+        org.robolectric.shadows.ShadowSpeechRecognizer.reset()
+    }
+
+    @Test @Config(qualifiers="w360dp-h800dp-night-xxhdpi") fun `transcribe ready in dark mode`() {
+        TranscriptionService.clearFinished()
+        WorkspaceStore(RuntimeEnvironment.getApplication()).use { Transcripts.append(it,null,1_790_000_000_000,1,4_000,"veckomöte med teamet om lanseringen","sv-SE") }
+        val activity=Robolectric.buildActivity(TranscribeActivity::class.java).setup()
+        shoot("transcribe-ready-night",activity.get().window.decorView,shotWidth=1080,shotHeight=2400)
+        activity.pause().stop().destroy()
+    }
 }

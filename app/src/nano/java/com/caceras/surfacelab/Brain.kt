@@ -51,7 +51,7 @@ private object NanoBrain : SurfaceBrain {
         pending = null
     }
 
-    override val tasks = listOf(Task.ASK, Task.SUMMARIZE, Task.PROOFREAD, Task.REWRITE)
+    override val tasks = listOf(Task.ASK, Task.SUMMARIZE, Task.PROOFREAD, Task.REWRITE, Task.POLISH)
 
     override fun status(context: Context, onStatus: (BrainStatus) -> Unit) {
         model().checkStatus().whenDone { result ->

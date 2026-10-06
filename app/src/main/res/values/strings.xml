@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Ægentica AI</string>
-    <string name="shortcut_alpha">Open chat</string>
+    <string name="shortcut_transcribe">Transcribe</string>
     <string name="shortcut_beta">Continue chat</string>
 
     <!-- Labels shown in the text-selection popup. Keep them short: the
@@ -11,6 +11,7 @@
     <string name="task_summarize">Summarise</string>
     <string name="task_proofread">Proofread</string>
     <string name="task_rewrite">Make professional</string>
+    <string name="task_polish">Polish dictation</string>
 
     <string name="working">Thinking on your phone\u2026</string>
     <string name="copy">Copy</string>

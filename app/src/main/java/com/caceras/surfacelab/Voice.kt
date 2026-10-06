@@ -73,6 +73,7 @@ class Ears(private val context: Context) {
     ) {
         if (Build.VERSION.SDK_INT < 31 || !available() || listening) return
         ReadingService.pauseForCapture()
+        TranscriptionService.yieldMicrophone()
 
         // Every SpeechRecognizer method must run on the main thread, and the
         // instance must be destroyed or the microphone stays held after this
