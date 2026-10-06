@@ -95,7 +95,12 @@ class TranscribeActivity : Activity() {
             if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) add(Manifest.permission.RECORD_AUDIO)
             if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED && !getSharedPreferences("surfacelab", 0).getBoolean("transcribe_notice_asked", false)) add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        if (Manifest.permission.RECORD_AUDIO in missing) { requestPermissions(missing.toTypedArray(), REQUEST); return }
+        // The notification is the stop control outside the app, so ask for it once even when the microphone is already allowed.
+        if (missing.isNotEmpty()) {
+            // Mark the notification request before asking so an interrupted dialog cannot loop.
+            if (Manifest.permission.POST_NOTIFICATIONS in missing) getSharedPreferences("surfacelab", 0).edit().putBoolean("transcribe_notice_asked", true).apply()
+            requestPermissions(missing.toTypedArray(), REQUEST); return
+        }
         if (!Ears(this).available()) {
             AlertDialog.Builder(this).setTitle("On-device speech").setMessage("Transcription needs Android's on-device speech. Open speech setup to download your language, then start again.")
                 .setNegativeButton("Not now", null).setPositiveButton("Speech setup") { _, _ -> startActivity(Intent(this, VoiceActivity::class.java).putExtra("setup", true)) }.showProtected(this)
@@ -118,9 +123,7 @@ class TranscribeActivity : Activity() {
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code, permissions, results)
         if (code != REQUEST) return
-        if (Manifest.permission.POST_NOTIFICATIONS in permissions) getSharedPreferences("surfacelab", 0).edit().putBoolean("transcribe_notice_asked", true).apply()
-        val audio = permissions.indexOf(Manifest.permission.RECORD_AUDIO)
-        if (audio >= 0 && results.getOrNull(audio) == PackageManager.PERMISSION_GRANTED) begin()
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) begin()
         else status.text = "Microphone access is off. Enable it in Android settings to transcribe; typing still works."
     }
 

@@ -122,6 +122,7 @@ class TranscriptionTest {
     }
 
     @Test fun `transcribe screen starts the service and launcher shortcuts reach their destinations`() {
+        shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         val screen = Robolectric.buildActivity(TranscribeActivity::class.java, TranscribeActivity.intent(context, start = true)).setup()
         assertEquals(TranscriptionService::class.java.name, shadowOf(context).nextStartedService.component?.className)
         screen.pause().stop().destroy()
