@@ -13,7 +13,8 @@ Every entry opens a foreground activity. The widget and tile do not run model in
 | App shortcuts | Flavor-specific `shortcuts.xml` | Android launcher entries; API-qualified files expose voice where supported |
 | Share target | MainActivity SEND filter, `text/plain` | Appends supplied text to a reviewed draft; does not fetch a shared URL |
 | Text selection | Flavor aliases → `ProcessTextActivity` | Nano offers Ask/Summarise/Proofread/Make professional/Polish dictation; core offers Uppercase |
-| Transcribe | `TranscribeActivity` + `TranscriptionService` (microphone foreground service) | Started only from visible UI (Today, Notes, launcher shortcut); persistent notification with Pause and Stop & save |
+| Transcribe | `TranscribeActivity` + `TranscriptionService` (microphone foreground service) | Started only from visible UI (Today, Notes, launcher shortcut, Quick Settings *Transcribe* tile via the visible screen); persistent notification with Pause and Stop & save |
+| Live voice | `LiveActivity` (Nano) | AI page → Talk live with Gemini; foreground only, ends on leaving the screen |
 
 Text-selection actions depend on the source app supporting Android's process-text contract. Editable preset results may replace the selection when appropriate; Ask results remain available for review. Ægentica AI receives the selected text, not the entire source app or page. Plain text is the only share MIME type currently registered.
 

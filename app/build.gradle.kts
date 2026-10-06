@@ -91,6 +91,12 @@ dependencies {
     // unavailable, still downloading, or refused while the app is off screen.
     "nanoImplementation"("com.google.mlkit:genai-speech-recognition:1.0.0-alpha1")
 
+    // Nano-only WebSocket client for Gemini Live (real-time voice). The
+    // framework has no WebSocket API; main/core stay dependency-free and only
+    // see the LiveTransport seam. 5.5.0 requires compileSdk 37; move with the
+    // deliberate SDK 37 upgrade.
+    "nanoImplementation"("com.squareup.okhttp3:okhttp:5.4.0")
+
     // Test-only, so nothing here reaches an APK and the zero-dependency
     // invariant is untouched. Robolectric runs the activities on the JVM,
     // which is the only way this project sees its own UI without a phone.

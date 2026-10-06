@@ -43,3 +43,9 @@ The **AI** destination can attach up to five selected live records through `Know
 ## Recall from your notes
 
 `KnowledgeContext` adds up to four Library records that match the distinctive words of the current question (full-text search with English/Swedish stop words, best term coverage then recency) as numbered excerpts after any explicitly selected sources. Trash and routines are excluded. Recall is on by default for on-device Nano and requires the separate *Include matching Library excerpts* opt-in before excerpts go to a connected provider. The home answer card lists the recalled titles so citations can be checked. This is word search, not semantic retrieval; embeddings remain a measured future step. See [second brain](second-brain.md).
+
+## Live voice and Insights
+
+`LiveSession` (main) implements the documented Gemini Live WebSocket protocol behind a `LiveTransport` seam: setup with `generationConfig.responseModalities: [AUDIO]`, input/output transcription, sliding-window context compression and session resumption; 16 kHz PCM16 microphone chunks only after `setupComplete`; 24 kHz playback with barge-in flushing; and three BLOCKING read-only tools (`search_notes`, `read_note`, `list_tasks`). Stale sockets are fenced by generation, `goAway` and lost connections resume with the latest handle up to five times, and errors such as a rejected key are explained. The Nano flavor supplies the OkHttp WebSocket; the core flavor reports Live as unavailable. Google Search grounding is not enabled because its terms require displaying search suggestions.
+
+`Insights` asks Nano or the connected provider for JSON (title, summary, tasks, people, projects) per chunk, tolerating code fences and prose, merges chunks, matches existing people/projects case-insensitively and applies only reviewed items in one transaction with exact undo. See [second brain](second-brain.md).

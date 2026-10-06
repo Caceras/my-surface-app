@@ -33,6 +33,7 @@ class WorkspaceActivity : Activity() {
     private var importRaw:String?=null
     private lateinit var pageGestures: GestureDetector
     private var polishing: PolishRun?=null
+    private var extracting: InsightRun?=null
 
     override fun onCreate(state:Bundle?) {
         super.onCreate(state); store=WorkspaceStore(this)
@@ -296,6 +297,7 @@ class WorkspaceActivity : Activity() {
                 "Link" to { if(save()) chooseLink(record) { dialog.dismiss(); edit(store.get(record.id)!!) } },
                 "Share" to { if(save()) startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,listOf(record.title,record.body).filter(String::isNotBlank).joinToString("\n\n")),"Share note")) },
                 "Polish" to { if(save(true)) polish(record,input) },
+                "Insights" to { if(save(true)) insights(record,input) { dialog.dismiss(); edit(store.get(record.id)!!) } },
                 (if(Transcripts.isTranscript(record)) "Verbatim" else "Original") to { showOriginal(record,input) },
                 "Trash" to { if(save()) {
                     record=store.save(record.copy(deleted=true)); Reminders.cancel(this,record.id); dialog.dismiss()
@@ -343,14 +345,63 @@ class WorkspaceActivity : Activity() {
     /** The verbatim original stays read-only; it can be copied back into the working text, never overwritten. */
     private fun showOriginal(record:Record,input:EditText) {
         val current=store.get(record.id) ?: record
-        val text=label(current.original.ifBlank { "The first finished version is kept when you tap Done." },15f).apply { setTextIsSelectable(true); padDp(24,8,24,8); tag="original-text" }
-        AlertDialog.Builder(this).setTitle(if(Transcripts.isTranscript(current)) "Verbatim transcript" else "Original capture").setView(ScrollView(this).apply { addView(text) })
+        val verbatim=current.original.ifBlank { "The first finished version is kept when you tap Done." }
+        val text=label(verbatim,15f).apply { setTextIsSelectable(true); padDp(24,8,24,8); tag="original-text" }
+        val view=column().apply { addView(text) }
+        val working=input.text.toString()
+        val changed=current.original.isNotBlank() && Transcripts.words(current.original).trim()!=working.trim()
+        if(changed) {
+            var comparing=false
+            val toggle=pill("Show changes",true) {}.apply { tag="original-compare" }
+            toggle.setOnClickListener {
+                comparing=!comparing
+                val pieces=if(comparing) TextDiff.words(Transcripts.words(current.original),working) else null
+                text.text=when { !comparing -> verbatim; pieces==null -> "Too long to compare on the phone. The verbatim text is unchanged."; else -> TextDiff.render(this,pieces) }
+                toggle.text=if(comparing) "Show verbatim" else "Show changes"
+            }
+            view.addView(toggle,0,LinearLayout.LayoutParams(-2,-2).apply { marginStart=dp(20); topMargin=dp(4) })
+            view.addView(label("Struck-through words were removed from the verbatim text; highlighted words were added.",12f,true).apply { padDp(24,0,24,4) },1)
+        }
+        AlertDialog.Builder(this).setTitle(if(Transcripts.isTranscript(current)) "Verbatim transcript" else "Original capture").setView(ScrollView(this).apply { addView(view) })
             .setPositiveButton("Done",null).apply {
                 if(current.original.isNotBlank() && current.original!=input.text.toString()) setNeutralButton("Use as text") { _,_ ->
                     AlertDialog.Builder(this@WorkspaceActivity).setMessage("Replace the working text with the original? The original stays saved either way.")
                         .setNegativeButton("Cancel",null).setPositiveButton("Replace") { _,_ -> input.setText(current.original); input.setSelection(input.length()) }.showProtected(this@WorkspaceActivity)
                 }
             }.showProtected(this)
+    }
+    /** AI suggests title, summary, tasks, people and projects; only checked items are created, linked to this note, and can be undone. */
+    private fun insights(record:Record,input:EditText,reopen:()->Unit) {
+        val source=input.text.toString()
+        if(source.isBlank()) { toast("Write or dictate something first."); return }
+        val brain=if(ConnectedAI.enabled(this)) ConnectedAI.brain else Brains.get()
+        val provider=if(brain===ConnectedAI.brain) ConnectedAI.host(this) else "on-device"
+        val run=InsightRun(this,brain,source)
+        extracting=run
+        val progress=AlertDialog.Builder(this).setTitle("Finding people, projects and tasks").setMessage("Starting…").setNegativeButton("Cancel") { _,_ -> run.cancel() }
+            .setCancelable(false).showProtected(this)
+        run.start(onProgress={ done,total -> progress.setMessage("Part ${done+1} of $total · ${if(brain===ConnectedAI.brain) "with "+provider else "on this phone"}") }) { insight,problem ->
+            if(extracting===run) extracting=null
+            if(progress.isShowing) progress.dismiss()
+            if(isDestroyed) return@start
+            if(insight==null) { toast(problem ?: "No suggestions."); return@start }
+            val current=store.get(record.id) ?: record
+            val proposals=Insights.proposals(store,current,insight)
+            if(proposals.isEmpty()) { toast("Nothing new to add. Your note is unchanged."); return@start }
+            val checked=BooleanArray(proposals.size) { true }
+            AlertDialog.Builder(this).setTitle("Add to your second brain?")
+                .setMultiChoiceItems(proposals.map { it.label }.toTypedArray(),checked) { _,n,on -> checked[n]=on }
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Add selected") { _,_ ->
+                    val accepted=proposals.filterIndexed { n,_ -> checked[n] }
+                    if(accepted.isEmpty()) return@setPositiveButton
+                    runCatching { Insights.apply(store,current,accepted,provider) }.onSuccess { applied ->
+                        reopen()
+                        AlertDialog.Builder(this).setMessage("Added ${accepted.size} item${if(accepted.size==1) "" else "s"}, linked to this note.")
+                            .setNegativeButton("Done",null).setPositiveButton("Undo") { _,_ -> Insights.undo(store,applied); populate(); store.get(record.id)?.let { edit(it) } }.showProtected(this)
+                    }.onFailure { toast(it.message ?: "Could not add those items. Nothing was changed.") }
+                }.showProtected(this)
+        }
     }
     /** AI cleans a copy, chunk by chunk, in the foreground. The user reviews before anything replaces the working text. */
     private fun polish(record:Record,input:EditText) {
@@ -536,7 +587,7 @@ class WorkspaceActivity : Activity() {
         if(code==BeeperAccess.SEND_REQUEST) toast("Return to the draft and review Send again.")
     }
     override fun onResume() { super.onResume(); NativePrivacy.apply(this,window); if(loaded && editor==null) populate() }
-    override fun onPause() { flush?.invoke(); stopDictation?.invoke(); polishing?.cancel("Polishing stopped when you left. Your text is unchanged."); super.onPause() }
+    override fun onPause() { flush?.invoke(); stopDictation?.invoke(); polishing?.cancel("Polishing stopped when you left. Your text is unchanged."); extracting?.cancel("Suggestions stopped when you left. Your note is unchanged."); super.onPause() }
     override fun onStop() { MarkdownVault.syncSoon(this); super.onStop() }
     override fun onSaveInstanceState(state:Bundle) { flush?.invoke(); state.putString("destination",destination); state.putString("filter",filter); state.putString("query",query); state.putString("editing",editingId); super.onSaveInstanceState(state) }
     override fun onDestroy() { flush?.invoke(); editor?.dismiss(); pendingSearch?.let(handler::removeCallbacks); ears?.cancel(); store.close(); super.onDestroy() }

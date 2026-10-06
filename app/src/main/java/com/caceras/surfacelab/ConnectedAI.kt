@@ -46,6 +46,9 @@ object ConnectedAI {
     /** A pinned stable model keeps polish and answers repeatable; aliases such as gemini-flash-latest can change underneath. */
     const val GEMINI_MODEL="gemini-3.8-flash"
     fun gemini(endpoint:String)=runCatching { URL(endpoint).host=="generativelanguage.googleapis.com" }.getOrDefault(false)
+    /** The saved key, only when the configured provider is Google's Gemini API (Live uses the same key). */
+    fun geminiKey(context:Context):String? = if(configured(context) && gemini(prefs(context).getString("endpoint","").orEmpty())) runCatching { secret(context) }.getOrNull() else null
+    fun geminiConfigured(context:Context)=configured(context) && gemini(prefs(context).getString("endpoint","").orEmpty())
     /** Matching Library excerpts are sent to the provider only after this separate opt-in. */
     fun recallAllowed(context:Context)=prefs(context).getBoolean("recall",false)
     /** Gemini 3 models always reason, and reasoning tokens share the completion budget, so request low effort and leave room for the answer. */

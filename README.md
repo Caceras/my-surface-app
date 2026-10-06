@@ -13,7 +13,8 @@ A native Kotlin Android workspace for **Today · AI · Library**, now **transcri
 
 ## The experience
 
-- **Transcribe verbatim.** One tap starts on-device, time-stamped transcription that keeps going with the screen locked; the original stays untouched while **Polish** cleans a copy.
+- **Transcribe verbatim.** One tap (or the Quick Settings tile) starts on-device, time-stamped transcription that keeps going with the screen locked; the original stays untouched while **Polish** cleans a copy and **Show changes** marks every edited word.
+- **Talk to your notes.** Real-time voice with Gemini Live that can search and read your notes (read-only) and saves the conversation verbatim. **Insights** proposes people, projects, tasks and a summary for you to approve, linked back to the source.
 - **Capture and remember.** Autosaved notes, originals, full-text search, pinning, Trash/undo and whole-workspace backups. Questions recall matching notes with citations; an optional Markdown vault mirrors everything for Obsidian or Git.
 - **Connect ideas.** People, projects, linked tasks and collections with typed fields and a table view over the same records.
 - **Plan your day.** Selected-calendar agenda, reviewed reminders, local AI routines and separately approved connected routines.
@@ -55,7 +56,7 @@ The Pixel 10 Pro XL is listed in Google's Prompt API support table. Availability
 | Voice | Opens the foreground voice conversation | Chat → Voice |
 | Pixel Quick Tap | Opens chat with a back-of-phone double tap | Android Settings → System → Gestures → Quick Tap → Open app |
 | Assistant gesture | Opens Voice where Android supports the selected assistant | Settings → Set as digital assistant |
-| Quick Settings | Opens Voice, with setup and Type available | Add the app tile from Android's tile editor |
+| Quick Settings | Voice tile opens Voice; **Transcribe** tile starts or opens a transcript | Add the tiles from Android's tile editor |
 | Home widget | Capture/Talk; pinned-note or last-answer preview only when enabled | Settings → Add home screen widget |
 | Launcher shortcuts | Transcribe, Voice, History and Capture note; Chat/Voice can be pinned | Long-press the launcher icon |
 | Transcribe | Long-form verbatim transcription with a Pause / Stop & save notification | Today or Notes → Transcribe |

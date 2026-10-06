@@ -27,6 +27,9 @@
 | `Transcription.kt`, `TranscriptionService.kt`, `TranscribeActivity.kt` | Verbatim transcript append, continuous platform recogniser, explicit microphone foreground service and its screen |
 | `core/…/SpeechEngineProvider.kt`, `nano/…/SpeechEngineProvider.kt` | Transcription engine choice: platform only (core); ML Kit GenAI Advanced with platform fallback (Nano) |
 | `Polish.kt` | Chunked foreground polish of a copy for review |
+| `LiveVoice.kt`, `LiveAudioDevice.kt`, `LiveActivity.kt`; `core|nano/…/LiveTransports.kt` | Gemini Live protocol/session and read-only note tools; framework audio; foreground screen; WebSocket seam (none in core, OkHttp in Nano) |
+| `Insights.kt`, `TextDiff.kt` | Reviewed AI entity/task extraction with provenance and undo; verbatim-versus-text word diff |
+| `TranscribeTileService.kt` | Quick Settings entry for Transcribe |
 | `MarkdownVault.kt` | One-way Obsidian-compatible Markdown export to a user-chosen folder |
 | `ResultStore.kt` | Last successful result used by the widget |
 | `Design.kt`, `Ui.kt`, `PresenceView.kt` | Shared view styling, insets/keyboard motion, state feedback |
