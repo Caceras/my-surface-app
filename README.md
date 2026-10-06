@@ -14,6 +14,7 @@ A native Kotlin Android workspace for **Today · AI · Library**, now **transcri
 ## The experience
 
 - **Transcribe verbatim.** One tap (or the Quick Settings tile) starts on-device, time-stamped transcription that keeps going with the screen locked; the original stays untouched while **Polish** cleans a copy and **Show changes** marks every edited word.
+- **Keep the audio, get the speakers.** *Record audio* keeps the recording itself on the phone; **Transcribe with Gemini** returns time-stamped lines per speaker (Swedish/English detected automatically) and **Name speakers** puts real names on them. Share audio files in from Recorder or messages.
 - **Talk to your notes.** Real-time voice with Gemini Live that can search and read your notes (read-only) and saves the conversation verbatim. **Insights** proposes people, projects, tasks and a summary for you to approve, linked back to the source.
 - **Capture and remember.** Autosaved notes, originals, full-text search, pinning, Trash/undo and whole-workspace backups. Questions recall matching notes with citations; an optional Markdown vault mirrors everything for Obsidian or Git.
 - **Connect ideas.** People, projects, linked tasks and collections with typed fields and a table view over the same records.

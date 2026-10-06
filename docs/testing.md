@@ -111,6 +111,12 @@ On Pixel: export first; install and verify version; create/dictate/edit a note; 
 
 On the Pixel, record: engine label shown (Gemini on-device vs Android), Swedish and English accuracy on the same 5-minute passage, a 30–60 minute session with the screen locked (lines keep arriving; notification Pause/Stop work), behaviour during an incoming call, start sounds between segments, battery drop per hour, Polish quality with Nano, recall on a known phrase, Gemini preset with a real key, and the Markdown vault in a local folder opened by Obsidian. JVM tests cannot establish any of these.
 
+## Recorded audio acceptance
+
+`AudioTest` drives `TranscriptionService` in record mode with Robolectric's `MediaRecorder` and a scripted Gemini HTTP seam: parts listed with durations, rollover at 25 minutes, paused time excluded, permanent deletion removing files, no empty note for an empty recording, recovery of unlisted parts after process death (empty files removed, unknown files untouched), Gemini request shape, part offsets, upload deletion on success/error/cancel, cancel on leaving the note with the late result dropped, editor transcription into an empty note, speaker renaming in the working text only, and shared audio import with an untrusted file name. `ShotTest` renders `transcribe-record-ready` and `recording-note`.
+
+On the Pixel: a 60-minute locked-screen recording (two parts, playback across the boundary, battery), force-stopping the app mid-recording and reopening Transcribe, an incoming call while recording, Gemini Transcribe on a real Swedish meeting with 2–4 speakers (labels, time stamps, cost in AI Studio), sharing a Pixel Recorder M4A, and Name speakers.
+
 ## Live voice and Insights acceptance
 
 `LiveAndInsightsTest` drives `LiveSession` and `LiveActivity` through a fake transport and fake audio: setup content and tool declarations, no microphone before `setupComplete`, PCM chunk encoding, read-only tool answers that exclude unrelated notes and reject unknown functions, playback and barge-in flush, transcript fragments merged into lines, a saved verbatim note, resumption with the latest handle after `goAway`, stale-socket fencing, a rejected-key message, and ending plus saving when the screen pauses. Insights covers JSON parsing around prose/code fences, review labels (existing vs new), transactional apply with provenance and exact undo. `ShotTest` renders `live-conversation`, `insights-review` and `verbatim-changes`.

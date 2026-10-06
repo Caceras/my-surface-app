@@ -36,6 +36,8 @@ class TranscribeActivity : Activity() {
     private lateinit var language: TextView
     private lateinit var engineSwitch: android.widget.Switch
     private lateinit var recent: LinearLayout
+    private lateinit var modes: LinearLayout
+    private fun recordMode() = getSharedPreferences("surfacelab", 0).getString("capture_mode", "live") == "record"
     private val handler = Handler(Looper.getMainLooper())
     private var shown: TranscriptionState? = null
     private var shownRecord = ""
@@ -63,12 +65,14 @@ class TranscribeActivity : Activity() {
             getSharedPreferences("surfacelab", 0).edit().putBoolean("transcribe_android", it).apply(); shown = null; update()
         }.apply { tag = "transcribe-engine" }
         root.addView(engineSwitch)
+        modes = LinearLayout(this).apply { gravity = Gravity.CENTER; tag = "transcribe-modes" }
+        root.addView(modes, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
         primary = pill("Start transcribing", true) { primaryAction() }.apply { tag = "transcribe-primary" }
         stop = pill("Stop & save") { stopAndSave() }.apply { tag = "transcribe-stop" }
         root.addView(LinearLayout(this).apply {
             gravity = Gravity.CENTER
-            addView(primary, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) })
-            addView(stop, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(primary, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(stop, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
         })
         root.addView(LinearLayout(this).apply {
             gravity = Gravity.CENTER
@@ -109,7 +113,7 @@ class TranscribeActivity : Activity() {
         TranscriptionService.clearFinished()
         openWhenSaved = false
         shownRecord = ""; shownSegments = -1; lines = ""
-        TranscriptionService.start(this)
+        TranscriptionService.start(this, record = recordMode())
         status.text = "Starting…"
     }
 
@@ -139,7 +143,7 @@ class TranscribeActivity : Activity() {
         }
         if (s.record != shownRecord || s.segments != shownSegments) {
             shownRecord = s.record; shownSegments = s.segments
-            lines = if (s.record.isBlank()) "" else WorkspaceStore(this).use { it.get(s.record)?.original.orEmpty() }.takeLast(DISPLAY)
+            lines = if (s.record.isBlank() || s.recording) "" else WorkspaceStore(this).use { it.get(s.record)?.original.orEmpty() }.takeLast(DISPLAY)
         }
         val text = SpannableStringBuilder(lines)
         if (s.active && s.partial.isNotBlank()) {
@@ -151,21 +155,40 @@ class TranscribeActivity : Activity() {
         if (s == shown) { if (s.active && !s.paused) timer.text = Transcripts.stamp(SystemClock.elapsedRealtime() - s.startedClock); return }
         shown = s
         timer.text = if (s.active) Transcripts.stamp(SystemClock.elapsedRealtime() - s.startedClock) else "00:00"
-        language.text = listOf(java.util.Locale.forLanguageTag(s.language.ifBlank { Ears(this).locale().toLanguageTag() }).displayName, s.engine.ifBlank { SpeechEngineProvider.choice(this) }).joinToString(" · ")
+        language.text = listOf(java.util.Locale.forLanguageTag(s.language.ifBlank { Ears(this).locale().toLanguageTag() }).displayName, s.engine.ifBlank { if (recordMode()) "Audio recording on this phone" else SpeechEngineProvider.choice(this) }).joinToString(" · ")
         status.text = when {
             !s.active && openWhenSaved -> "Saving…"
             !s.active -> s.message.ifBlank { "Ready. Speak naturally; pauses are fine." }
             s.paused -> s.message.ifBlank { "Paused" }
+            s.recording -> s.message.ifBlank { "Recording audio" + if (s.segments > 1) " · part ${s.segments}" else "" }
             else -> s.message.ifBlank { "Listening · ${s.segments} line${if (s.segments == 1) "" else "s"} saved" }
         }
-        primary.text = when { !s.active -> "Start transcribing"; s.paused -> "Resume"; else -> "Pause" }
+        primary.text = when { !s.active -> if (recordMode()) "Start recording" else "Start transcribing"; s.paused -> "Resume"; else -> "Pause" }
         stop.text = if (s.active) "Stop & save" else "Close"
-        hint.text = if (s.active) "Keeps transcribing if you leave or lock the phone. Stop & save ends it." else IDLE_HINT
-        engineSwitch.visibility = if (s.active) View.GONE else View.VISIBLE
+        hint.text = when {
+            s.active && s.recording -> "Audio is saved on this phone as you record, also with the screen locked. After Stop & save, open the note and choose Transcribe with Gemini for speaker labels."
+            s.active -> "Keeps transcribing if you leave or lock the phone. Stop & save ends it."
+            recordMode() -> RECORD_HINT
+            else -> IDLE_HINT
+        }
+        engineSwitch.visibility = if (s.active || recordMode()) View.GONE else View.VISIBLE
+        renderModes(s.active)
         stop.visibility = if (s.active) View.VISIBLE else View.GONE
         showRecent(!s.active && lines.isBlank())
         // Google's on-device model only runs while the app is on screen, so keep it visible while capturing.
         if (s.active && !s.paused) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    /** Live on-device transcript, or the audio itself as the original for later speaker-labelled transcription. */
+    private fun renderModes(active: Boolean) {
+        modes.removeAllViews()
+        if (active) return
+        for ((key, title) in listOf("live" to "Live transcript", "record" to "Record audio")) {
+            val selected = (getSharedPreferences("surfacelab", 0).getString("capture_mode", "live") ?: "live") == key
+            modes.addView(pill(title, selected) { getSharedPreferences("surfacelab", 0).edit().putString("capture_mode", key).apply(); shown = null; update() }.apply {
+                tag = "mode-$key"; isSelected = selected; contentDescription = title + if (selected) ", selected" else ""
+            }, LinearLayout.LayoutParams(0, -2, 1f).apply { if (key == "live") marginEnd = dp(4) else marginStart = dp(4) })
+        }
     }
 
     /** Idle screens show the latest transcripts instead of empty space. */
@@ -183,12 +206,18 @@ class TranscribeActivity : Activity() {
         }
     }
 
-    override fun onResume() { super.onResume(); NativePrivacy.apply(this, window); shown = null; handler.post(refresh) }
+    override fun onResume() {
+        super.onResume(); NativePrivacy.apply(this, window)
+        // Audio cut off by a killed process is listed again before the screen shows recent notes.
+        if (!TranscriptionService.state.active) runCatching { WorkspaceStore(this).use { AudioNotes.recover(this, it) } }
+        shown = null; handler.post(refresh)
+    }
     override fun onPause() { handler.removeCallbacks(refresh); super.onPause() }
     override fun onSaveInstanceState(state: Bundle) { state.putBoolean("openWhenSaved", openWhenSaved); super.onSaveInstanceState(state) }
 
     companion object {
         const val START = "start"
+        private const val RECORD_HINT = "Keeps the audio itself on this phone (about 14 MB per hour), in parts of up to 25 minutes. Transcribe it later with Gemini for speaker labels and Swedish/English detection. Audio is never uploaded unless you ask."
         private const val IDLE_HINT = "Words are transcribed on this phone and saved exactly as recognised, with time stamps. It keeps going with the screen locked; use the notification or this screen to stop."
         private const val REQUEST = 44
         private const val DISPLAY = 40_000

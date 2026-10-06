@@ -554,4 +554,33 @@ class ShotTest {
         shoot("verbatim-changes",dialog.window!!.decorView,minPainted=0.3)
         activity.pause().stop().destroy()
     }
+
+    @Test fun `record audio mode ready`() {
+        val app=RuntimeEnvironment.getApplication()
+        TranscriptionService.clearFinished()
+        app.getSharedPreferences("surfacelab",0).edit().putString("capture_mode","record").commit()
+        val activity=Robolectric.buildActivity(TranscribeActivity::class.java).setup()
+        val root=activity.get().window.decorView
+        fun children(v:View):List<View> = listOf(v)+if(v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
+        assertTrue(children(root).any { it.tag=="mode-record" && it.isSelected })
+        shoot("transcribe-record-ready",root)
+        activity.pause().stop().destroy()
+    }
+
+    @Test fun `recording note with speakers and audio`() {
+        val app=RuntimeEnvironment.getApplication()
+        val text="[00:00] Speaker 1: Okej, då kör vi veckomötet. Lina, hur går onboardingen?\n[00:06] Speaker 2: Bra, tre exempel är klara och jag skickar utkastet före fredag.\n[00:14] Speaker 1: Perfekt. Then let's review it together on Monday."
+        val id=WorkspaceStore(app).use { store ->
+            val note=store.save(Record(title="Recording · veckomöte",body=text,original=text,source=AudioNotes.SOURCE))
+            java.io.File(AudioNotes.dir(app),"${note.id}-1.aac").writeBytes(ByteArray(10))
+            AudioNotes.add(store,note.id,AudioNotes.Part("${note.id}-1.aac",1_520_000)); note.id
+        }
+        val activity=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(app,"library",id)).setup()
+        val decor=org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
+        fun children(v:View):List<View> = listOf(v)+if(v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
+        assertTrue(children(decor).any { it.tag=="audio-speakers" }); assertTrue(children(decor).none { it.tag=="audio-transcribe" })
+        shoot("recording-note",decor,minPainted=0.3)
+        activity.pause().stop().destroy()
+        AudioNotes.dir(app).deleteRecursively()
+    }
 }

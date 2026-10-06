@@ -58,7 +58,7 @@ object Insights {
         projects = parts.flatMap { it.projects }.distinctBy { it.lowercase() }.take(8))
 
     /** Generated titles may replace blank or automatic transcript titles only. */
-    private fun replaceableTitle(record: Record) = record.title.isBlank() || record.title.startsWith("Transcript · ") || record.title.startsWith("Live conversation · ")
+    private fun replaceableTitle(record: Record) = record.title.isBlank() || record.title.startsWith("Transcript · ") || record.title.startsWith("Live conversation · ") || record.title.startsWith("Recording · ")
 
     fun proposals(store: WorkspaceStore, record: Record, insight: Insight): List<Proposal> = buildList {
         if (insight.title.isNotBlank() && replaceableTitle(record)) add(Proposal("title", insight.title))
