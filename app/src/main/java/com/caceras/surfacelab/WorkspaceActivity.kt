@@ -349,13 +349,13 @@ class WorkspaceActivity : Activity() {
         val text=label(verbatim,15f).apply { setTextIsSelectable(true); padDp(24,8,24,8); tag="original-text" }
         val view=column().apply { addView(text) }
         val working=input.text.toString()
-        val changed=current.original.isNotBlank() && Transcripts.words(current.original).trim()!=working.trim()
+        val changed=current.original.isNotBlank() && Transcripts.words(current.original).trim()!=Transcripts.words(working).trim()
         if(changed) {
             var comparing=false
             val toggle=pill("Show changes",true) {}.apply { tag="original-compare" }
             toggle.setOnClickListener {
                 comparing=!comparing
-                val pieces=if(comparing) TextDiff.words(Transcripts.words(current.original),working) else null
+                val pieces=if(comparing) TextDiff.words(Transcripts.words(current.original),Transcripts.words(working)) else null
                 text.text=when { !comparing -> verbatim; pieces==null -> "Too long to compare on the phone. The verbatim text is unchanged."; else -> TextDiff.render(this,pieces) }
                 toggle.text=if(comparing) "Show verbatim" else "Show changes"
             }
