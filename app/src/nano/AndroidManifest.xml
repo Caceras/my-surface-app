@@ -52,6 +52,19 @@
             </intent-filter>
         </activity-alias>
 
+        <activity-alias
+            android:name=".Polish"
+            android:targetActivity=".ProcessTextActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_surface"
+            android:label="@string/task_polish">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+
     </application>
 
 </manifest>

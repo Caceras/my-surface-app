@@ -20,6 +20,19 @@ data class Record(
     val revision: Int = 1
 )
 data class Property(val id: String, val collection: String, val name: String, val type: String)
+data class Recalled(val record: Record, val excerpt: String)
+
+private val STOP_WORDS = setOf(
+    "the","and","for","are","but","not","you","all","any","can","had","her","was","one","our","out","has","him","his","how","did","its","let","say","she","too","use",
+    "what","when","where","which","with","this","that","from","have","will","your","about","into","than","them","then","they","were","been","also","more","some",
+    "would","there","their","could","should","does","said","tell","show","find","know","give","who","why","please","my","me",
+    "och","att","det","som","för","med","har","inte","den","till","var","jag","men","vad","när","hur","kan","ska","skulle","om","på","av","är","ett","en","de",
+    "vi","du","han","hon","mig","min","mitt","mina","sig","sin","där","här","alla","från","eller","efter","under","över","vid","bara","också","sedan","någon",
+    "något","några","detta","dessa","vilken","vilket","vilka","sagt","sade","berätta","visa","hitta","vet","dig","din","ditt","dina","oss","era","vår","våra"
+)
+/** Distinctive words of a question, safe to quote in an FTS query. */
+internal fun recallTerms(question: String): List<String> =
+    Regex("[\\p{L}\\p{N}]{3,}").findAll(question.lowercase()).map { it.value }.filter { it !in STOP_WORDS }.distinct().take(8).toList()
 
 class WorkspaceStore(context: Context) : SQLiteOpenHelper(context.applicationContext, "aegentica.db", null, 1) {
     private val app = context.applicationContext
@@ -85,6 +98,35 @@ class WorkspaceStore(context: Context) : SQLiteOpenHelper(context.applicationCon
             db.setTransactionSuccessful()
             return next
         } finally { db.endTransaction() }
+    }
+    /** Capture-only growth: one recognised line joins the verbatim original and the working text atomically. */
+    fun appendVerbatim(id: String, line: String): Record {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            val current = get(id) ?: error("The transcript is missing.")
+            require(!current.deleted) { "This transcript is in Trash." }
+            fun join(text: String) = if (text.isBlank()) line else text.trimEnd() + "\n" + line
+            val next = current.copy(original = join(current.original), body = join(current.body), updated = System.currentTimeMillis(), revision = current.revision + 1)
+            validate(next)
+            db.update("records", recordValues(next), "id=?", arrayOf(id)); index(db, next)
+            db.setTransactionSuccessful()
+            return next
+        } finally { db.endTransaction() }
+    }
+    /** Word search across live records for AI recall: best term coverage first, then recency, with a matching excerpt. */
+    fun recall(question: String, exclude: Set<String> = emptySet(), limit: Int = 4): List<Recalled> {
+        val terms = recallTerms(question)
+        if (terms.isEmpty()) return emptyList()
+        val rows = readableDatabase.rawQuery("SELECT id,snippet(search,'','','…',2,40) FROM search WHERE search MATCH ? LIMIT 80",
+            // Unquoted: FTS4 matches nothing for quoted prefixes joined by OR. Terms are lowercase letters/digits, never operators.
+            arrayOf(terms.joinToString(" OR ") { "$it*" })).use { c -> buildList { while (c.moveToNext()) add(c.getString(0) to c.getString(1).orEmpty()) } }
+        return rows.mapNotNull { (id, excerpt) ->
+            val r = get(id)?.takeIf { !it.deleted && it.kind != "routine" && it.id !in exclude } ?: return@mapNotNull null
+            val text = (r.title + " " + r.body).lowercase()
+            Triple(r, Transcripts.words(excerpt.ifBlank { r.body.take(280) }).replace('\n', ' ').trim(), terms.count { text.contains(it) })
+        }.sortedWith(compareByDescending<Triple<Record, String, Int>> { it.third }.thenByDescending { it.first.updated })
+            .take(limit).map { Recalled(it.first, it.second) }
     }
     fun link(a: String, b: String, label: String = "related") {
         require(a != b && label in listOf("related", "member", "source"))

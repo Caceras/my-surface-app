@@ -22,6 +22,7 @@ class HomeActivity : Activity() {
     private lateinit var assistantSend: ImageButton
     private lateinit var answerCard: LinearLayout
     private lateinit var answerText: TextView
+    private lateinit var answerSources: TextView
     private lateinit var nav: LinearLayout
     private val pageBodies = mutableMapOf<String, LinearLayout>()
     private var currentPage = 0
@@ -36,11 +37,36 @@ class HomeActivity : Activity() {
         refreshAll()
         pager.setPage(currentPage, false)
         readableSystemBars()
+        if (state == null) route(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pageKeys.indexOf(intent.getStringExtra("destination")).takeIf { it >= 0 }?.let { pager.setPage(it, true) }
+        route(intent)
+    }
+
+    /** Launcher shortcuts target this shell; each action opens its real destination. */
+    private fun route(intent: Intent?) {
+        when (intent?.action) {
+            NativeShortcuts.CAPTURE -> startActivity(WorkspaceActivity.intent(this, "library").putExtra("capture", true))
+            NativeShortcuts.TRANSCRIBE -> startActivity(TranscribeActivity.intent(this, start = true))
+            NativeShortcuts.HISTORY, NativeShortcuts.ACTIONS -> startActivity(Intent(this, MainActivity::class.java).setAction(intent.action))
+            else -> return
+        }
+        // Consume the action so recreation or Recents does not open it again.
+        intent.action = Intent.ACTION_MAIN
     }
 
     override fun onResume() {
         super.onResume()
         if (::pager.isInitialized) refreshAll()
+    }
+
+    override fun onStop() {
+        MarkdownVault.syncSoon(this)
+        super.onStop()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -137,7 +163,18 @@ class HomeActivity : Activity() {
         parent.addView(label(text,14f,true).apply { padDp(0,4,0,10) })
     }
 
+    /** Live session banner, or the primary capture action when nothing is recording. */
+    private fun transcribeEntry(parent:LinearLayout) {
+        val s=TranscriptionService.state
+        val text=when { s.active && s.paused -> "Transcription paused · Open"; s.active -> "● Transcribing · Open"; else -> "Transcribe" }
+        parent.addView(actionRow(text) { startActivity(TranscribeActivity.intent(this, start = !s.active)) }.apply {
+            tag="home-transcribe"; contentDescription=if(s.active) "Open the running transcription" else "Start transcribing"
+            if(s.active) { background=surface(R.color.accent,18); setTextColor(ink(R.color.on_accent)) }
+        },LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(16); bottomMargin=dp(4) })
+    }
+
     private fun fillToday(parent:LinearLayout) {
+        transcribeEntry(parent)
         parent.addView(label(LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, d MMMM")),13f,true).apply { padDp(0,16,0,4) })
         val tasks=store.list(kind="task").filter { !it.done }.sortedWith(compareBy<Record>{ if(it.due==0L) Long.MAX_VALUE else it.due }.thenByDescending { it.updated })
         section(parent,"Next")
@@ -172,7 +209,7 @@ class HomeActivity : Activity() {
 
     private fun fillTasks(parent:LinearLayout) {
         parent.addView(actionRow("Add task") {
-            startActivity(WorkspaceActivity.intent(this,"tasks").putExtra("newTask",true))
+            startActivity(WorkspaceActivity.intent(this,"tasks").putExtra(WorkspaceActivity.NEW_TASK,true))
         },LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(16); bottomMargin=dp(12) })
         val tasks=store.list(kind="task").sortedWith(compareBy<Record>{it.done}.thenBy { if(it.due==0L) Long.MAX_VALUE else it.due }.thenByDescending { it.updated })
         if(tasks.isEmpty()) muted(parent,"No tasks yet.")
@@ -180,9 +217,10 @@ class HomeActivity : Activity() {
     }
 
     private fun fillNotes(parent:LinearLayout) {
+        transcribeEntry(parent)
         parent.addView(actionRow("New note") {
             startActivity(WorkspaceActivity.intent(this,"library").putExtra("capture",true))
-        },LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(16); bottomMargin=dp(12) })
+        },LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8); bottomMargin=dp(12) })
         val records=store.list().filter { it.kind!="task" && it.kind!="routine" }.take(60)
         if(records.isEmpty()) muted(parent,"No notes yet.")
         records.forEach { parent.addView(recordCard(it)) }
@@ -192,11 +230,11 @@ class HomeActivity : Activity() {
         orientation=LinearLayout.VERTICAL
         background=glassSurface(20)
         padDp(16,14,16,14)
-        addView(label(record.kind.replaceFirstChar(Char::uppercase)+(if(record.pinned) " · Pinned" else ""),11f,true))
+        addView(label((if(Transcripts.isTranscript(record)) "Transcript" else record.kind.replaceFirstChar(Char::uppercase))+(if(record.pinned) " · Pinned" else ""),11f,true))
         addView(label(record.title.ifBlank { record.body.lineSequence().firstOrNull().orEmpty().take(80).ifBlank { "Untitled" } },17f).apply {
             medium(); maxLines=2; ellipsize=android.text.TextUtils.TruncateAt.END; padDp(0,5,0,3)
         })
-        if(record.body.isNotBlank()) addView(label(record.body,13f,true).apply { maxLines=2; ellipsize=android.text.TextUtils.TruncateAt.END })
+        if(record.body.isNotBlank()) addView(label(if(Transcripts.isTranscript(record)) Transcripts.words(record.body).trim() else record.body,13f,true).apply { maxLines=2; ellipsize=android.text.TextUtils.TruncateAt.END })
         isFocusable=true; buttonSemantics()
         setOnClickListener {
             startActivity(WorkspaceActivity.intent(this@HomeActivity,if(record.kind=="task") "tasks" else "library",record.id))
@@ -238,12 +276,14 @@ class HomeActivity : Activity() {
             })
             addView(miniAction("Close") { answerCard.visibility=View.GONE })
         }
+        answerSources=label("",12f,true).apply { visibility=View.GONE; tag="answer-sources"; padDp(0,8,0,0) }
         answerCard=LinearLayout(this).apply {
             orientation=LinearLayout.VERTICAL
             background=glassSurface(22,true)
             padDp(16,14,12,10)
             visibility=View.GONE
             addView(answerText)
+            addView(answerSources)
             addView(actions,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(8) })
         }
         return answerCard
@@ -358,10 +398,11 @@ class HomeActivity : Activity() {
         assistantSend.alpha=.45f; assistantSend.isEnabled=false
         answerCard.visibility=View.VISIBLE
         answerText.text="Thinking…"
+        answerSources.visibility=View.GONE
         val history=Chat.load(this)
         val contextual="Current screen: "+pageTitles[currentPage]+".\n"+currentContext()+"\n\nUser request:\n"+question
-        val instruction=KnowledgeContext.prompt(this,Prompts.conversation(history,contextual))
         val brain=if(ConnectedAI.enabled(this)) ConnectedAI.brain else Brains.get()
+        val instruction=KnowledgeContext.prompt(this,Prompts.conversation(history,contextual),question,brain===ConnectedAI.brain)
         brain.run(this,Task.ASK,input="",instruction=instruction,onPartial={ partial ->
             if(token!=requestId) return@run
             val reply=Prompts.reply(partial)
@@ -372,6 +413,9 @@ class HomeActivity : Activity() {
             val said=Prompts.reply(result.text)
             if(result.ok && !Prompts.isEcho(said,Task.ASK)) {
                 answerText.text=Markdown.render(said,dp(18))
+                val recalled=KnowledgeContext.lastRecalled
+                answerSources.text="From your notes: "+recalled.joinToString(" · ") { it.title.ifBlank { it.body.take(40) } }
+                answerSources.visibility=if(recalled.isEmpty()) View.GONE else View.VISIBLE
                 Chat.append(this,Turn(question,said))
                 assistantInput.setText("")
                 refreshPage("ai")
@@ -406,6 +450,7 @@ class HomeActivity : Activity() {
     }
 
     private fun showAnswer(text:String) {
+        answerSources.visibility=View.GONE
         answerCard.visibility=View.VISIBLE
         answerText.text=text
     }

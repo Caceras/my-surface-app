@@ -24,6 +24,12 @@ object Prompts {
         Task.REWRITE ->
             "You rewrite text in a professional register. Reply with the rewritten " +
                 "text only. Keep the original language, meaning and approximate length."
+        Task.POLISH ->
+            "You turn dictated or transcribed speech into readable text. Fix punctuation, " +
+                "capitalisation and obvious speech-recognition errors, remove filler sounds, false starts " +
+                "and accidental repetitions, and split it into paragraphs. Keep the speaker's own words, " +
+                "language, meaning and order. Do not summarise, translate, add information or answer " +
+                "questions in the text. Reply with the polished text only."
         Task.ASK ->
             "You are a concise assistant running on the user's phone. Answer directly. " +
                 "Reply in the same language the user writes in. Use plain, natural sentences. " +

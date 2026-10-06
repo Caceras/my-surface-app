@@ -32,6 +32,7 @@ class WorkspaceActivity : Activity() {
     private var loaded=false
     private var importRaw:String?=null
     private lateinit var pageGestures: GestureDetector
+    private var polishing: PolishRun?=null
 
     override fun onCreate(state:Bundle?) {
         super.onCreate(state); store=WorkspaceStore(this)
@@ -58,6 +59,8 @@ class WorkspaceActivity : Activity() {
         val record=state?.getString("editing") ?: intent.getStringExtra("record")
         if(record!=null) store.get(record)?.let { edit(it) }
         else if(state==null && intent.getBooleanExtra("capture",false)) capture(intent.getStringExtra("text").orEmpty())
+        else if(state==null && intent.getBooleanExtra(NEW_TASK,false)) edit(Record(kind="task"))
+        else if(state==null && intent.getBooleanExtra(VAULT,false)) vault()
     }
     private var editingId:String?=null
     private fun column()=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
@@ -190,7 +193,7 @@ class WorkspaceActivity : Activity() {
     private fun card(record:Record) {
         val card=column().apply {
             tag="record-${record.id}"; background=glassSurface(20); elevation=dp(2).toFloat(); padDp(16,15,16,14)
-            addView(label(record.kind.replaceFirstChar { it.uppercase() } + if(record.pinned) " · Pinned" else "",11f,true).apply { letterSpacing=.03f })
+            addView(label((if(Transcripts.isTranscript(record)) "Transcript" else record.kind.replaceFirstChar { it.uppercase() }) + if(record.pinned) " · Pinned" else "",11f,true).apply { letterSpacing=.03f })
             addView(label(record.title.ifBlank { record.body.lineSequence().firstOrNull().orEmpty().take(80).ifBlank { "Untitled ${record.kind}" } },17f).apply { medium(); maxLines=2; ellipsize=TextUtils.TruncateAt.END; padDp(0,5,0,3) })
             if(record.body.isNotBlank()) addView(label(record.body,13f,true).apply { maxLines=2; ellipsize=TextUtils.TruncateAt.END })
             if(record.due>0) addView(label((if(record.done) "Completed · " else if(!record.enabled) "Paused · " else "")+date(record.due),12f,true).apply { padDp(0,8,0,0) })
@@ -292,7 +295,8 @@ class WorkspaceActivity : Activity() {
             content.addView(tools((if(record.pinned) "Unpin" else "Pin") to { if(save()) { record=store.save(record.copy(pinned=!record.pinned)); close() } },
                 "Link" to { if(save()) chooseLink(record) { dialog.dismiss(); edit(store.get(record.id)!!) } },
                 "Share" to { if(save()) startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,listOf(record.title,record.body).filter(String::isNotBlank).joinToString("\n\n")),"Share note")) },
-                "Original" to { AlertDialog.Builder(this).setTitle("Original capture").setMessage(record.original.ifBlank { "The first finished version is kept when you tap Done." }).setPositiveButton("Done",null).showProtected(this) },
+                "Polish" to { if(save(true)) polish(record,input) },
+                (if(Transcripts.isTranscript(record)) "Verbatim" else "Original") to { showOriginal(record,input) },
                 "Trash" to { if(save()) {
                     record=store.save(record.copy(deleted=true)); Reminders.cancel(this,record.id); dialog.dismiss()
                     AlertDialog.Builder(this).setMessage("Moved to Trash").setNegativeButton("Done",null).setPositiveButton("Undo") { _,_ -> val restored=store.save(record.copy(deleted=false)); Reminders.schedule(this,restored); populate() }.showProtected(this)
@@ -335,6 +339,44 @@ class WorkspaceActivity : Activity() {
             populate()
         }
         dialog.show(); dialog.window?.setLayout(-1,-1); dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE); dialog.window?.let { readableSystemBars(it) }
+    }
+    /** The verbatim original stays read-only; it can be copied back into the working text, never overwritten. */
+    private fun showOriginal(record:Record,input:EditText) {
+        val current=store.get(record.id) ?: record
+        val text=label(current.original.ifBlank { "The first finished version is kept when you tap Done." },15f).apply { setTextIsSelectable(true); padDp(24,8,24,8); tag="original-text" }
+        AlertDialog.Builder(this).setTitle(if(Transcripts.isTranscript(current)) "Verbatim transcript" else "Original capture").setView(ScrollView(this).apply { addView(text) })
+            .setPositiveButton("Done",null).apply {
+                if(current.original.isNotBlank() && current.original!=input.text.toString()) setNeutralButton("Use as text") { _,_ ->
+                    AlertDialog.Builder(this@WorkspaceActivity).setMessage("Replace the working text with the original? The original stays saved either way.")
+                        .setNegativeButton("Cancel",null).setPositiveButton("Replace") { _,_ -> input.setText(current.original); input.setSelection(input.length()) }.showProtected(this@WorkspaceActivity)
+                }
+            }.showProtected(this)
+    }
+    /** AI cleans a copy, chunk by chunk, in the foreground. The user reviews before anything replaces the working text. */
+    private fun polish(record:Record,input:EditText) {
+        val source=input.text.toString()
+        if(source.isBlank()) { toast("Write or dictate something first."); return }
+        val brain=if(ConnectedAI.enabled(this)) ConnectedAI.brain else Brains.get()
+        val where=if(brain===ConnectedAI.brain) "with ${ConnectedAI.host(this)}" else "on this phone"
+        val run=PolishRun(this,brain,source)
+        polishing=run
+        val progress=AlertDialog.Builder(this).setTitle("Polishing $where").setMessage("Starting…").setNegativeButton("Cancel") { _,_ -> run.cancel() }
+            .setCancelable(false).showProtected(this)
+        run.start(onProgress={ done,total -> progress.setMessage("Part ${done+1} of $total · the original stays unchanged") }) { polished,problem ->
+            if(polishing===run) polishing=null
+            if(progress.isShowing) progress.dismiss()
+            if(isDestroyed) return@start
+            if(polished==null) { toast(problem ?: "Polishing stopped. Your text is unchanged."); return@start }
+            val view=label(polished,15f).apply { setTextIsSelectable(true); padDp(24,8,24,8); tag="polish-preview" }
+            AlertDialog.Builder(this).setTitle("Polished version").setMessage(if(run.shortened) "Some parts came back much shorter. Compare with the original before replacing." else null)
+                .setView(ScrollView(this).apply { addView(view) })
+                .setNegativeButton("Discard",null)
+                .setNeutralButton("Save as new note") { _,_ ->
+                    val copy=store.save(Record(title=(record.title.ifBlank { "Note" }+" · polished").take(200),body=polished,source="Polished from ${record.id}"))
+                    store.link(copy.id,record.id,"source"); toast("Saved a linked polished note")
+                }
+                .setPositiveButton("Replace text") { _,_ -> input.setText(polished); input.setSelection(0) }.showProtected(this)
+        }
     }
     private fun chooseLink(record:Record, after:()->Unit) {
         val candidates=store.list().filter { it.id!=record.id }
@@ -425,7 +467,8 @@ class WorkspaceActivity : Activity() {
         startActivity(Intent(this,MainActivity::class.java).putExtra("workspaceDraft",true).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
     }
     private fun menu() {
-        AlertDialog.Builder(this).setTitle("Your workspace").setItems(arrayOf("Beeper conversations","Export everything","Restore workspace","Open AI settings","Read aloud player")) { _,n -> when(n) {
+        AlertDialog.Builder(this).setTitle("Your workspace").setItems(arrayOf("Beeper conversations","Export everything","Restore workspace","Open AI settings","Read aloud player","Markdown vault (Obsidian)")) { _,n -> when(n) {
+            5 -> vault()
             0 -> BeeperAccess.open(this)
             1 -> startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/json").putExtra(Intent.EXTRA_TITLE,"aegentica-workspace.json"),61)
             2 -> startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/json"),62)
@@ -433,8 +476,33 @@ class WorkspaceActivity : Activity() {
             4 -> startActivity(Intent(this,ReadingActivity::class.java))
         } }.showProtected(this)
     }
+    private fun vault() {
+        val folder=MarkdownVault.folder(this)
+        if(folder==null) {
+            AlertDialog.Builder(this).setTitle("Markdown vault").setMessage("Choose a folder on this phone, for example your Obsidian vault in Documents. Notes, tasks, people and projects are written there as Markdown with links and the verbatim original. Ægentica only changes files it wrote, inside an \"${MarkdownVault.FOLDER}\" folder.")
+                .setNegativeButton("Cancel",null).setPositiveButton("Choose folder") { _,_ -> startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE),63) }.showProtected(this)
+            return
+        }
+        val last=MarkdownVault.lastSync(this)
+        AlertDialog.Builder(this).setTitle("Markdown vault").setMessage("Folder: ${folder.lastPathSegment.orEmpty()}\nLast sync: ${if(last==0L) "never" else date(last)}\n\nThe vault also refreshes when you leave the app.")
+            .setNegativeButton("Stop syncing") { _,_ -> runCatching { contentResolver.releasePersistableUriPermission(folder,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }; MarkdownVault.forget(this); toast("Vault sync stopped. Files already written stay in the folder.") }
+            .setNeutralButton("Change folder") { _,_ -> startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE),63) }
+            .setPositiveButton("Sync now") { _,_ -> syncVault() }.showProtected(this)
+    }
+    private fun syncVault() {
+        toast("Writing Markdown files…")
+        Thread { runCatching { MarkdownVault.sync(this) }.onSuccess { n -> runOnUiThread { if(!isDestroyed) toast(if(n==0) "Vault is up to date" else "Wrote $n Markdown file${if(n==1) "" else "s"}") } }
+            .onFailure { e -> runOnUiThread { if(!isDestroyed) toast(e.message ?: "Could not write to that folder. Choose it again.") } } }.start()
+    }
     override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?) {
         super.onActivityResult(requestCode,resultCode,data)
+        if(requestCode==63 && resultCode==RESULT_OK) {
+            val tree=data?.data ?: return
+            runCatching { contentResolver.takePersistableUriPermission(tree,Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }
+                .onSuccess { MarkdownVault.setFolder(this,tree); syncVault() }
+                .onFailure { toast("That location cannot be kept for syncing. Choose a folder on this phone instead.") }
+            return
+        }
         if(resultCode!=RESULT_OK || requestCode !in listOf(61,62)) return
         val uri=data?.data ?: return
         Thread {
@@ -468,13 +536,16 @@ class WorkspaceActivity : Activity() {
         if(code==BeeperAccess.SEND_REQUEST) toast("Return to the draft and review Send again.")
     }
     override fun onResume() { super.onResume(); NativePrivacy.apply(this,window); if(loaded && editor==null) populate() }
-    override fun onPause() { flush?.invoke(); stopDictation?.invoke(); super.onPause() }
+    override fun onPause() { flush?.invoke(); stopDictation?.invoke(); polishing?.cancel("Polishing stopped when you left. Your text is unchanged."); super.onPause() }
+    override fun onStop() { MarkdownVault.syncSoon(this); super.onStop() }
     override fun onSaveInstanceState(state:Bundle) { flush?.invoke(); state.putString("destination",destination); state.putString("filter",filter); state.putString("query",query); state.putString("editing",editingId); super.onSaveInstanceState(state) }
     override fun onDestroy() { flush?.invoke(); editor?.dismiss(); pendingSearch?.let(handler::removeCallbacks); ears?.cancel(); store.close(); super.onDestroy() }
     private fun toast(text:String)=Toast.makeText(this,text,Toast.LENGTH_LONG).show()
     private fun date(value:Long)=DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(Date(value))
     companion object {
         val PAGES=listOf("today","calendar","tasks","library")
+        const val NEW_TASK="newTask"
+        const val VAULT="vault"
         fun intent(context:Context,destination:String="today",id:String?=null)=Intent(context,WorkspaceActivity::class.java).putExtra("destination",destination.takeIf { it in PAGES } ?: "today").apply { if(id!=null) putExtra("record",id) }
     }
 }

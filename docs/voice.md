@@ -34,7 +34,7 @@ This does not add background playback, lock-screen recording or a notification p
 
 ## Boundaries
 
-No wake word, background microphone service, background inference, guaranteed Bluetooth routing, or universal speech-language support is implemented. A working language pack and a working TTS voice are separate from Gemini Nano's language quality. Device vendors/services may differ in permission, language download, and audio behavior.
+No wake word, background inference, guaranteed Bluetooth routing, or universal speech-language support is implemented. The only background microphone service is an explicitly started Transcribe session (below). A working language pack and a working TTS voice are separate from Gemini Nano's language quality. Device vendors/services may differ in permission, language download, and audio behavior.
 
 ## API references
 
@@ -57,3 +57,7 @@ Rotating/recreating Voice pauses capture and preserves displayed text; tap Talk 
 `ReadingService` owns completed-text playback separately from the live `Mouth` stream. Listen on a note/answer opens `ReadingActivity`: sentence highlighting, pause/resume, previous/next and speed. A mediaPlayback foreground service, generic MediaSession metadata and native notification allow screen-lock/headset control. Position persists at sentence boundaries; after process death playback only resumes by an explicit user action. TTS voices still must be installed/offline. Audio-focus loss, headphone disconnect and all microphone entry points pause it. Navigation does not stop this explicitly requested reading session.
 
 Notes use editable on-device dictation. Manual editing cancels recognition so late partials cannot overwrite a newer draft. Saved text is independent of model or recognizer availability. The alpha GenAI recognizer remains an evaluation opportunity, not an untested default replacement.
+
+## Transcribe
+
+`TranscriptionService` hosts long-form transcription behind an explicit start, a microphone foreground service and a persistent notification. `PlatformSpeechEngine` restarts Android's on-device recogniser after each pause, keeps the last partial when a session ends without a final result, and pauses visibly after six consecutive failures (for example during a call) instead of retrying forever. On the Nano build `SpeechEngineProvider` prefers ML Kit GenAI Speech Recognition in Advanced mode for supported locales, including `sv-SE`, and falls back to the platform engine when the model is unavailable, downloading, or refused while off screen. Any capture through `Ears` pauses transcription; nothing resumes it automatically. Each final segment is appended to the transcript's verbatim original in its own transaction. Device behaviour (start sounds between sessions, screen-off continuity, Swedish accuracy, battery) is a Pixel check. [Second-brain guide](second-brain.md).

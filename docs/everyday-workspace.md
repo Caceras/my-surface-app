@@ -8,7 +8,7 @@ Open **Library → Capture a thought**, use **Capture note** from the launcher, 
 
 **AI → Save** turns the composer draft into a note without running a model. Each completed answer also has Save, with the question recorded as provenance. Share plain text into the app, then choose Save or Send. Nothing is sent merely because it was shared.
 
-Library supports word search, type filters, pinning, Trash, restore and permanent deletion. Search uses local full-text indexing; it is not semantic/vector search. Lists show up to 200 results: narrow the search for older records. Notes are not subject to the recent-conversation retention limit. Export before uninstalling; local storage does not survive uninstall.
+Library supports word search, type filters, pinning, Trash, restore and permanent deletion. Search uses local full-text indexing; it is not semantic/vector search. **Transcribe** creates time-stamped transcript notes with a protected verbatim original; **Polish** cleans a copy for review. See the [second-brain guide](second-brain.md). Lists show up to 200 results: narrow the search for older records. Notes are not subject to the recent-conversation retention limit. Export before uninstalling; local storage does not survive uninstall.
 
 ## Build your knowledge
 
@@ -20,7 +20,7 @@ This first table implementation does not provide spreadsheet formulas, arbitrary
 
 ## AI with sources
 
-Open a saved item and tap AI, or choose **AI Settings → AI sources**. Select up to five live records. The next request includes bounded excerpts, asks the model to treat them as reference data, and requests numbered source citations. You can inspect the selected records in Library. Citations are model-generated and must be checked; they are not a guarantee of factual grounding. Long sources are excerpted. There is no automatic scan of your whole phone or Library.
+Open a saved item and tap AI, or choose **AI Settings → AI sources**. Select up to five live records. The next request includes bounded excerpts, asks the model to treat them as reference data, and requests numbered source citations. You can inspect the selected records in Library. Citations are model-generated and must be checked; they are not a guarantee of factual grounding. Long sources are excerpted. In addition, recall adds a few Library excerpts that match the words of your question (on-device by default; connected providers need a separate opt-in). There is no automatic scan of your phone or other apps.
 
 Typing and dictation use the same editable AI composer. New clears its selected sources. Existing hands-free Voice shares conversation history and selected source context, uses Nano, and retains its explicit foreground/Keep talking behavior. Connected AI applies to the typed/dictated AI composer; it does not silently change hands-free Voice or selection presets.
 

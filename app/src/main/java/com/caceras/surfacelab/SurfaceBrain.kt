@@ -80,7 +80,10 @@ enum class Task(val alias: String) {
     // here plus one manifest alias.
     SUMMARIZE("Summarize"),
     PROOFREAD("Proofread"),
-    REWRITE("Rewrite");
+    REWRITE("Rewrite"),
+
+    /** Readable text from dictation or a transcript; the caller keeps the verbatim original. */
+    POLISH("Polish");
 
     companion object {
         fun fromComponent(className: String?): Task {
