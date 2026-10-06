@@ -15,8 +15,9 @@ Every entry opens a foreground activity. The widget and tile do not run model in
 | Text selection | Flavor aliases → `ProcessTextActivity` | Nano offers Ask/Summarise/Proofread/Make professional/Polish dictation; core offers Uppercase |
 | Transcribe | `TranscribeActivity` + `TranscriptionService` (microphone foreground service) | Started only from visible UI (Today, Notes, launcher shortcut, Quick Settings *Transcribe* tile via the visible screen); persistent notification with Pause and Stop & save |
 | Live voice | `LiveActivity` (Nano) | AI page → Talk live with Gemini; foreground only, ends on leaving the screen |
+| Audio share target | `AudioShareActivity`, SEND `audio/*` | Copies one shared audio file (≤300 MB, Gemini-supported formats) into a private recording note and opens it; uploads nothing |
 
-Text-selection actions depend on the source app supporting Android's process-text contract. Editable preset results may replace the selection when appropriate; Ask results remain available for review. Ægentica AI receives the selected text, not the entire source app or page. Plain text is the only share MIME type currently registered.
+Text-selection actions depend on the source app supporting Android's process-text contract. Editable preset results may replace the selection when appropriate; Ask results remain available for review. Ægentica AI receives the selected text, not the entire source app or page. Shared plain text goes to the AI draft; shared audio becomes a recording note. No other share types are registered.
 
 ## Add an entry
 

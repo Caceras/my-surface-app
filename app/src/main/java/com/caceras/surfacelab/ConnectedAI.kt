@@ -47,7 +47,9 @@ object ConnectedAI {
     const val GEMINI_MODEL="gemini-3.8-flash"
     fun gemini(endpoint:String)=runCatching { URL(endpoint).host=="generativelanguage.googleapis.com" }.getOrDefault(false)
     /** The saved key, only when the configured provider is Google's Gemini API (Live uses the same key). */
-    fun geminiKey(context:Context):String? = if(configured(context) && gemini(prefs(context).getString("endpoint","").orEmpty())) runCatching { secret(context) }.getOrNull() else null
+    /** Test-only stand-in for the Keystore-held key. */
+    @Volatile var geminiKeyForTest:String?=null
+    fun geminiKey(context:Context):String? = geminiKeyForTest ?: if(configured(context) && gemini(prefs(context).getString("endpoint","").orEmpty())) runCatching { secret(context) }.getOrNull() else null
     fun geminiConfigured(context:Context)=configured(context) && gemini(prefs(context).getString("endpoint","").orEmpty())
     /** Matching Library excerpts are sent to the provider only after this separate opt-in. */
     fun recallAllowed(context:Context)=prefs(context).getBoolean("recall",false)

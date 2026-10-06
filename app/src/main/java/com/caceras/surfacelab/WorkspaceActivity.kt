@@ -34,9 +34,13 @@ class WorkspaceActivity : Activity() {
     private lateinit var pageGestures: GestureDetector
     private var polishing: PolishRun?=null
     private var extracting: InsightRun?=null
+    private var audioPlayer: RecordingPlayer?=null
+    /** The current Gemini transcription; cleared to cancel it. */
+    @Volatile private var transcribing:Any?=null
 
     override fun onCreate(state:Bundle?) {
         super.onCreate(state); store=WorkspaceStore(this)
+        if(!TranscriptionService.state.active) runCatching { AudioNotes.recover(this,store) }
         destination=state?.getString("destination") ?: intent.getStringExtra("destination") ?: "today"
         filter=state?.getString("filter").orEmpty(); query=state?.getString("query").orEmpty()
         pageGestures = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
@@ -285,6 +289,20 @@ class WorkspaceActivity : Activity() {
             addView(pill("AI") { if(save(true)) { dialog.dismiss(); askWith(record) } },LinearLayout.LayoutParams(0,-2,1f))
         }
         content.addView(actions,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(12); bottomMargin=dp(12) })
+        val audio=AudioNotes.parts(store,record.id)
+        // The audio row offers the next step: transcribe an untouched recording, then name its speakers.
+        val transcribed=record.body.isNotBlank() || record.original.isNotBlank()
+        val labelled=Speakers.labels(record.body).isNotEmpty()
+        val transcribe={ if(save(true)) transcribeAudio(record) { dialog.dismiss(); store.get(record.id)?.let { edit(it) } } }
+        if(audio.isNotEmpty() && !record.deleted) content.addView(LinearLayout(this).apply {
+            tag="audio-row"
+            addView(pill(AudioNotes.totalMs(audio).let { if(it>0) "Play recording · ${Transcripts.stamp(it)}" else "Play recording" }) { stopDictation?.invoke(); playRecording(record) }.apply { tag="audio-play" },LinearLayout.LayoutParams(0,-2,1f))
+            when {
+                !transcribed -> pill("Transcribe with Gemini",true) { transcribe() }.apply { tag="audio-transcribe" }
+                labelled -> pill("Name speakers",true) { stopDictation?.invoke(); nameSpeakers(input) }.apply { tag="audio-speakers" }
+                else -> null
+            }?.let { addView(it,LinearLayout.LayoutParams(0,-2,1f).apply { marginStart=dp(8) }) }
+        },LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(12) })
         if(record.deleted) {
             content.addView(pill("Restore from Trash",true) { record=store.save(record.copy(deleted=false)); dialog.dismiss(); Reminders.schedule(this,record) })
             content.addView(pill("Delete permanently") {
@@ -293,16 +311,18 @@ class WorkspaceActivity : Activity() {
             })
             title.isEnabled=false; input.isEnabled=false; actions.visibility=View.GONE
         } else {
-            content.addView(tools((if(record.pinned) "Unpin" else "Pin") to { if(save()) { record=store.save(record.copy(pinned=!record.pinned)); close() } },
+            content.addView(tools(*listOfNotNull((if(record.pinned) "Unpin" else "Pin") to { if(save()) { record=store.save(record.copy(pinned=!record.pinned)); close() } },
                 "Link" to { if(save()) chooseLink(record) { dialog.dismiss(); edit(store.get(record.id)!!) } },
                 "Share" to { if(save()) startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,listOf(record.title,record.body).filter(String::isNotBlank).joinToString("\n\n")),"Share note")) },
                 "Polish" to { if(save(true)) polish(record,input) },
                 "Insights" to { if(save(true)) insights(record,input) { dialog.dismiss(); edit(store.get(record.id)!!) } },
+                ("Speakers" to { nameSpeakers(input) }).takeIf { labelled && audio.isEmpty() },
+                ("Transcribe again" to transcribe).takeIf { audio.isNotEmpty() && transcribed },
                 (if(Transcripts.isTranscript(record)) "Verbatim" else "Original") to { showOriginal(record,input) },
                 "Trash" to { if(save()) {
                     record=store.save(record.copy(deleted=true)); Reminders.cancel(this,record.id); dialog.dismiss()
                     AlertDialog.Builder(this).setMessage("Moved to Trash").setNegativeButton("Done",null).setPositiveButton("Undo") { _,_ -> val restored=store.save(record.copy(deleted=false)); Reminders.schedule(this,restored); populate() }.showProtected(this)
-                } }))
+                } }).toTypedArray()))
             if(record.kind in listOf("task","routine")) {
                 content.addView(pill(if(record.due>0) "Reminder · ${date(record.due)}" else "Choose reminder time") {
                     if(save()) chooseTime(record) { next -> record=store.save(next); Reminders.schedule(this,record); dialog.dismiss(); edit(record); askNotificationPermission() }
@@ -369,6 +389,83 @@ class WorkspaceActivity : Activity() {
                         .setNegativeButton("Cancel",null).setPositiveButton("Replace") { _,_ -> input.setText(current.original); input.setSelection(input.length()) }.showProtected(this@WorkspaceActivity)
                 }
             }.showProtected(this)
+    }
+    /** Plays the note's audio parts in order while this screen is open. */
+    private fun playRecording(record:Record) {
+        val files=AudioNotes.parts(store,record.id).map { AudioNotes.file(this,it) }.filter { it.isFile }
+        if(files.isEmpty()) { toast("The audio for this note is no longer on this phone."); return }
+        ReadingService.pauseForCapture()
+        audioPlayer?.release()
+        val status=label("${files.size} part${if(files.size==1) "" else "s"} · saved on this phone",14f,true).apply { padDp(24,8,24,8); tag="audio-status" }
+        val dialog=AlertDialog.Builder(this).setTitle("Recording").setView(status).setNegativeButton("Close",null).setPositiveButton("Play",null).showProtected(this)
+        val player=RecordingPlayer(files) { playing,part -> if(dialog.isShowing) {
+            status.text=(if(playing) "Playing" else "Paused")+if(files.size>1) " · part ${part+1} of ${files.size}" else ""
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).text=if(playing) "Pause" else "Play"
+        } }
+        audioPlayer=player
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { player.toggle() }
+        dialog.setOnDismissListener { player.release(); if(audioPlayer===player) audioPlayer=null }
+    }
+    /**
+     * Uploads the note's audio to Gemini Transcribe after explicit consent. Like
+     * polish, it runs only while this screen is open (kept awake meanwhile);
+     * leaving cancels it and late results are dropped. An empty note receives the
+     * words as its text and verbatim original; otherwise a linked transcript
+     * note is created, so no result overwrites existing words.
+     */
+    private fun transcribeAudio(record:Record,reopen:()->Unit) {
+        val parts=AudioNotes.parts(store,record.id)
+        if(parts.isEmpty()) { toast("No audio is saved for this note."); return }
+        val key=ConnectedAI.geminiKey(this)
+        if(key==null) {
+            AlertDialog.Builder(this).setTitle("Connect Gemini").setMessage("Transcription with speaker labels uses your own Gemini API key. Open Connected AI, tap Use Google Gemini, paste your AI Studio key and save.")
+                .setNegativeButton("Not now",null).setPositiveButton("Connected AI") { _,_ -> ConnectedAI.settings(this) }.showProtected(this)
+            return
+        }
+        val ms=AudioNotes.totalMs(parts)
+        AlertDialog.Builder(this).setTitle(if(ms>0) "Transcribe ${Transcripts.stamp(ms)} with Gemini?" else "Transcribe this recording with Gemini?")
+            .setMessage("The audio is uploaded to Google's Gemini API with your key and transcribed by ${GeminiTranscribe.MODEL} with speaker labels and automatic Swedish/English detection. Ægentica deletes the upload straight afterwards and asks Google not to store the request. Keep this screen open while it runs. ${if(ms>0) "Estimated cost about US$"+GeminiTranscribe.cost(ms)+"." else "Gemini bills about US$0.30 per hour of audio."} The audio stays on this phone.")
+            .setNegativeButton("Cancel",null).setPositiveButton("Transcribe") { _,_ -> runTranscription(record,parts,key,reopen) }.showProtected(this)
+    }
+    private fun runTranscription(record:Record,parts:List<AudioNotes.Part>,key:String,reopen:()->Unit) {
+        val run=Any()
+        transcribing=run
+        val cancelled={ transcribing!==run }
+        val app=applicationContext
+        val progress=AlertDialog.Builder(this).setTitle("Transcribing with Gemini").setMessage("Starting… Keep this screen open; leaving cancels.").setNegativeButton("Cancel") { _,_ -> if(transcribing===run) transcribing=null }
+            .setCancelable(false).showProtected(this)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        Thread {
+            val outcome=runCatching {
+                val text=GeminiTranscribe.transcribe(key,parts.map { AudioNotes.file(app,it) to it },cancelled) { message -> runOnUiThread { if(progress.isShowing) progress.setMessage(message) } }
+                if(cancelled()) throw GeminiTranscribe.Cancelled()
+                WorkspaceStore(app).use { s ->
+                    val current=s.get(record.id) ?: error("The note was deleted.")
+                    if(current.body.isBlank() && current.original.isBlank()) { s.save(current.copy(body=text,original=text)); "Transcribed. Tap Name speakers to add names." }
+                    else {
+                        val copy=s.save(Record(title=(current.title.ifBlank { "Recording" }+" · Gemini transcript").take(200),body=text,original=text,source="Transcript · ${GeminiTranscribe.MODEL} · from ${current.id}"))
+                        s.link(copy.id,current.id,"source"); "Saved as a linked transcript note."
+                    }
+                }
+            }
+            runOnUiThread {
+                if(progress.isShowing) progress.dismiss()
+                if(transcribing===run) transcribing=null
+                if(transcribing==null) window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                if(isDestroyed) return@runOnUiThread
+                outcome.onSuccess { toast(it); reopen() }.onFailure { toast(if(it is GeminiTranscribe.Cancelled) "Transcription cancelled. The audio stays on this phone." else it.message ?: "Gemini could not transcribe this recording.") }
+            }
+        }.start()
+    }
+    /** Replaces "Speaker 1" style labels in the working text; the verbatim original keeps them. */
+    private fun nameSpeakers(input:EditText) {
+        val labels=Speakers.labels(input.text.toString())
+        if(labels.isEmpty()) { toast("No speaker labels here. Transcribe a recording with Gemini first."); return }
+        val layout=column().apply { padDp(20,8,20,8) }
+        layout.addView(label("Changes this text only. The verbatim original keeps the labels.",13f,true).apply { padDp(0,0,0,8) })
+        val fields=labels.associateWith { name -> EditText(this).apply { styleField(); hint="Name for $name"; setSingleLine(); tag="speaker-$name" }.also { layout.addView(label(name,13f,true)); layout.addView(it) } }
+        AlertDialog.Builder(this).setTitle("Name speakers").setView(ScrollView(this).apply { addView(layout) }).setNegativeButton("Cancel",null)
+            .setPositiveButton("Rename") { _,_ -> input.setText(Speakers.rename(input.text.toString(),fields.mapValues { it.value.text.toString() })) }.showProtected(this)
     }
     /** AI suggests title, summary, tasks, people and projects; only checked items are created, linked to this note, and can be undone. */
     private fun insights(record:Record,input:EditText,reopen:()->Unit) {
@@ -587,7 +684,7 @@ class WorkspaceActivity : Activity() {
         if(code==BeeperAccess.SEND_REQUEST) toast("Return to the draft and review Send again.")
     }
     override fun onResume() { super.onResume(); NativePrivacy.apply(this,window); if(loaded && editor==null) populate() }
-    override fun onPause() { flush?.invoke(); stopDictation?.invoke(); polishing?.cancel("Polishing stopped when you left. Your text is unchanged."); extracting?.cancel("Suggestions stopped when you left. Your note is unchanged."); super.onPause() }
+    override fun onPause() { flush?.invoke(); stopDictation?.invoke(); polishing?.cancel("Polishing stopped when you left. Your text is unchanged."); extracting?.cancel("Suggestions stopped when you left. Your note is unchanged."); audioPlayer?.pause(); transcribing=null; super.onPause() }
     override fun onStop() { MarkdownVault.syncSoon(this); super.onStop() }
     override fun onSaveInstanceState(state:Bundle) { flush?.invoke(); state.putString("destination",destination); state.putString("filter",filter); state.putString("query",query); state.putString("editing",editingId); super.onSaveInstanceState(state) }
     override fun onDestroy() { flush?.invoke(); editor?.dismiss(); pendingSearch?.let(handler::removeCallbacks); ears?.cancel(); store.close(); super.onDestroy() }

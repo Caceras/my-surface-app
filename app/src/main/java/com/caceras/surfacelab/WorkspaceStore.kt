@@ -144,8 +144,11 @@ class WorkspaceStore(context: Context) : SQLiteOpenHelper(context.applicationCon
         db.beginTransaction()
         try {
             require(get(id)?.deleted == true) { "Move an item to Trash first." }
+            // Recorded audio is deleted with its note; the list key goes in the same transaction.
+            val audio = AudioNotes.parts(this, id)
             db.delete("records", "id=?", arrayOf(id)); db.delete("search", "id=?", arrayOf(id))
-            db.delete("executions", "record=?", arrayOf(id)); db.setTransactionSuccessful()
+            db.delete("executions", "record=?", arrayOf(id)); db.delete("content", "key=?", arrayOf("audio:$id")); db.setTransactionSuccessful()
+            audio.forEach { AudioNotes.file(app, it).delete() }
         } finally { db.endTransaction() }
     }
     fun properties(collection: String): List<Property> = readableDatabase.rawQuery("SELECT * FROM properties WHERE collection=? ORDER BY name", arrayOf(collection)).use { c -> buildList { while(c.moveToNext()) add(Property(c.getString(0),c.getString(1),c.getString(2),c.getString(3))) } }
@@ -176,7 +179,7 @@ class WorkspaceStore(context: Context) : SQLiteOpenHelper(context.applicationCon
             val result = JSONObject().put("format", "aegentica-workspace-v1")
             for (table in TABLES) {
                 val rows = JSONArray()
-                db.rawQuery(if(table=="content") "SELECT key FROM content" else "SELECT * FROM $table", null).use { c -> while(c.moveToNext()) {
+                db.rawQuery(if(table=="content") "SELECT key FROM content WHERE key NOT LIKE 'audio:%'" else "SELECT * FROM $table", null).use { c -> while(c.moveToNext()) {
                     val item = JSONObject()
                     c.columnNames.forEachIndexed { i, name -> item.put(name, if(c.getType(i) == Cursor.FIELD_TYPE_INTEGER) c.getLong(i) else c.getString(i)) }
                     if(table=="content") item.put("value",value(item.getString("key")))

@@ -6,13 +6,19 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.media.MediaRecorder
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import java.io.File
 
 data class TranscriptionState(
     val active: Boolean = false, val paused: Boolean = false, val record: String = "", val started: Long = 0,
     val startedClock: Long = 0, val partial: String = "", val segments: Int = 0, val message: String = "",
-    val engine: String = "", val language: String = "", val level: Float = 0f
+    val engine: String = "", val language: String = "", val level: Float = 0f,
+    /** Record mode keeps audio parts instead of transcribing live; [segments] then counts parts. */
+    val recording: Boolean = false
 )
 
 /**
@@ -26,6 +32,19 @@ class TranscriptionService : Service() {
     private var engine: SpeechEngine? = null
     private var part = 1
     private var stopping = false
+    private val main = Handler(Looper.getMainLooper())
+    private var recorder: MediaRecorder? = null
+    private var partFile: File? = null
+    private var partActiveMs = 0L
+    private var partResumedAt = 0L
+    private val rollover = Runnable { if (state.active && state.recording && !state.paused) { closePart(); openPart() } }
+    private val meter = object : Runnable {
+        override fun run() {
+            val r = recorder ?: return
+            if (!state.paused) state = state.copy(level = (runCatching { r.maxAmplitude }.getOrDefault(0) / 3276.8f).coerceIn(0f, 10f))
+            if (state.active && state.recording) main.postDelayed(this, 200)
+        }
+    }
 
     override fun onBind(intent: Intent?) = null
     override fun onCreate() { super.onCreate(); active = this }
@@ -35,22 +54,55 @@ class TranscriptionService : Service() {
             PAUSE -> pause("")
             RESUME -> resume()
             STOP -> stop()
-            else -> begin()
+            else -> begin(intent?.getBooleanExtra(RECORD, false) == true)
         }
         // A notification action can arrive after the session ended; never leave an idle started service.
         if (!state.active && !stopping) stopSelf()
         return START_NOT_STICKY
     }
 
-    private fun begin() {
+    private fun begin(record: Boolean) {
         if (state.active) { foreground(); return }
         val language = Ears(this).locale()
-        state = TranscriptionState(active = true, started = System.currentTimeMillis(), startedClock = SystemClock.elapsedRealtime(), language = language.toLanguageTag())
+        state = TranscriptionState(active = true, started = System.currentTimeMillis(), startedClock = SystemClock.elapsedRealtime(), language = language.toLanguageTag(), recording = record)
         if (!foreground()) return
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { end("Microphone permission is needed to transcribe."); return }
         ReadingService.pauseForCapture()
         part = 1
-        listen()
+        if (record) beginRecording() else listen()
+    }
+
+    /** Record mode: the audio itself is the original; Gemini can transcribe it later with speaker labels. */
+    private fun beginRecording() {
+        val note = WorkspaceStore(this).use { it.save(Record(title = "Recording · " + java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT).format(java.util.Date(state.started)),
+            source = AudioNotes.SOURCE, created = state.started)) }
+        state = state.copy(record = note.id, engine = "Audio recording on this phone")
+        if (!openPart()) return
+        publish(); main.post(meter)
+    }
+
+    private fun openPart(): Boolean {
+        val file = File(AudioNotes.dir(this), "${state.record}-${state.segments + 1}.${AudioNotes.EXTENSION}")
+        val next = try { AudioNotes.recorder(this, file).also { it.prepare(); it.start() } } catch (_: Exception) {
+            file.delete(); end("The microphone could not record. Close other recording apps and try again."); return false
+        }
+        recorder = next; partFile = file; partActiveMs = 0; partResumedAt = SystemClock.elapsedRealtime()
+        main.removeCallbacks(rollover); main.postDelayed(rollover, AudioNotes.PART_MS)
+        state = state.copy(segments = state.segments + 1, message = "")
+        return true
+    }
+
+    /** Finalises the current part; an empty or failed part is discarded rather than listed. */
+    private fun closePart() {
+        main.removeCallbacks(rollover)
+        val r = recorder ?: return
+        recorder = null
+        val ms = partActiveMs + if (!state.paused) SystemClock.elapsedRealtime() - partResumedAt else 0
+        val ok = runCatching { r.stop() }.isSuccess
+        r.release()
+        val file = partFile ?: return
+        partFile = null
+        if (ok && file.length() > 0) WorkspaceStore(this).use { AudioNotes.add(it, state.record, AudioNotes.Part(file.name, ms)) } else file.delete()
     }
 
     /** Required within seconds of startForegroundService; failure must not leave a hidden capture behind. */
@@ -94,6 +146,14 @@ class TranscriptionService : Service() {
 
     private fun pause(message: String) {
         if (!state.active || state.paused) return
+        if (state.recording) {
+            main.removeCallbacks(rollover)
+            partActiveMs += SystemClock.elapsedRealtime() - partResumedAt
+            state = state.copy(paused = true, message = message, level = 0f)
+            // Paused must mean the microphone is off: a recorder that cannot pause is stopped and resumes as a new part.
+            if (runCatching { recorder?.pause() }.isFailure) closePart()
+            publish(); return
+        }
         val current = engine
         state = state.copy(paused = true, message = message); publish()
         current?.finish { if (engine === current) engine = null; state = state.copy(partial = ""); publish() }
@@ -103,6 +163,13 @@ class TranscriptionService : Service() {
         if (!state.active || !state.paused || stopping) return
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { end("Microphone permission is needed to transcribe."); return }
         ReadingService.pauseForCapture()
+        if (state.recording) {
+            val resumed = recorder?.let { r -> runCatching { r.resume() }.isSuccess } ?: false
+            state = state.copy(paused = false, message = "")
+            if (resumed) { partResumedAt = SystemClock.elapsedRealtime(); main.postDelayed(rollover, (AudioNotes.PART_MS - partActiveMs).coerceAtLeast(1000)) }
+            else { closePart(); if (!openPart()) return }
+            publish(); main.removeCallbacks(meter); main.post(meter); return
+        }
         engine?.cancel(); engine = null
         listen()
     }
@@ -111,6 +178,7 @@ class TranscriptionService : Service() {
         if (stopping) return
         if (!state.active) { stopSelf(); return }
         stopping = true
+        if (state.recording) { closePart(); end(""); return }
         val current = engine
         if (current == null) { end(""); return }
         current.finish { end("") }
@@ -118,7 +186,17 @@ class TranscriptionService : Service() {
 
     private fun end(message: String) {
         engine?.cancel(); engine = null
-        state = TranscriptionState(record = state.record, segments = state.segments, message = message, language = state.language)
+        main.removeCallbacks(meter)
+        if (state.recording) {
+            closePart()
+            // A recording that captured nothing leaves no empty note behind.
+            WorkspaceStore(this).use { store ->
+                if (state.record.isNotBlank() && AudioNotes.parts(store, state.record).isEmpty()) store.get(state.record)?.let { r ->
+                    if (r.body.isBlank()) { store.save(r.copy(deleted = true)); store.purge(r.id); state = state.copy(record = "") }
+                }
+            }
+        }
+        state = TranscriptionState(record = state.record, segments = state.segments, message = message, language = state.language, recording = state.recording)
         stopping = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         getSystemService(NotificationManager::class.java).cancel(ID)
@@ -138,8 +216,8 @@ class TranscriptionService : Service() {
         val paused = state.paused
         // Generic text only: transcripts never appear on the lock screen.
         return Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_surface)
-            .setContentTitle(if (paused) "Transcription paused" else "Transcribing on this phone")
-            .setContentText(if (paused) "Tap Resume to continue or Stop to save" else "Verbatim lines save as you speak")
+            .setContentTitle(if (paused) (if (state.recording) "Recording paused" else "Transcription paused") else if (state.recording) "Recording audio on this phone" else "Transcribing on this phone")
+            .setContentText(if (paused) "Tap Resume to continue or Stop to save" else if (state.recording) "Audio saves on this phone as you record" else "Verbatim lines save as you speak")
             .setContentIntent(open).setVisibility(Notification.VISIBILITY_PRIVATE).setOnlyAlertOnce(true).setOngoing(true)
             .setWhen(state.started).setShowWhen(true).setUsesChronometer(!paused)
             .setCategory(Notification.CATEGORY_SERVICE)
@@ -150,6 +228,8 @@ class TranscriptionService : Service() {
 
     override fun onDestroy() {
         engine?.cancel(); engine = null
+        main.removeCallbacks(meter); main.removeCallbacks(rollover)
+        if (state.active && state.recording) closePart()
         if (state.active) state = TranscriptionState(record = state.record, segments = state.segments, message = "Transcription stopped. Saved lines are in Notes.", language = state.language)
         if (active === this) active = null
         super.onDestroy()
@@ -161,11 +241,12 @@ class TranscriptionService : Service() {
         const val PAUSE = "com.caceras.surfacelab.TRANSCRIBE_PAUSE"
         const val RESUME = "com.caceras.surfacelab.TRANSCRIBE_RESUME"
         const val STOP = "com.caceras.surfacelab.TRANSCRIBE_STOP"
+        const val RECORD = "record"
         private var active: TranscriptionService? = null
         @Volatile var state = TranscriptionState(); private set
 
         /** Call only from a visible screen after microphone permission is granted. */
-        fun start(context: Context) { context.startForegroundService(Intent(context, TranscriptionService::class.java)) }
+        fun start(context: Context, record: Boolean = false) { context.startForegroundService(Intent(context, TranscriptionService::class.java).putExtra(RECORD, record)) }
         fun command(context: Context, action: String) { if (active != null) context.startService(Intent(context, TranscriptionService::class.java).setAction(action)) }
         /** Another capture in this app needs the microphone: pause, never resume by itself. */
         fun yieldMicrophone() { active?.pause("Paused while you dictate elsewhere. Tap Resume to continue.") }
