@@ -17,3 +17,7 @@ The owner asked for one native app that is "a transcription and note-taking app 
 ## Acceptance
 
 Local pinned toolchain (JDK 21, Gradle 9.7.1, SDK 36): `python tools/check.py`, then `gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug` — 197 tests, 0 failures, lint 0 errors in both flavors, both APKs built. CI evidence, published build and visual review are recorded in the PR. Physical Pixel checks are listed in [testing](../testing.md#transcription-acceptance); they remain open. New lint warnings are in existing tracked categories (translation strings, AndroidX suggestions).
+
+## Second batch: live voice, insights, diff, tile
+
+Build 176 shipped the first batch (PR #16, publication verified: unique and rolling Nano assets byte-identical, SHA-256 `6c1229…`, package/version 176). The owner asked for more depth. Added: Gemini Live voice with read-only note tools and resumption (Nano; OkHttp 5.4.0 because 5.5.0 requires compileSdk 37), reviewed Insights with provenance and undo, a verbatim word diff, and a Transcribe Quick Settings tile. Fixed release notes to use absolute links (the release body embeds this file). Local gate: 206 tests, 0 lint errors in both flavors, both APKs. Signing secrets remain unprovisioned: creating them from the agent session was blocked by the environment's secret-store policy and is left as an owner decision.

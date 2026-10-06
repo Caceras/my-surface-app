@@ -122,11 +122,13 @@ class TranscriptionService : Service() {
         stopping = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         getSystemService(NotificationManager::class.java).cancel(ID)
+        TranscribeTileService.refresh(this)
         stopSelf()
     }
 
     private fun publish(notify: Boolean = true) {
         if (notify && state.active) getSystemService(NotificationManager::class.java).notify(ID, notification())
+        if (notify) TranscribeTileService.refresh(this)
     }
 
     private fun notification(): Notification {

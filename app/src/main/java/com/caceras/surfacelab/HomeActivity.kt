@@ -196,6 +196,9 @@ class HomeActivity : Activity() {
     }
 
     private fun fillAi(parent:LinearLayout) {
+        if(Live.available()) parent.addView(actionRow("Talk live with Gemini") { startActivity(LiveActivity.intent(this, start = true)) }.apply {
+            tag="home-live"; contentDescription="Start a real-time voice conversation with Gemini about your notes"
+        },LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(16); bottomMargin=dp(4) })
         val turns=Chat.load(this)
         if(turns.isEmpty()) {
             muted(parent,"Your conversation lives here. The same AI bar stays available on every page.")

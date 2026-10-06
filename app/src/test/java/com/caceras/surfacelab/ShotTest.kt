@@ -497,4 +497,61 @@ class ShotTest {
         shoot("transcribe-ready-night",activity.get().window.decorView,shotWidth=1080,shotHeight=2400)
         activity.pause().stop().destroy()
     }
+
+    @Test fun `live conversation with note sources`() {
+        val app=RuntimeEnvironment.getApplication()
+        org.robolectric.Shadows.shadowOf(app).grantPermissions(android.Manifest.permission.RECORD_AUDIO)
+        app.getSharedPreferences("surfacelab",0).edit().putBoolean("live_consent",true).commit()
+        WorkspaceStore(app).use { Transcripts.append(it,null,1_790_000_000_000,1,4_000,"vi bestämde att lansera onboarding på fredag med tre exempel","sv-SE") }
+        var listener: LiveTransportListener?=null
+        Live.keyForTest="test"; Live.transportForTest={ _,l -> listener=l; object:LiveTransport { override fun send(text:String)=true; override fun close() {} } }
+        Live.audioForTest=object:LiveAudio { override fun start(onChunk:(ByteArray)->Unit,onLevel:(Float)->Unit)=true; override fun play(pcm:ByteArray) {}; override fun flush() {}; override fun stop() {} }
+        try {
+            val activity=Robolectric.buildActivity(LiveActivity::class.java,LiveActivity.intent(app,start=true)).setup()
+            fun server(json:String) { listener!!.message(json); org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle() }
+            listener!!.opened(); server("""{"setupComplete":{}}""")
+            server("""{"serverContent":{"inputTranscription":{"text":"Vad bestämde vi om onboardingen?"}}}""")
+            server("""{"toolCall":{"functionCalls":[{"id":"1","name":"search_notes","args":{"query":"onboarding"}}]}}""")
+            server("""{"serverContent":{"outputTranscription":{"text":"Ni bestämde att lansera på fredag med tre exempel, enligt ditt transkript."},"turnComplete":true}}""")
+            server("""{"serverContent":{"interimInputTranscription":{"text":"Och vem skulle"}}}""")
+            shoot("live-conversation",activity.get().window.decorView)
+            activity.pause().stop().destroy()
+        } finally { Live.keyForTest=null; Live.transportForTest=null; Live.audioForTest=null }
+    }
+
+    @Test fun `insights review before anything is added`() {
+        val app=RuntimeEnvironment.getApplication()
+        val id=WorkspaceStore(app).use { store -> store.save(Record(kind="person",title="Lina")); Transcripts.append(store,null,1_790_000_000_000,1,2_000,"okej så Lina ska få utkastet innan fredag och vi visar tre exempel i Ægentica onboardingen","sv-SE").id }
+        Brains.useForTest(object:SurfaceBrain {
+            override val tasks=listOf(Task.ASK)
+            override fun status(context:android.content.Context,onStatus:(BrainStatus)->Unit)=onStatus(BrainStatus("Test",true))
+            override fun prepare(context:android.content.Context,onStatus:(BrainStatus)->Unit)=status(context,onStatus)
+            override fun run(context:android.content.Context,task:Task,input:String,instruction:String,onPartial:(String)->Unit,onResult:(BrainResult)->Unit) =
+                onResult(BrainResult("{\"title\":\"Onboarding med tre exempel\",\"summary\":[\"Tre exempel visas i onboardingen\"],\"tasks\":[\"Skicka utkastet till Lina före fredag\"],\"people\":[\"Lina\"],\"projects\":[\"Ægentica onboarding\"]}",true))
+        })
+        try {
+            val activity=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(app,"library",id)).setup()
+            fun children(v:View):List<View> = listOf(v)+if(v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
+            children(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView).filterIsInstance<android.widget.TextView>().first { it.text=="Insights" }.performClick()
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            shoot("insights-review",org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView,minPainted=0.3)
+            activity.pause().stop().destroy()
+        } finally { Brains.useForTest(null) }
+    }
+
+    @Test fun `verbatim changes after polish`() {
+        val app=RuntimeEnvironment.getApplication()
+        val id=WorkspaceStore(app).use { store ->
+            val r=Transcripts.append(store,null,1_790_000_000_000,1,3_000,"eh så vi ses på fredag och eh tar med de tre exemplen","sv-SE")
+            store.save(r.copy(body="Vi ses på fredag och tar med de tre exemplen."),r.revision).id
+        }
+        val activity=Robolectric.buildActivity(WorkspaceActivity::class.java,WorkspaceActivity.intent(app,"library",id)).setup()
+        fun children(v:View):List<View> = listOf(v)+if(v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
+        children(org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView).filterIsInstance<android.widget.TextView>().first { it.text=="Verbatim" }.performClick()
+        val dialog=org.robolectric.shadows.ShadowDialog.getLatestDialog()
+        children(dialog.window!!.decorView).filterIsInstance<android.widget.TextView>().first { it.tag=="original-compare" }.performClick()
+        assertTrue(children(dialog.window!!.decorView).filterIsInstance<android.widget.TextView>().any { it.tag=="original-text" && it.text is android.text.Spanned })
+        shoot("verbatim-changes",dialog.window!!.decorView,minPainted=0.3)
+        activity.pause().stop().destroy()
+    }
 }
