@@ -33,6 +33,8 @@ android {
             dimension = "brain"
             applicationIdSuffix = ".nano"
             versionNameSuffix = "-nano"
+            // Pixel 10 is 64-bit ARM; LiveKit's WebRTC would otherwise add four ABIs.
+            ndk { abiFilters += "arm64-v8a" }
         }
     }
 
@@ -96,6 +98,11 @@ dependencies {
     // see the LiveTransport seam. 5.5.0 requires compileSdk 37; move with the
     // deliberate SDK 37 upgrade.
     "nanoImplementation"("com.squareup.okhttp3:okhttp:5.4.0")
+
+    // Nano-only real-time voice rooms (WebRTC) for the owner's LiveKit agent:
+    // microphone, the agent's voice, live transcripts, screen share and
+    // phone-side tools over RPC. No Compose; main/core only see the AgentRoom seam.
+    "nanoImplementation"("io.livekit:livekit-android:2.29.1")
 
     // Test-only, so nothing here reaches an APK and the zero-dependency
     // invariant is untouched. Robolectric runs the activities on the JVM,

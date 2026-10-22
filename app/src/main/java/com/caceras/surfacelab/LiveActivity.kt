@@ -36,6 +36,7 @@ class LiveActivity : Activity() {
     private var session: LiveSession? = null
     private var saved: Record? = null
     private var focus: AudioFocusRequest? = null
+    private var screenNote: String? = null
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -68,7 +69,7 @@ class LiveActivity : Activity() {
 
     private fun intro() = when {
         !Live.available() -> "Live voice needs the Nano build of Ægentica."
-        !ConnectedAI.geminiConfigured(this) && Live.keyForTest == null -> "Connect Gemini first: Settings → Connected AI → Use Google Gemini."
+        !ConnectedAI.geminiConfigured(this) && Live.keyForTest == null -> "Connect Gemini first: Settings → Connected AI → Gemini."
         else -> "Talk naturally and interrupt any time. Gemini can search your notes (read-only). Leaving this screen ends the conversation; it is saved to Notes."
     }
 
@@ -85,13 +86,13 @@ class LiveActivity : Activity() {
         if (!Live.available()) { status.text = intro(); return }
         val key = Live.keyForTest ?: ConnectedAI.geminiKey(this)
         if (key == null) {
-            AlertDialog.Builder(this).setTitle("Connect Gemini").setMessage("Live voice uses your own Gemini API key. Open Connected AI, tap Use Google Gemini, paste your AI Studio key and save.")
+            AlertDialog.Builder(this).setTitle("Connect Gemini").setMessage("Live voice uses your own Gemini API key. Open Connected AI, tap Gemini, paste your AI Studio key and save. Chat can use another provider afterwards; the Gemini key stays saved.")
                 .setNegativeButton("Not now", null).setPositiveButton("Connected AI") { _, _ -> ConnectedAI.settings(this) { status.text = intro() } }.showProtected(this)
             return
         }
         if (!prefs().getBoolean("live_consent", false)) {
             AlertDialog.Builder(this).setTitle("Talk live with Gemini?")
-                .setMessage("While this screen is open, your microphone audio streams to Google's Gemini Live API using your key. When Gemini searches your notes, the matching titles and excerpts are sent too. Google bills roughly US$0.005 per minute you speak and US$0.018 per minute Gemini speaks (October 2026 prices). Set a spending limit in AI Studio. The conversation is saved as a note on this phone when it ends.")
+                .setMessage("While this screen is open, your microphone audio streams to Google's Gemini Live API using your key. When Gemini searches your notes, the matching titles and excerpts are sent too, and when you talk about a screen from the assistant, its text and screenshot. Google bills roughly US$0.005 per minute you speak and US$0.018 per minute Gemini speaks (October 2026 prices). Set a spending limit in AI Studio. The conversation is saved as a note on this phone when it ends.")
                 .setNegativeButton("Cancel", null).setPositiveButton("Start") { _, _ -> prefs().edit().putBoolean("live_consent", true).apply(); begin() }.showProtected(this)
             return
         }
@@ -100,11 +101,13 @@ class LiveActivity : Activity() {
         TranscriptionService.yieldMicrophone()
         saved = null; text.text = ""; sources.visibility = View.GONE
         requestFocus()
+        val screen = Live.pendingScreen.also { Live.pendingScreen = null }
         val live = LiveSession(this, key, Live.audioForTest ?: LiveAudioDevice(), object : LiveSession.Listener {
             override fun state(state: LiveSession.State, detail: String) { show(state, detail) }
             override fun transcript(lines: List<LiveLine>, current: String) { render(lines, current) }
             override fun level(rms: Float) { primary.speechLevel(rms) }
-        })
+        }, screen = screen)
+        screenNote = if (screen != null) "Talking about the screen you were on" + if (screen.screenshot != null) " (screenshot sent)" else "" else null
         live.holdMicWhileSpeaking = prefs().getBoolean("live_hold_mic", false)
         session = live
         live.start()
@@ -127,8 +130,8 @@ class LiveActivity : Activity() {
         holdHint.visibility = hold.visibility
         if (active) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val used = session?.consulted.orEmpty()
-        sources.text = "Notes used: " + used.joinToString(" · ")
-        sources.visibility = if (used.isEmpty()) View.GONE else View.VISIBLE
+        sources.text = listOfNotNull(screenNote, used.takeIf { it.isNotEmpty() }?.let { "Notes used: " + it.joinToString(" · ") }).joinToString("\n")
+        sources.visibility = if (sources.text.isEmpty()) View.GONE else View.VISIBLE
         if (state == LiveSession.State.ENDED) { primary.speechLevel(0f); finishSession(detail) }
     }
 

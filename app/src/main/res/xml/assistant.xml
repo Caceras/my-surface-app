@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Ægentica as the digital assistant app. The recognition service is
+    required by the declaration but unused since Android 12. When the target
+    moves to SDK 37, add usesAssistData, usesAssistScreenshots and
+    usesAssistStructureScreenContent here and request
+    READ_ASSIST_STRUCTURE_SCREEN_CONTENT, or Android stops sharing the screen.
+-->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="com.caceras.surfacelab.AssistantSessionService"
+    android:recognitionService="com.caceras.surfacelab.AssistantRecognitionService"
+    android:supportsAssist="true" />

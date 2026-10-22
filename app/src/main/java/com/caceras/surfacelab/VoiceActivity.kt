@@ -234,6 +234,12 @@ class VoiceActivity : Activity() {
         return card
     }
 
+    /** Whichever model is answering stops: Nano, or the connected provider when it handles voice. */
+    private fun stopModels() {
+        Brains.get().cancel()
+        ConnectedAI.brain.cancel()
+    }
+
     private fun stopForSetup() {
         main.removeCallbacks(nextListen)
         continuousSwitch.isChecked = false
@@ -241,7 +247,7 @@ class VoiceActivity : Activity() {
         streamed.cancel()
         requestId++
         if (generating) {
-            Brains.get().cancel()
+            stopModels()
             if (Chat.draft(this).isBlank()) Chat.saveDraft(this, lastQuestion)
         }
         generating = false
@@ -454,7 +460,7 @@ class VoiceActivity : Activity() {
         action.setOnClickListener {
             streamed.cancel()
             requestId++
-            Brains.get().cancel()
+            stopModels()
             if (Chat.draft(this).isBlank()) Chat.saveDraft(this, lastQuestion)
             generating = false
             continuousSwitch.isChecked = false
@@ -478,11 +484,13 @@ class VoiceActivity : Activity() {
         }
         voice.begin(ears.locale())
 
-        Brains.get().run(
+        // Nano on the phone unless the owner chose the connected model for voice too.
+        val brain = ConnectedAI.assistantBrain(this)
+        brain.run(
             context = this,
             task = Task.ASK,
             input = "",
-            instruction = KnowledgeContext.prompt(this, Prompts.conversation(Chat.load(this), spoken), spoken, remote = false),
+            instruction = KnowledgeContext.prompt(this, Prompts.conversation(Chat.load(this), spoken), spoken, remote = brain === ConnectedAI.brain),
             onPartial = { partial ->
                 if (!gone && resumed && token == requestId && !Prompts.isEcho(partial, Task.ASK)) {
                     streamed.offer(Prompts.reply(partial))
@@ -637,7 +645,7 @@ class VoiceActivity : Activity() {
         streamed.cancel()
         requestId++
         if (generating) {
-            Brains.get().cancel()
+            stopModels()
             if (Chat.draft(this).isBlank()) Chat.saveDraft(this, lastQuestion)
             answer.text = getString(R.string.response_stopped)
         }

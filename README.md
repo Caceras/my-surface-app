@@ -15,6 +15,7 @@ A native Kotlin Android workspace for **Today · AI · Library**, now **transcri
 
 - **Transcribe verbatim.** One tap (or the Quick Settings tile) starts on-device, time-stamped transcription that keeps going with the screen locked; the original stays untouched while **Polish** cleans a copy and **Show changes** marks every edited word.
 - **Keep the audio, get the speakers.** *Record audio* keeps the recording itself on the phone; **Transcribe with Gemini** returns time-stamped lines per speaker (Swedish/English detected automatically) and **Name speakers** puts real names on them. Share audio files in from Recorder or messages.
+- **Your phone's assistant.** Choose Ægentica as the digital assistant and ask about any screen from a glass bar over the app; answers come from Gemini Nano on the phone, any **OpenRouter** model or a **local model** on your Mac. **Agent voice** adds a real-time LiveKit agent that can see a screen you share and suggests actions you confirm.
 - **Talk to your notes.** Real-time voice with Gemini Live that can search and read your notes (read-only) and saves the conversation verbatim. **Insights** proposes people, projects, tasks and a summary for you to approve, linked back to the source.
 - **Capture and remember.** Autosaved notes, originals, full-text search, pinning, Trash/undo and whole-workspace backups. Questions recall matching notes with citations; an optional Markdown vault mirrors everything for Obsidian or Git.
 - **Connect ideas.** People, projects, linked tasks and collections with typed fields and a table view over the same records.
@@ -97,6 +98,8 @@ APKs appear under `app/build/outputs/apk/{core,nano}/debug/`. Native screenshots
 | Guide | Covers |
 |---|---|
 | [Second brain](docs/second-brain.md) | Transcribe, verbatim originals, Polish, recall, Gemini preset, Markdown vault, limits and roadmap |
+| [Agent voice](docs/agent.md) | Your own LiveKit agent: costs, setup, privacy and what is verified |
+| [Research: assistant, Oct 2026](docs/research/2026-10-assistant.md) | Android assistant role, OpenRouter, LiveKit and local-model findings with sources |
 | [Research, Oct 2026](docs/research/2026-10-second-brain.md) | Latest Android, Gemini Nano, Gemini API, knowledge-store, cost and legal findings |
 | [Test/process audit](docs/audits/iteration-efficiency.md) | Test necessity, measured CI costs, request-to-install gaps and fixes |
 | [Everyday guide](docs/everyday-workspace.md) | Notes, tables, sources, playback, calendar, Beeper, connected routines and backups |

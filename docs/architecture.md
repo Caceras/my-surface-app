@@ -30,6 +30,9 @@
 | `LiveVoice.kt`, `LiveAudioDevice.kt`, `LiveActivity.kt`; `core|nano/…/LiveTransports.kt` | Gemini Live protocol/session and read-only note tools; framework audio; foreground screen; WebSocket seam (none in core, OkHttp in Nano) |
 | `Insights.kt`, `TextDiff.kt` | Reviewed AI entity/task extraction with provenance and undo; verbatim-versus-text word diff |
 | `TranscribeTileService.kt` | Quick Settings entry for Transcribe |
+| `ConnectedAI.kt` | Providers (Gemini, OpenRouter, local), per-host Keystore keys, streaming client, image input, model list and settings |
+| `AssistantService.kt`, `AssistantSessionService.kt`, `AssistantRecognitionService.kt`, `AssistantActivity.kt`, `ScreenContext.kt` | Digital-assistant role, per-invocation session that hands screen text and screenshot to the assistant ask-bar panel, in-memory screen context |
+| `AgentVoice.kt`, `AgentService.kt`, `AgentActivity.kt`; `core|nano/…/AgentRoomFactory.kt` | LiveKit agent conversation, token tickets, phone tools and proposals; microphone foreground service; screen; WebRTC seam (none in core, LiveKit in Nano) |
 | `AudioNotes.kt`, `RecordingPlayer.kt`, `GeminiTranscribe.kt`, `AudioShareActivity.kt` | Recorded audio parts per note (ADTS, recovery, deletion) and speaker renaming; sequential playback; Files API + Interactions transcription; audio share target |
 | `MarkdownVault.kt` | One-way Obsidian-compatible Markdown export to a user-chosen folder |
 | `ResultStore.kt` | Last successful result used by the widget |
@@ -107,3 +110,10 @@ All remain framework-only in main/core. Existing ML Kit stays in Nano; no Room, 
 ## Transcription and second-brain boundaries
 
 Transcripts are ordinary notes whose source begins with `Transcript`. `WorkspaceStore.appendVerbatim` is the only path that grows an original after creation, and it is used only by an active capture; `save()` still preserves an existing original. `TranscriptionService` publishes an in-process snapshot polled by `TranscribeActivity`, finishes the in-flight words on Stop, and is `START_NOT_STICKY`. ML Kit speech is confined to the Nano source set; main/core remain framework-only. Recall (`WorkspaceStore.recall`) uses FTS4 OR-prefix queries over lowercase letter/digit terms. `MarkdownVault` writes through `DocumentsContract`, records file names and content hashes per record, and only rewrites or deletes files it wrote. *Record audio* runs in the same service with `MediaRecorder` instead of a speech engine: parts are listed under the content key `audio:<note id>` when they close, rolled over every 25 minutes, paused with the recorder (a recorder that cannot pause is stopped, so a pause always releases the microphone), and listed again by `AudioNotes.recover` after process death. Audio keys are left out of workspace backups. Details: [second brain](second-brain.md).
+
+## Assistant and agent boundaries
+
+`AssistantSession` draws no window; it starts `AssistantActivity` above the current app with `startAssistantActivity` and fills `ScreenContexts` as `onHandleAssist` and `onHandleScreenshot` arrive. The panel cancels generation, dictation and speech in `onPause`, and clears the screen context in `onDestroy`.
+
+LiveKit lives only in the Nano source set (`AgentRoomFactory`), behind the framework-only `AgentRoom` and `AgentRoomListener` seam. Main code holds the conversation, the tools and the UI, and is tested with a fake room. `AgentService` owns the conversation so it survives leaving the screen; it is started only from the visible Agent voice screen, is `START_NOT_STICKY`, and shows a notification with *Stop & save* throughout. Nano ships arm64 only and removes LiveKit's camera permission. JitPack is limited to LiveKit's audio-routing group.
+

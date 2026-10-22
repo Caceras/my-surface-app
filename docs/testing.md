@@ -81,7 +81,7 @@ Both APKs also pass Android `apksigner verify`; certificate fingerprints are ret
 
 ## Narrow lint exceptions
 
-Two source-local exceptions are documented beside the code: the Intent tile overload is used only under an explicit runtime API < 34 check because the PendingIntent overload does not exist there; `PresenceView` deliberately extends the framework ImageView and applies its own tint despite Nano's transitive AppCompat dependency. Neither exception disables lint globally. Other errors/fatals still block the release.
+Three source-local exceptions are documented beside the code: the Intent tile overload is used only under an explicit runtime API < 34 check because the PendingIntent overload does not exist there; `PresenceView` deliberately extends the framework ImageView and applies its own tint despite Nano's transitive AppCompat dependency; the Nano manifest's `tools:node="remove"` marker for LiveKit's camera permission is read by lint as a camera permission (`PermissionImpliesUnsupportedChromeOsHardware`), so that one element carries a local ignore. None of these exceptions disables lint globally. Other errors/fatals still block the release.
 
 Screenshot capture drains immediate dialog layout work, remeasures the frame and verifies shared-header close controls before drawing. This catches missing or clipped exits that a painted-pixel threshold alone cannot detect.
 
@@ -110,6 +110,47 @@ On Pixel: export first; install and verify version; create/dictate/edit a note; 
 `TranscriptionTest` covers verbatim append and part rollover, continuous platform recognition with restart after each pause, normal silence versus quick repeated failures, a visible pause after six busy/microphone failures with no hidden retries, resume only on request, yielding to in-app dictation, stop-time flushing of the last partial, polish review that leaves the original untouched, chunk budgets, recall scoping and opt-ins, Markdown rendering, Gemini request shape and shortcut/Add-task routing. `ShotTest` renders `transcribe-live` and `transcribe-ready-night`.
 
 On the Pixel, record: engine label shown (Gemini on-device vs Android), Swedish and English accuracy on the same 5-minute passage, a 30–60 minute session with the screen locked (lines keep arriving; notification Pause/Stop work), behaviour during an incoming call, start sounds between segments, battery drop per hour, Polish quality with Nano, recall on a known phrase, Gemini preset with a real key, and the Markdown vault in a local folder opened by Obsidian. JVM tests cannot establish any of these.
+
+## Assistant, providers and agent acceptance
+
+`ProvidersTest` covers:
+- streaming with OpenRouter keep-alive comments;
+- errors inside a 200 stream, and 402, 403 and 200-with-error bodies;
+- servers that ignore `stream`;
+- per-provider request options (OpenRouter privacy routing and reasoning, Gemini reasoning, local `max_tokens`);
+- images only for models that see them;
+- the Gemini key surviving a switch to OpenRouter (legacy installs included);
+- Tailscale-only plain HTTP;
+- voice using the connected model only after its opt-in;
+- model-list parsing;
+- the settings presets.
+
+`AssistantTest` covers:
+- screen text reading order, with password fields skipped;
+- the screen marked as data with the request last;
+- the panel sending the screenshot only to a model that sees images, and offering explicit follow-ups;
+- the chip leaving the screen out;
+- leaving the panel cancelling generation and dropping late results;
+- the direct-open explanation;
+- the follow-up detector;
+- Gemini Live receiving the screen text and exactly one frame.
+
+`AgentTest` covers:
+- room tickets and errors;
+- tool validation and size limits;
+- transcript order with interim text replaced;
+- proposals that run only when tapped;
+- the verbatim save;
+- the service's Stop action.
+
+`agent/tests` (CI job *LiveKit agent tests*) covers the token endpoint's access code, rate limit and ticket claims, tool forwarding and checks, settings validation and both voice modes. `ShotTest` renders `assistant-ready`, `assistant-panel` (over a stand-in app screenshot) and `agent-voice`.
+
+On the Pixel:
+- choose Ægentica as digital assistant and invoke it with the corner swipe and power button, over Sheets, Gmail and a banking app (which should arrive empty);
+- Nano answering about a screenshot in Swedish;
+- OpenRouter with a real key: streaming, the model picker, and a spent credit limit;
+- a local Ollama server over Tailscale;
+- Agent voice end to end on LiveKit Cloud: Swedish turn-taking, sharing another app's screen, a timer proposal, Stop from the notification.
 
 ## Recorded audio acceptance
 

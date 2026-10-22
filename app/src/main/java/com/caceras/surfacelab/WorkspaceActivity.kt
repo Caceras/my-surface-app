@@ -418,7 +418,7 @@ class WorkspaceActivity : Activity() {
         if(parts.isEmpty()) { toast("No audio is saved for this note."); return }
         val key=ConnectedAI.geminiKey(this)
         if(key==null) {
-            AlertDialog.Builder(this).setTitle("Connect Gemini").setMessage("Transcription with speaker labels uses your own Gemini API key. Open Connected AI, tap Use Google Gemini, paste your AI Studio key and save.")
+            AlertDialog.Builder(this).setTitle("Connect Gemini").setMessage("Transcription with speaker labels uses your own Gemini API key. Open Connected AI, tap Gemini, paste your AI Studio key and save. Chat can use another provider afterwards; the Gemini key stays saved.")
                 .setNegativeButton("Not now",null).setPositiveButton("Connected AI") { _,_ -> ConnectedAI.settings(this) }.showProtected(this)
             return
         }

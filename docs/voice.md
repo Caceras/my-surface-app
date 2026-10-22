@@ -34,7 +34,7 @@ This does not add background playback, lock-screen recording or a notification p
 
 ## Boundaries
 
-No wake word, background inference, guaranteed Bluetooth routing, or universal speech-language support is implemented. The only background microphone service is an explicitly started Transcribe session (below). A working language pack and a working TTS voice are separate from Gemini Nano's language quality. Device vendors/services may differ in permission, language download, and audio behavior.
+No wake word, background inference, guaranteed Bluetooth routing, or universal speech-language support is implemented. Background microphone use is limited to an explicitly started Transcribe session (below) or Agent voice conversation ([agent voice](agent.md)). Voice answers come from Nano unless the owner chose the connected model for voice in Connected AI; then they stream from that provider and speech starts at the first finished sentence. A working language pack and a working TTS voice are separate from Gemini Nano's language quality. Device vendors/services may differ in permission, language download, and audio behavior.
 
 ## API references
 

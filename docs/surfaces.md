@@ -15,6 +15,8 @@ Every entry opens a foreground activity. The widget and tile do not run model in
 | Text selection | Flavor aliases → `ProcessTextActivity` | Nano offers Ask/Summarise/Proofread/Make professional/Polish dictation; core offers Uppercase |
 | Transcribe | `TranscribeActivity` + `TranscriptionService` (microphone foreground service) | Started only from visible UI (Today, Notes, launcher shortcut, Quick Settings *Transcribe* tile via the visible screen); persistent notification with Pause and Stop & save |
 | Live voice | `LiveActivity` (Nano) | AI page → Talk live with Gemini; foreground only, ends on leaving the screen |
+| Digital assistant | `AssistantService` + `AssistantSessionService` → `AssistantActivity` | Chosen in Default apps → Digital assistant app; corner swipe or power button in any app; screen text and screenshot only on invocation |
+| Agent voice | `AgentActivity` + `AgentService` (Nano) | AI page → Talk with your agent; microphone foreground service with Stop; optional MediaProjection screen share |
 | Audio share target | `AudioShareActivity`, SEND `audio/*` | Copies one shared audio file (≤300 MB, Gemini-supported formats) into a private recording note and opens it; uploads nothing |
 
 Text-selection actions depend on the source app supporting Android's process-text contract. Editable preset results may replace the selection when appropriate; Ask results remain available for review. Ægentica AI receives the selected text, not the entire source app or page. Shared plain text goes to the AI draft; shared audio becomes a recording note. No other share types are registered.
@@ -25,7 +27,7 @@ Use Settings to request the assistant role, widget pinning, or tile addition whe
 
 ## Not implemented
 
-Always-on hotwords, privileged lock-screen integration, arbitrary screen reading, notification replies/listeners, accessibility automation, Android Auto, Wear OS, Live Wallpaper, Now Playing, At a Glance and Quick Share integration are not part of this app. A phone's default-assistant selection does not automatically grant those capabilities.
+Always-on hotwords, privileged lock-screen integration, background screen reading (the screen is read only when the owner invokes the assistant or shares it), notification replies/listeners, accessibility automation (tapping or typing in other apps), Android Auto, Wear OS, Live Wallpaper, Now Playing, At a Glance and Quick Share integration are not part of this app. A phone's default-assistant selection does not automatically grant those capabilities.
 
 ## Development
 
@@ -46,4 +48,4 @@ See the [complete Android plan](android-native-plan.md) for unsupported and cond
 
 Today and Library are internal native activities reached from the common Today · AI · Library navigation. Capture note launcher and widget actions route to the same editor. AI still receives plain-text sharing, with an explicit Save option before sending. The widget uses compact capture/talk controls and a bounded expanded preview; pinned-note text is included only when previews are enabled.
 
-Calendar is read only after choosing calendars; Beeper is a separately permission-gated experimental provider. Reminder notifications open their exact record and provide supported actions. Explicit read-aloud has a media playback notification and lock-screen transport. Connected routine completion opens its result note. No overlay permission, notification scraping, accessibility automation, wearable or car surface was introduced. The only background microphone use is an explicitly started Transcribe session with its notification; see [second brain](second-brain.md).
+Calendar is read only after choosing calendars; Beeper is a separately permission-gated experimental provider. Reminder notifications open their exact record and provide supported actions. Explicit read-aloud has a media playback notification and lock-screen transport. Connected routine completion opens its result note. No overlay permission, notification scraping, accessibility automation, wearable or car surface was introduced. Background microphone use is limited to an explicitly started Transcribe session or Agent voice conversation, each with its notification; see [second brain](second-brain.md) and [agent voice](agent.md).

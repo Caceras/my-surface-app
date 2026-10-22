@@ -1,0 +1,8 @@
+# Pinned versions tested together (October 2026). Upgrade deliberately.
+livekit-agents[openai,silero,google]==1.8.8
+livekit-plugins-openai==1.8.8
+livekit-plugins-silero==1.8.8
+livekit-plugins-google==1.8.8
+livekit-api==1.2.2
+livekit==1.1.20
+aiohttp==3.14.5

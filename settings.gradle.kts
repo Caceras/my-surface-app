@@ -10,6 +10,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // LiveKit's audio routing library is published only on JitPack;
+        // nothing else may resolve from there.
+        maven("https://jitpack.io") { content { includeGroup("com.github.davidliu") } }
     }
 }
 

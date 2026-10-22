@@ -40,6 +40,23 @@ interface SurfaceBrain {
         onPartial: (String) -> Unit = {},
         onResult: (BrainResult) -> Unit
     )
+
+    /** True when [look] actually shows the picture to the model. */
+    fun seesImages(context: Context): Boolean = false
+
+    /**
+     * Like run(), with a picture (a screenshot) the model can look at. A brain
+     * that cannot see images answers from the text alone.
+     */
+    fun look(
+        context: Context,
+        task: Task,
+        input: String,
+        instruction: String,
+        image: android.graphics.Bitmap,
+        onPartial: (String) -> Unit = {},
+        onResult: (BrainResult) -> Unit
+    ) = run(context, task, input, instruction, onPartial, onResult)
 }
 
 /**
@@ -83,12 +100,18 @@ enum class Task(val alias: String) {
     REWRITE("Rewrite"),
 
     /** Readable text from dictation or a transcript; the caller keeps the verbatim original. */
-    POLISH("Polish");
+    POLISH("Polish"),
+
+    /**
+     * The screen assistant: a request about what is on another app's screen.
+     * An empty alias means the task has no text-selection menu entry.
+     */
+    ASSIST("");
 
     companion object {
         fun fromComponent(className: String?): Task {
             val simple = className.orEmpty().substringAfterLast('.')
-            return entries.firstOrNull { it.alias == simple } ?: UPPERCASE
+            return entries.firstOrNull { it.alias.isNotEmpty() && it.alias == simple } ?: UPPERCASE
         }
     }
 }

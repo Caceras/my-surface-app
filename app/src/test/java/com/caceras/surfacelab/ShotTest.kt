@@ -49,7 +49,8 @@ class ShotTest {
      * colours, and passed on a screen that was ninety per cent unpainted --
      * an assertion weak enough to be worthless.
      */
-    private fun shoot(name: String, decor: View, minPainted: Double = 0.9, shotWidth: Int = width, shotHeight: Int = height, afterLayout: () -> Unit = {}) {
+    /** [backdrop] stands in for the app behind a translucent panel, as on the phone. */
+    private fun shoot(name: String, decor: View, minPainted: Double = 0.9, shotWidth: Int = width, shotHeight: Int = height, backdrop: Bitmap? = null, afterLayout: () -> Unit = {}) {
         decor.measure(
             View.MeasureSpec.makeMeasureSpec(shotWidth, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(shotHeight, View.MeasureSpec.EXACTLY)
@@ -91,6 +92,7 @@ class ShotTest {
         }
         invalidateTree(decor)
         bitmap.eraseColor(Color.MAGENTA)
+        if (backdrop != null) Canvas(bitmap).drawBitmap(backdrop, null, android.graphics.Rect(0, 0, shotWidth, shotHeight), null)
         decor.draw(Canvas(bitmap))
 
         val dir = File("build/screenshots").apply { mkdirs() }
@@ -582,5 +584,63 @@ class ShotTest {
         shoot("recording-note",decor,minPainted=0.3)
         activity.pause().stop().destroy()
         AudioNotes.dir(app).deleteRecursively()
+    }
+
+    @Test fun `assistant panel over another app`() {
+        val app=RuntimeEnvironment.getApplication()
+        val rows=listOf("SEO task","Hemsidetyp?","Har ni jobbat med byrå tidigare?","Kan ni ge en bakgrund om er hemsida","Viktigaste tjänsterna?","Vilka sökord tror ni är viktigast?","Målgrupp?","Säsonger?")
+        val shot=android.graphics.Bitmap.createBitmap(1080,2400,android.graphics.Bitmap.Config.ARGB_8888).also { b ->
+            val c=android.graphics.Canvas(b); c.drawColor(android.graphics.Color.WHITE)
+            val p=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textSize=40f; color=android.graphics.Color.rgb(32,33,36) }
+            val line=android.graphics.Paint().apply { color=android.graphics.Color.rgb(218,220,224); strokeWidth=3f }
+            c.drawRect(0f,0f,1080f,220f,android.graphics.Paint().apply { color=android.graphics.Color.rgb(11,87,208) })
+            rows.forEachIndexed { i,r -> val y=320f+i*110f; c.drawText(r,40f,y,p); c.drawLine(0f,y+40f,1080f,y+40f,line) }
+            c.drawLine(700f,220f,700f,2400f,line)
+        }
+        val answer="Förslag, en rad per fråga:\n1. Hemsidetyp – e-handel, tjänsteföretag eller lokal verksamhet.\n2. Tidigare byrå – vilka byråer och vad som fungerade.\n3. Bakgrund – affärsidé, historik och var sidan står i dag.\n4. Viktigaste tjänster – de 3–5 som ska ranka först.\n5. Sökord – kundens egna gissningar, att jämföra mot data."
+        Brains.useForTest(object:SurfaceBrain {
+            override val tasks=listOf(Task.ASSIST)
+            override fun status(context:android.content.Context,onStatus:(BrainStatus)->Unit)=onStatus(BrainStatus("Test",true))
+            override fun prepare(context:android.content.Context,onStatus:(BrainStatus)->Unit)=status(context,onStatus)
+            override fun seesImages(context:android.content.Context)=true
+            override fun run(context:android.content.Context,task:Task,input:String,instruction:String,onPartial:(String)->Unit,onResult:(BrainResult)->Unit)=onResult(BrainResult(answer,true))
+        })
+        try {
+            val activity=Robolectric.buildActivity(AssistantActivity::class.java,AssistantActivity.intent(app)).setup()
+            ScreenContexts.text("com.google.android.apps.docs.editors.sheets",rows.joinToString("\n")); ScreenContexts.screenshot(shot)
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            val root=activity.get().window.decorView
+            shoot("assistant-ready",root,backdrop=shot)
+            (root.findViewWithTag<android.widget.EditText>("assistant-input")).setText("Fyll i beskrivningar för raderna")
+            root.findViewWithTag<View>("assistant-ask").performClick()
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            shoot("assistant-panel",root,backdrop=shot)
+            activity.pause().stop().destroy()
+        } finally { Brains.useForTest(null); ScreenContexts.begin() }
+    }
+
+    @Test fun `agent voice with a proposal`() {
+        val app=RuntimeEnvironment.getApplication()
+        app.getSharedPreferences("agent-voice",0).edit().clear().putString("endpoint","https://agent.example.se/token").commit()
+        app.getSharedPreferences("surfacelab",0).edit().putBoolean("agent_consent",true).commit()
+        org.robolectric.Shadows.shadowOf(app).grantPermissions(android.Manifest.permission.RECORD_AUDIO,android.Manifest.permission.POST_NOTIFICATIONS)
+        var listener:AgentRoomListener?=null
+        AgentConfig.codeForTest="code"
+        AgentConfig.httpForTest=ConnectedAI.Http { _,_,_,_ -> ConnectedAI.Response(201,"application/json",java.io.ByteArrayInputStream("""{"server_url":"wss://lk.example.se","participant_token":"t"}""".toByteArray())) {} }
+        AgentRooms.forTest={ _,_,_,l -> listener=l; object:AgentRoom { override fun setMicrophone(on:Boolean) {}; override fun shareScreen(permission:android.content.Intent?,notification:android.app.Notification?,onStop:()->Unit) {}; override fun disconnect() {} } }
+        try {
+            val activity=Robolectric.buildActivity(AgentActivity::class.java,AgentActivity.intent(app,start=true)).setup()
+            val service=Robolectric.buildService(AgentService::class.java,org.robolectric.Shadows.shadowOf(app).nextStartedService).create().startCommand(0,1)
+            var n=0; while(listener==null && n<100) { Thread.sleep(20); org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); n++ }
+            listener!!.connected()
+            listener!!.transcript("u1","Vad står det i mitt SEO-ark och vad saknas?",true,false)
+            listener!!.transcript("a1","Arket listar 44 frågor till kunden. Beskrivningarna saknas för alla rader; jag kan föreslå dem en i taget.",true,true)
+            listener!!.transcript("u2","Påminn mig om tio minuter att skicka det till Lina.",true,false)
+            listener!!.agentState("listening")
+            listener!!.call("propose_action","""{"kind":"timer","minutes":10}""")
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            shoot("agent-voice",activity.get().window.decorView)
+            activity.pause().stop().destroy(); AgentService.conversation?.end(); service.destroy()
+        } finally { AgentService.clear(); AgentConfig.codeForTest=null; AgentConfig.httpForTest=null; AgentRooms.forTest=null }
     }
 }
