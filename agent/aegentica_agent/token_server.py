@@ -48,7 +48,7 @@ def create_app(settings: Settings, clock=time.monotonic) -> web.Application:
         calls.append(now)
         if not hmac.compare_digest(request.headers.get("Authorization", "").encode(), expected):
             return web.json_response({"error": "unauthorized"}, status=401)
-        return web.json_response({"server_url": settings.livekit_url, "participant_token": ticket(settings)}, status=201)
+        return web.json_response({"server_url": settings.public_url, "participant_token": ticket(settings)}, status=201)
 
     async def health(_: web.Request) -> web.Response:
         return web.json_response({"ok": True})

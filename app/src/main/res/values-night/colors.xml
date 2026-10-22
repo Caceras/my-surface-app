@@ -22,13 +22,12 @@
     <color name="ask_ink">#F4F4F5</color>
     <color name="ask_ink_2">#D4D4D8</color>
     <color name="ask_ink_3">#A1A1AA</color>
-    <color name="ask_ink_4">#71717A</color>
-    <color name="ask_sunken">#27272A</color>
-    <color name="ask_line_strong">#3F3F46</color>
-    <color name="ask_surface">#18181B</color>
+    <color name="ask_ink_4">#7C7C85</color>
     <color name="ask_on_ink">#111114</color>
-    <color name="ask_glass">#F218181B</color>
-    <color name="ask_ring">#1FFFFFFF</color>
-    <color name="ask_divider">#14FFFFFF</color>
+    <color name="ask_fill">#1AFFFFFF</color>
     <color name="ask_press">#1FFFFFFF</color>
+    <color name="ask_glass_blur">#D91C1C1F</color>
+    <color name="ask_glass_solid">#F51C1C1F</color>
+    <color name="ask_edge">#24FFFFFF</color>
+    <color name="ask_divider">#1AFFFFFF</color>
 </resources>

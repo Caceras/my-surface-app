@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from datetime import date
 from typing import Awaitable, Callable
 
@@ -241,7 +242,10 @@ async def entrypoint(ctx: JobContext) -> None:
 
 
 def main() -> None:
-    Settings.from_env()  # fail fast with a readable message
+    settings = Settings.from_env()  # fail fast with a readable message
+    # The worker reads its LiveKit credentials from the environment; keys taken
+    # from LIVEKIT_KEYS_FILE stay in this process only.
+    os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"] = settings.livekit_api_key, settings.livekit_api_secret
     cli.run_app(server)
 
 

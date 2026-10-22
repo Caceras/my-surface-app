@@ -31,7 +31,7 @@
 | `Insights.kt`, `TextDiff.kt` | Reviewed AI entity/task extraction with provenance and undo; verbatim-versus-text word diff |
 | `TranscribeTileService.kt` | Quick Settings entry for Transcribe |
 | `ConnectedAI.kt` | Providers (Gemini, OpenRouter, local), per-host Keystore keys, streaming client, image input, model list and settings |
-| `AssistantService.kt`, `AssistantSessionService.kt`, `AssistantRecognitionService.kt`, `AssistantActivity.kt`, `ScreenContext.kt` | Digital-assistant role, per-invocation session that hands screen text and screenshot to the assistant ask-bar panel, in-memory screen context |
+| `AssistantService.kt`, `AssistantSessionService.kt`, `AssistantRecognitionService.kt`, `AssistantActivity.kt`, `ScreenContext.kt` | Digital-assistant role, per-invocation session that hands screen text and screenshot to the frosted assistant sheet (a floating translucent window, so Android blurs only what is behind it), in-memory screen context |
 | `AgentVoice.kt`, `AgentService.kt`, `AgentActivity.kt`; `core|nano/…/AgentRoomFactory.kt` | LiveKit agent conversation, token tickets, phone tools and proposals; microphone foreground service; screen; WebRTC seam (none in core, LiveKit in Nano) |
 | `AudioNotes.kt`, `RecordingPlayer.kt`, `GeminiTranscribe.kt`, `AudioShareActivity.kt` | Recorded audio parts per note (ADTS, recovery, deletion) and speaker renaming; sequential playback; Files API + Interactions transcription; audio share target |
 | `MarkdownVault.kt` | One-way Obsidian-compatible Markdown export to a user-chosen folder |

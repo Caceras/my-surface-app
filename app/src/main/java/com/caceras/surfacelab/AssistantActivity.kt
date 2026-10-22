@@ -9,9 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
-import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.RippleDrawable
@@ -24,7 +21,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -43,19 +39,20 @@ import android.widget.Toast
 class AssistantActivity : Activity() {
     private lateinit var seen: TextView
     private lateinit var chip: LinearLayout
-    private lateinit var suggestions: LinearLayout
+    private lateinit var suggestions: HorizontalScrollView
+    private lateinit var chips: LinearLayout
     private lateinit var card: LinearLayout
-    private lateinit var where: TextView
-    private lateinit var halt: TextView
     private lateinit var asked: TextView
     private lateinit var input: EditText
-    private lateinit var reopen: TextView
     private lateinit var mic: ImageButton
     private lateinit var send: ImageButton
     private val sendFill = GradientDrawable().apply { shape = GradientDrawable.OVAL }
+    /** The window background: the frosted sheet itself. */
+    private val sheet = GradientDrawable()
     private lateinit var status: TextView
     private lateinit var answer: TextView
     private lateinit var actions: LinearLayout
+    private lateinit var follows: LinearLayout
     private val main = Handler(Looper.getMainLooper())
     private var unlisten: (() -> Unit)? = null
     private var brain: SurfaceBrain? = null
@@ -65,157 +62,143 @@ class AssistantActivity : Activity() {
     private var question = ""
     private var reply = ""
     private var settled = false
-    private var minimised = false
     private var invocation = 0
 
     private fun prefs() = getSharedPreferences("surfacelab", 0)
     /** The owner can leave the screen out of a question with one tap on the context chip. */
     private fun screenOn() = prefs().getBoolean("assistant_screen", true)
+    private fun hint() = if (!ScreenContexts.current.empty && screenOn()) "Ask about this screen" else "Ask anything"
 
-    // The look follows the owner's awesome-SEO ask bar: square glass panels in a
-    // neutral ink palette, one round send button, compact type.
     private fun press() = ColorStateList.valueOf(ink(R.color.ask_press))
-    private fun box(fill: Int, stroke: Int? = null) = GradientDrawable().apply { setColor(fill); stroke?.let { setStroke(dp(1), it) } }
-    /** A 48dp touch target that draws only its middle 32dp, like the web bar's compact controls. */
-    private fun compact(fill: Drawable?) = InsetDrawable(RippleDrawable(press(), fill, ColorDrawable(Color.WHITE)), 0, dp(8), 0, dp(8))
+    private fun pill(fill: Int?, radius: Int) = GradientDrawable().apply { fill?.let { setColor(ink(it)) }; cornerRadius = dp(radius).toFloat() }
 
     /**
-     * Strong glass: near-white fill, a hairline ring and a soft wide shadow. The
-     * web bar blurs the page behind it; Android cannot blur another app behind
-     * one view, so the fill is a little more opaque to keep answers legible.
+     * Frosted glass. Android blurs the app behind this window when cross-window
+     * blur is on (the default on Pixel); with blur off, for example in battery
+     * saver, the sheet turns nearly opaque so text stays readable.
      */
-    private fun View.glass() {
-        background = box(ink(R.color.ask_glass), ink(R.color.ask_ring))
-        elevation = dp(12).toFloat()
-        outlineSpotShadowColor = 0x33111114; outlineAmbientShadowColor = 0x0A111114
+    private fun frost(blurred: Boolean) {
+        sheet.setColor(ink(if (blurred) R.color.ask_glass_blur else R.color.ask_glass_solid))
+        if (android.os.Build.VERSION.SDK_INT >= 31) window.setBackgroundBlurRadius(if (blurred) dp(30) else 0)
     }
 
-    private fun icon(drawable: Int, description: String, tagName: String, action: () -> Unit) = ImageButton(this).apply {
+    @android.annotation.TargetApi(31)
+    private fun followBlur() {
+        val listener = java.util.function.Consumer<Boolean> { frost(blurForTest ?: it) }
+        window.decorView.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) = windowManager.addCrossWindowBlurEnabledListener(listener)
+            override fun onViewDetachedFromWindow(v: View) = windowManager.removeCrossWindowBlurEnabledListener(listener)
+        })
+    }
+
+    private fun icon(drawable: Int, description: String, tagName: String, size: Int = 18, action: () -> Unit) = ImageButton(this).apply {
         setImageResource(drawable); imageTintList = ColorStateList.valueOf(ink(R.color.ask_ink_3)); scaleType = ImageView.ScaleType.FIT_CENTER
         contentDescription = description; tag = tagName
-        background = RippleDrawable(press(), null, ColorDrawable(Color.WHITE)); padDp(10, 12, 10, 12)
-        setOnClickListener { action() }
+        background = RippleDrawable(press(), null, null)
+        val side = (dp(40) - dp(size)) / 2; setPadding(side, side, side, side)
+        setOnClickListener { performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); action() }
     }
 
-    private fun action(title: String, tagName: String, primary: Boolean, run: () -> Unit) = label(title, 12.5f).apply {
-        medium(); tag = tagName; gravity = Gravity.CENTER; maxLines = 1; setLineSpacing(0f, 1f); isFocusable = true; buttonSemantics()
-        setTextColor(ink(if (primary) R.color.ask_ink else R.color.ask_ink_2))
-        background = compact(if (primary) box(ink(R.color.ask_surface), ink(R.color.ask_line_strong)) else null)
-        val side = dp(if (primary) 12 else 10); setPadding(side, 0, side, 0)
-        setOnClickListener { performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK); run() }
+    /** A quiet rounded chip: suggestions before the first question, links and numbers after an answer. */
+    private fun chipView(title: String, tagName: String?, lead: Int? = null, run: () -> Unit) = label(title, 13.5f).apply {
+        tag = tagName; gravity = Gravity.CENTER_VERTICAL; maxLines = 1; setLineSpacing(0f, 1f); isFocusable = true; buttonSemantics()
+        setTextColor(ink(R.color.ask_ink_2))
+        background = InsetDrawable(RippleDrawable(press(), pill(R.color.ask_fill, 16), null), 0, dp(6), 0, dp(6))
+        setPadding(dp(if (lead != null) 10 else 14), 0, dp(14), 0)
+        lead?.let { getDrawable(it)!!.mutate().apply { setTint(ink(R.color.ask_ink_3)); setBounds(0, 0, dp(15), dp(15)) } }?.let { setCompoundDrawablesRelative(it, null, null, null); compoundDrawablePadding = dp(6) }
+        setOnClickListener { run() }
     }
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         val metrics = resources.displayMetrics
-        val column = minOf(metrics.widthPixels - dp(24), dp(680))
-        // Conversation panel: where it was asked, then the question, the streamed answer and follow-ups.
-        where = label("", 12.5f).apply { tag = "assistant-where"; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END; setTextColor(ink(R.color.ask_ink_3)) }
-        halt = label("Stop", 12f).apply {
-            medium(); tag = "assistant-halt"; gravity = Gravity.CENTER; setLineSpacing(0f, 1f); setTextColor(ink(R.color.ask_ink_2)); visibility = View.GONE
-            val square = getDrawable(R.drawable.ic_stop)!!.mutate().apply { setTint(ink(R.color.ask_ink_2)); setBounds(0, 0, dp(18), dp(18)) }
-            setCompoundDrawablesRelative(square, null, null, null); compoundDrawablePadding = dp(2)
-            background = RippleDrawable(press(), null, ColorDrawable(Color.WHITE)); padDp(6, 0, 8, 0); buttonSemantics()
-            setOnClickListener { stop(); status.text = "Stopped." }
-        }
-        val header = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL; padDp(16, 0, 6, 0)
-            addView(where, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(halt, LinearLayout.LayoutParams(-2, dp(40)))
-            addView(icon(R.drawable.ic_chevron_down, "Hide the answer", "assistant-minimise") { minimise(true) }, LinearLayout.LayoutParams(dp(36), dp(40)))
-            addView(icon(R.drawable.ic_close, "Clear the answer", "assistant-close") { clearThread() }, LinearLayout.LayoutParams(dp(36), dp(40)))
-        }
-        asked = label("", 13.5f).apply {
-            tag = "assistant-question"; setTextColor(ink(R.color.ask_ink)); background = box(ink(R.color.ask_sunken))
-            padDp(14, 8, 14, 8); maxWidth = ((column - dp(32)) * 0.85f).toInt()
-        }
-        answer = label("", 14f).apply { tag = "assistant-answer"; setTextColor(ink(R.color.ask_ink_2)); setTextIsSelectable(true); setLineSpacing(0f, 1.38f); padDp(0, 12, 0, 0) }
-        status = label("", 12.5f).apply { tag = "assistant-status"; setTextColor(ink(R.color.ask_ink_4)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE; padDp(0, 10, 0, 0) }
+        val width = minOf(metrics.widthPixels - dp(20), dp(680))
+        // The conversation: the question, the streamed answer, then quiet icon actions.
+        asked = label("", 13f).apply { tag = "assistant-question"; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END; setLineSpacing(0f, 1.1f); setTextColor(ink(R.color.ask_ink_3)) }
+        answer = label("", 15f).apply { tag = "assistant-answer"; setTextColor(ink(R.color.ask_ink)); setTextIsSelectable(true); setLineSpacing(0f, 1.32f); padDp(0, 6, 4, 0) }
+        follows = LinearLayout(this).apply { tag = "assistant-follows"; gravity = Gravity.CENTER_VERTICAL }
+        status = label("", 12f).apply { tag = "assistant-status"; maxLines = 2; setLineSpacing(0f, 1.05f); setTextColor(ink(R.color.ask_ink_4)); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }
         actions = LinearLayout(this).apply { tag = "assistant-actions"; gravity = Gravity.CENTER_VERTICAL }
+        val top = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(asked, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(icon(R.drawable.ic_close, "Clear the answer", "assistant-close", 16) { clearThread() }, LinearLayout.LayoutParams(dp(40), dp(40)))
+        }
         val body = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; padDp(16, 16, 16, 6)
-            addView(asked, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.END })
+            orientation = LinearLayout.VERTICAL
             addView(answer, LinearLayout.LayoutParams(-1, -2))
-            addView(status, LinearLayout.LayoutParams(-1, -2))
-            addView(HorizontalScrollView(this@AssistantActivity).apply { isHorizontalScrollBarEnabled = false; addView(actions) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+            addView(HorizontalScrollView(this@AssistantActivity).apply { isHorizontalScrollBarEnabled = false; addView(follows) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        }
+        val foot = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(status, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(actions, LinearLayout.LayoutParams(-2, -2))
         }
         card = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; tag = "assistant-card"; visibility = View.GONE; isClickable = true
-            glass()
-            addView(header, LinearLayout.LayoutParams(-1, -2))
-            addView(View(this@AssistantActivity).apply { setBackgroundColor(ink(R.color.ask_divider)) }, LinearLayout.LayoutParams(-1, dp(1)))
-            addView(CappedScroll(this@AssistantActivity).apply { addView(body) }, LinearLayout.LayoutParams(-1, -2))
+            orientation = LinearLayout.VERTICAL; tag = "assistant-card"; visibility = View.GONE; padDp(14, 4, 4, 0)
+            addView(top, LinearLayout.LayoutParams(-1, -2))
+            addView(CappedScroll(this@AssistantActivity).apply { isVerticalScrollBarEnabled = false; addView(body) }, LinearLayout.LayoutParams(-1, -2))
+            addView(foot, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
+            addView(View(this@AssistantActivity).apply { setBackgroundColor(ink(R.color.ask_divider)) }, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(2); marginEnd = dp(10) })
         }
-        // Suggestions panel, shown before the first question.
-        suggestions = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; tag = "assistant-suggestions"; isClickable = true
-            glass(); padDp(6, 6, 6, 6)
-        }
-        // The bar: context chip with the Æ mark, prompt, microphone and a round send button.
+        // Suggestions before the first question.
+        chips = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; padDp(4, 0, 4, 0) }
+        suggestions = HorizontalScrollView(this).apply { tag = "assistant-suggestions"; isHorizontalScrollBarEnabled = false; addView(chips) }
+        // The bar: the Æ context chip, the prompt, the microphone and a round send button.
         val signum = ImageView(this).apply {
             setImageResource(R.drawable.ic_surface); imageTintList = ColorStateList.valueOf(ink(R.color.ask_on_ink)); contentDescription = null; tag = "assistant-signum"
-            background = GradientDrawable().apply { setColor(ink(R.color.ask_ink)); cornerRadius = dp(4).toFloat() }; padDp(3, 3, 3, 3)
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(ink(R.color.ask_ink)) }; padDp(4, 4, 4, 4)
         }
-        seen = label("", 12.5f).apply {
+        seen = label("", 13f).apply {
             tag = "assistant-seen"; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END; setLineSpacing(0f, 1f); setTextColor(ink(R.color.ask_ink_2))
-            maxWidth = (column * 0.46f).toInt() - dp(40)
+            maxWidth = (width * 0.4f).toInt()
         }
         chip = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL; tag = "assistant-screen"; isClickable = true; isFocusable = true; buttonSemantics()
-            background = compact(box(ink(R.color.ask_sunken))); padDp(6, 0, 10, 0)
-            addView(signum, LinearLayout.LayoutParams(dp(18), dp(18)).apply { marginEnd = dp(6) })
+            background = InsetDrawable(RippleDrawable(press(), pill(R.color.ask_fill, 18), null), 0, dp(8), 0, dp(8)); padDp(5, 0, 12, 0)
+            addView(signum, LinearLayout.LayoutParams(dp(24), dp(24)).apply { marginEnd = dp(7) })
             addView(seen, LinearLayout.LayoutParams(-2, -2))
             setOnClickListener { chipTapped() }
         }
         input = EditText(this).apply {
-            tag = "assistant-input"; hint = HINT; textSize = 16f; background = null; isSingleLine = true
+            tag = "assistant-input"; textSize = 16f; background = null; isSingleLine = true
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or android.text.InputType.TYPE_TEXT_FLAG_AUTO_CORRECT
-            setTextColor(ink(R.color.ask_ink)); setHintTextColor(ink(R.color.ask_ink_4)); padDp(2, 0, 2, 0)
+            setTextColor(ink(R.color.ask_ink)); setHintTextColor(ink(R.color.ask_ink_3)); padDp(10, 0, 4, 0)
             imeOptions = EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
             setOnEditorActionListener { _, action, _ -> if (action == EditorInfo.IME_ACTION_SEND) { ask(text.toString(), false); true } else false }
             afterChange { updateSend(); showSuggestions() }
         }
-        reopen = label("Answer", 12f).apply {
-            tag = "assistant-show"; gravity = Gravity.CENTER; setLineSpacing(0f, 1f); setTextColor(ink(R.color.ask_ink_3)); visibility = View.GONE
-            contentDescription = "Show the answer"; background = compact(null); padDp(8, 0, 8, 0); buttonSemantics()
-            setOnClickListener { minimise(false) }
-        }
-        mic = icon(R.drawable.ic_mic, "Speak your question", "assistant-mic") { listen() }.apply { padDp(10, 14, 10, 14) }
+        mic = icon(R.drawable.ic_mic_line, "Speak your question", "assistant-mic", 20) { listen() }.apply { imageTintList = ColorStateList.valueOf(ink(R.color.ask_ink_2)) }
         send = ImageButton(this).apply {
             tag = "assistant-ask"; contentDescription = "Ask"; scaleType = ImageView.ScaleType.FIT_CENTER
-            // A 36dp circle centred in a 44 x 48dp touch target.
-            background = InsetDrawable(RippleDrawable(press(), sendFill, null), dp(4), dp(6), dp(4), dp(6))
+            // A 36dp circle centred in a 44dp touch target.
+            background = InsetDrawable(RippleDrawable(press(), sendFill, null), dp(4), dp(4), dp(4), dp(4))
             setOnClickListener { if (brain != null) { stop(); status.text = "Stopped." } else ask(input.text.toString(), false) }
         }
         val bar = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL; tag = "assistant-bar"; isClickable = true
-            glass(); padDp(8, 0, 2, 0)
-            addView(chip, LinearLayout.LayoutParams(-2, -1))
-            addView(input, LinearLayout.LayoutParams(0, -1, 1f).apply { marginStart = dp(8) })
-            addView(reopen, LinearLayout.LayoutParams(-2, -1))
-            addView(mic, LinearLayout.LayoutParams(dp(40), -1))
-            addView(send, LinearLayout.LayoutParams(dp(44), -1))
+            gravity = Gravity.CENTER_VERTICAL; tag = "assistant-bar"; padDp(4, 0, 0, 0)
+            addView(chip, LinearLayout.LayoutParams(-2, dp(52)))
+            addView(input, LinearLayout.LayoutParams(0, dp(52), 1f))
+            addView(mic, LinearLayout.LayoutParams(dp(40), dp(40)))
+            addView(send, LinearLayout.LayoutParams(dp(44), dp(44)))
         }
-        val stack = CappedWidth(this).apply {
-            orientation = LinearLayout.VERTICAL; tag = "assistant-sheet"
-            addView(card, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
-            addView(suggestions, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) })
-            addView(bar, LinearLayout.LayoutParams(-1, dp(48)))
-        }
-        val root = FrameLayout(this).apply {
-            tag = "assistant-scrim"; isClickable = true; contentDescription = "Close the assistant"; setOnClickListener { finish() }
-            addView(stack, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL))
-            setOnApplyWindowInsetsListener { _, insets ->
-                // Bars and keyboard: the glass stays above both, and the app above stays uncovered.
-                val (left, top, right, bottom) = if (android.os.Build.VERSION.SDK_INT >= 30)
-                    insets.getInsets(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.ime()).let { listOf(it.left, it.top, it.right, it.bottom) }
-                else @Suppress("DEPRECATION") listOf(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
-                setPadding(left + dp(12), top + dp(48), right + dp(12), maxOf(dp(14), bottom + dp(8))); insets
-            }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; tag = "assistant-sheet"; padDp(4, 6, 4, 4)
+            addView(card, LinearLayout.LayoutParams(-1, -2))
+            addView(suggestions, LinearLayout.LayoutParams(-1, -2))
+            addView(bar, LinearLayout.LayoutParams(-1, -2))
         }
         setContentView(root)
-        if (android.os.Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false)
-        else @Suppress("DEPRECATION") { root.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION }
+        // One floating sheet near the bottom, above the navigation bar and the keyboard.
+        sheet.cornerRadius = dp(28).toFloat(); sheet.setStroke(dp(1), ink(R.color.ask_edge))
+        window.setBackgroundDrawable(sheet)
+        window.setLayout(width, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+        window.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
+        window.attributes = window.attributes.apply { y = dp(10) }
+        setFinishOnTouchOutside(true)
+        frost(blurForTest ?: (android.os.Build.VERSION.SDK_INT >= 31 && windowManager.isCrossWindowBlurEnabled))
+        if (android.os.Build.VERSION.SDK_INT >= 31) followBlur()
+        root.post { root.arrive() }
         unlisten = ScreenContexts.listen { showContext() }
         start(intent)
     }
@@ -225,41 +208,25 @@ class AssistantActivity : Activity() {
         val filled = busy || input.text.isNotBlank()
         send.setImageResource(if (busy) R.drawable.ic_stop else R.drawable.ic_arrow_up)
         send.imageTintList = ColorStateList.valueOf(ink(if (filled) R.color.ask_on_ink else R.color.ask_ink_4))
-        sendFill.setColor(ink(if (filled) R.color.ask_ink else R.color.ask_sunken))
-        // The arrow draws at 16dp, the stop square at 12dp.
-        if (busy) send.padDp(10, 12, 10, 12) else send.padDp(14, 16, 14, 16)
+        sendFill.setColor(ink(if (filled) R.color.ask_ink else R.color.ask_fill))
+        // The arrow draws at 18dp, the stop square at 12dp.
+        if (busy) send.padDp(10, 10, 10, 10) else send.padDp(13, 13, 13, 13)
         send.contentDescription = if (busy) "Stop" else "Ask"
-        halt.visibility = if (busy) View.VISIBLE else View.GONE
     }
 
     private fun showSuggestions() {
-        suggestions.removeAllViews()
+        chips.removeAllViews()
         val visible = question.isEmpty() && input.text.isBlank()
         suggestions.visibility = if (visible) View.VISIBLE else View.GONE
         if (!visible) return
-        val app = appName(ScreenContexts.current.app)
-        suggestions.addView(label(if (app.isNotBlank() && screenOn()) "Ask about $app" else "Ask Ægentica", 12f).apply { setTextColor(ink(R.color.ask_ink_4)); padDp(12, 8, 12, 4) })
-        SUGGESTIONS.forEach { s ->
-            suggestions.addView(label(s, 13.5f).apply {
-                setTextColor(ink(R.color.ask_ink_2)); setLineSpacing(0f, 1f); minHeight = dp(36); gravity = Gravity.CENTER_VERTICAL; padDp(12, 8, 12, 8)
-                isFocusable = true; buttonSemantics(); background = RippleDrawable(press(), null, ColorDrawable(Color.WHITE))
-                setOnClickListener { input.setText(s); ask(s, false) }
-            }, LinearLayout.LayoutParams(-1, -2))
-        }
-    }
-
-    /** The chevron tucks the answer away behind the bar; "Answer" in the bar brings it back. */
-    private fun minimise(hide: Boolean) {
-        minimised = hide && question.isNotEmpty()
-        card.visibility = if (question.isNotEmpty() && !minimised) View.VISIBLE else View.GONE
-        reopen.visibility = if (minimised) View.VISIBLE else View.GONE
+        SUGGESTIONS.forEach { s -> chips.addView(chipView(s, null) { input.setText(s); ask(s, false) }, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) }) }
     }
 
     /** The cross ends the current question and returns to the suggestions. */
     private fun clearThread() {
         stop()
-        question = ""; reply = ""; answer.text = ""; asked.text = ""; status.text = ""; actions.removeAllViews()
-        minimise(false); showSuggestions()
+        question = ""; reply = ""; answer.text = ""; asked.text = ""; status.text = ""; actions.removeAllViews(); follows.removeAllViews()
+        card.visibility = View.GONE; showSuggestions()
     }
 
     private fun chipTapped() {
@@ -275,8 +242,8 @@ class AssistantActivity : Activity() {
         invocation = ScreenContexts.invocation
         settled = intent?.getBooleanExtra(DIRECT, false) == true
         if (!settled) main.postDelayed({ settled = true; showContext() }, 2500)
-        question = ""; reply = ""; answer.text = ""; asked.text = ""; status.text = ""; actions.removeAllViews(); input.setText("")
-        minimise(false)
+        question = ""; reply = ""; answer.text = ""; asked.text = ""; status.text = ""; actions.removeAllViews(); follows.removeAllViews(); input.setText("")
+        card.visibility = View.GONE
         showContext()
     }
 
@@ -304,7 +271,8 @@ class AssistantActivity : Activity() {
             intent?.getBooleanExtra(DIRECT, false) == true -> "No screen shared. Tap to set up the assistant gesture."
             else -> "Android shared nothing from this screen. Tap for assistant settings."
         }
-        chip.alpha = if (!c.empty && !on) 0.6f else 1f
+        chip.alpha = if (!c.empty && !on) 0.55f else 1f
+        if (input.hint != "Listening…") input.hint = hint()
         updateSend(); showSuggestions()
     }
 
@@ -318,10 +286,9 @@ class AssistantActivity : Activity() {
         val text = screen.text.take(if (connected) ScreenContexts.MAX_TEXT else ScreenContexts.NANO_TEXT)
         val image = screen.screenshot?.takeIf { chosen.seesImages(this) }
         val token = ++request
-        this.question = question; reply = ""; answer.text = ""; actions.removeAllViews()
+        this.question = question; reply = ""; answer.text = ""; actions.removeAllViews(); follows.removeAllViews()
         asked.text = question; input.setText("")
-        minimise(false); showSuggestions(); updateSend()
-        where.text = if (!screen.empty) "Asked from " + appName(screen.app).ifBlank { "this screen" } else "Asked without the screen"
+        card.visibility = View.VISIBLE; showSuggestions(); updateSend()
         status.text = (if (screen.empty) "Thinking" else "Reading the screen") + " · " + modelLabel() + if (image != null) " · sees the screenshot" else ""
         val voice = if (aloud) (mouth ?: Mouth(this).also { mouth = it }).apply { begin(Ears(this@AssistantActivity).locale()) } else null
         val partial = { p: String ->
@@ -349,25 +316,26 @@ class AssistantActivity : Activity() {
     }
 
     private fun showActions() {
-        actions.removeAllViews()
-        fun add(title: String, tagName: String, primary: Boolean = false, run: () -> Unit) =
-            actions.addView(action(title, tagName, primary, run), LinearLayout.LayoutParams(-2, dp(48)).apply { marginEnd = dp(8) })
-        add("Copy", "assistant-copy", primary = true) {
+        actions.removeAllViews(); follows.removeAllViews()
+        fun add(icon: Int, description: String, tagName: String, run: () -> Unit) = actions.addView(icon(icon, description, tagName) { run() }, LinearLayout.LayoutParams(dp(40), dp(40)))
+        add(R.drawable.ic_copy, "Copy", "assistant-copy") {
             getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Ægentica", Markdown.strip(reply)))
             toast("Copied. Paste it where you need it.")
         }
-        add("Save to notes", "assistant-save", primary = true) {
+        add(R.drawable.ic_bookmark, "Save to notes", "assistant-save") {
             val app = appName(ScreenContexts.current.app)
             WorkspaceStore(this).use { it.save(Record(title = ("Assistant · " + question).take(120), body = Markdown.strip(reply),
                 source = "Assistant · ${modelLabel()}" + if (app.isNotBlank()) " · about $app" else "")) }
             toast("Saved to Notes.")
         }
-        AssistantActions.detect(reply).forEach { (title, intent) -> add(title, "assistant-follow") { open(intent) } }
-        add("Share", "assistant-share") { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, Markdown.strip(reply)), "Share answer")) }
-        add("Read aloud", "assistant-read") { (mouth ?: Mouth(this).also { mouth = it }).apply { begin(Ears(this@AssistantActivity).locale()); finish(Markdown.strip(reply)) } }
-        if (Live.available() && ConnectedAI.geminiConfigured(this)) add("Talk live", "assistant-live") {
+        add(R.drawable.ic_share_line, "Share", "assistant-share") { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, Markdown.strip(reply)), "Share answer")) }
+        add(R.drawable.ic_volume, "Read aloud", "assistant-read") { (mouth ?: Mouth(this).also { mouth = it }).apply { begin(Ears(this@AssistantActivity).locale()); finish(Markdown.strip(reply)) } }
+        if (Live.available() && ConnectedAI.geminiConfigured(this)) add(R.drawable.ic_waves, "Talk live about this screen", "assistant-live") {
             Live.pendingScreen = ScreenContexts.current.takeIf { !it.empty && screenOn() }
             startActivity(LiveActivity.intent(this, start = true)); finish()
+        }
+        AssistantActions.detect(reply).forEach { (title, intent) ->
+            follows.addView(chipView(title, "assistant-follow", R.drawable.ic_arrow_up_right) { open(intent) }, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) })
         }
     }
 
@@ -383,7 +351,7 @@ class AssistantActivity : Activity() {
         mic.setColorFilter(ink(R.color.listening)); input.hint = "Listening…"
         e.listen(onLevel = { mic.speechLevel(it) }, onPartial = { input.setText(it) },
             onFinal = { heard -> input.setText(heard); if (heard.isNotBlank()) ask(heard, true) },
-            onStop = { problem -> mic.setColorFilter(null); mic.speechLevel(0f); input.hint = HINT; problem?.let { toast(it.message) } })
+            onStop = { problem -> mic.setColorFilter(null); mic.speechLevel(0f); input.hint = hint(); problem?.let { toast(it.message) } })
     }
 
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
@@ -421,26 +389,18 @@ class AssistantActivity : Activity() {
         super.onDestroy()
     }
 
-    /** Full width on a phone, at most 680dp on a tablet or unfolded screen, like the owner's web ask bar. */
-    private class CappedWidth(context: Context) : LinearLayout(context) {
-        override fun onMeasure(widthSpec: Int, heightSpec: Int) {
-            val cap = (680 * resources.displayMetrics.density).toInt()
-            val width = MeasureSpec.getSize(widthSpec)
-            super.onMeasure(if (width > cap) MeasureSpec.makeMeasureSpec(cap, MeasureSpec.EXACTLY) else widthSpec, heightSpec)
-        }
-    }
-
-    /** A scroll area that grows with the answer up to 56% of the screen (520dp at most), keeping the bar in view. */
+    /** A scroll area that grows with the answer up to half the screen (460dp at most), keeping the bar in view. */
     private class CappedScroll(context: Context) : ScrollView(context) {
         override fun onMeasure(widthSpec: Int, heightSpec: Int) {
-            val cap = minOf((resources.displayMetrics.heightPixels * 0.56f).toInt(), (520 * resources.displayMetrics.density).toInt())
+            val cap = minOf((resources.displayMetrics.heightPixels * 0.5f).toInt(), (460 * resources.displayMetrics.density).toInt())
             super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(cap, MeasureSpec.AT_MOST))
         }
     }
 
     companion object {
         const val DIRECT = "direct"
-        private const val HINT = "Ask about this screen"
+        /** Renders force the blurred or the plain sheet; null follows the device. */
+        internal var blurForTest: Boolean? = null
         private const val REQUEST = 46
         val SUGGESTIONS = listOf("Explain this", "Summarize", "Fill in what's missing", "Draft a reply", "Translate to English")
         fun intent(context: Context, direct: Boolean = false) = Intent(context, AssistantActivity::class.java).putExtra(DIRECT, direct)

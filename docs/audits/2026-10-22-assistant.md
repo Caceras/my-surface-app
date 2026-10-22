@@ -14,7 +14,7 @@ Build 183 had these gaps:
 
 ## Repair
 
-- **Phone assistant:** `VoiceInteractionService` role, a session that hands screen text and screenshot to an ask-bar panel, and Nano image input.
+- **Phone assistant:** `VoiceInteractionService` role, a session that hands screen text and screenshot to a frosted assistant sheet, and Nano image input.
 - **Assistant safety:**
   - screen content is marked as data;
   - one tap leaves the screen out;
@@ -31,14 +31,18 @@ Build 183 had these gaps:
 
 ## Review findings fixed before push
 
-The owner reviewed the assistant renders twice as "horrible" and pointed to their own ask bars (EmmaDiaz `AskBar`, then specifically the awesome-SEO `AskBar` in `apps/web/src/app/ask/AskBar.tsx`). The panel now follows the awesome-SEO bar's own tokens and measurements:
-- square "strong glass" panels: a near-white fill, a hairline ink ring and a soft wide shadow;
-- a neutral ink palette (`ask_*` colours, with dark-mode equivalents) instead of the app's sky-blue accents;
-- a 48dp bar with a grey context chip (the Æ mark on an ink square, then the app name), a 16sp prompt, a microphone and a 36dp round send button (ink with a white arrow when there is text, grey when empty, a stop square while answering);
-- a suggestions panel ("Ask about Sheets") and a conversation panel with an "Asked from Sheets" header, hide and clear buttons, the question as a grey bubble on the right, the answer at 14sp and bordered *Copy* and *Save to notes* buttons followed by plain text actions;
-- no shade over the other app, and at most 680dp wide on large screens.
+The owner rejected three assistant designs: the first render, a rounded glass card, and a copy of the awesome-SEO `AskBar` (square, near-opaque white panels). Their direction: "transparent", "premium", "tasteful and minimal". Build 187 shipped the awesome-SEO copy; the follow-up replaces it with one frosted sheet:
+- **Real blur.** The assistant is now a floating translucent window (`AssistantSheet` theme) sized to its content. Android's cross-window blur (`setBackgroundBlurRadius`, Android 12+) then blurs only the app behind the sheet. A full-screen overlay could not do this: blur covers a whole window.
+- **Blur off.** When the system turns blur off (battery saver, or the developer setting), a listener switches the sheet to a nearly opaque tint so text stays readable.
+- **One rounded sheet** (28dp corners, a hairline edge, 10dp from the screen edges) holding everything:
+  - before the first question, a row of quiet suggestion chips;
+  - after asking, the question in small grey type with a clear button, the answer at 15sp, the model name, and icon actions (copy, save, share, read aloud, talk live);
+  - links and phone numbers as chips;
+  - the input row: the Æ chip with the app's name, the prompt, a microphone and a round send button.
+- **Colours.** Neutral ink `ask_*` tokens with dark-mode values; the dark sheet is a smoky glass.
+- **Dismissal.** Tapping outside the sheet closes it.
 
-Renders show a stand-in Sheets screen behind the panel. Android cannot blur another app behind a single view, so the glass is slightly more opaque than the web bar to keep answers legible over busy screens. Compact controls draw at the web's 32dp but keep 48dp touch areas.
+Renders draw the sheet where Android places it, over a stand-in Sheets screen whose rows run under it, in light and dark. The blur in renders is simulated; real blur strength and frame timing need the Pixel.
 
 Preflight caught two problems, both fixed:
 - service classes must live in their own files;

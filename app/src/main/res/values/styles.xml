@@ -26,6 +26,20 @@
         <item name="android:windowIsFloating">false</item>
         <item name="android:backgroundDimEnabled">false</item>
     </style>
+    <!--
+        The phone assistant floats over another app as one frosted sheet. A
+        floating translucent window is sized to its content, so Android blurs
+        only what is behind the sheet, not the whole screen.
+    -->
+    <style name="AssistantSheet" parent="Chat">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="android:windowElevation">0dp</item>
+    </style>
     <style name="SurfaceDialog" parent="@android:style/Theme.DeviceDefault.Light.Dialog.Alert">
         <item name="android:colorAccent">@color/accent_text</item>
         <item name="android:colorBackground">@color/composer_bg</item>
