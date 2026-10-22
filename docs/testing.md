@@ -143,10 +143,11 @@ On the Pixel, record: engine label shown (Gemini on-device vs Android), Swedish 
 - the verbatim save;
 - the service's Stop action.
 
-`agent/tests` (CI job *LiveKit agent tests*) covers the token endpoint's access code, rate limit and ticket claims, tool forwarding and checks, settings validation and both voice modes. `ShotTest` renders `assistant-ready`, `assistant-panel` (over a stand-in app screenshot) and `agent-voice`.
+`agent/tests` (CI job *LiveKit agent tests*) covers the token endpoint's access code, rate limit and ticket claims, tool forwarding and checks, settings validation and both voice modes. `ShotTest` renders `assistant-ready` and `assistant-panel` in light and dark (the floating sheet placed where Android puts it, over a stand-in app screenshot with simulated blur) and `agent-voice`.
 
 On the Pixel:
 - choose Ægentica as digital assistant and invoke it with the corner swipe and power button, over Sheets, Gmail and a banking app (which should arrive empty);
+- check that the sheet blurs the app behind it, turns nearly opaque in battery saver, rises above the keyboard and closes on a tap outside;
 - Nano answering about a screenshot in Swedish;
 - OpenRouter with a real key: streaming, the model picker, and a spent credit limit;
 - a local Ollama server over Tailscale;

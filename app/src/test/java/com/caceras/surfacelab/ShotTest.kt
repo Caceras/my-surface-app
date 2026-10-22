@@ -111,6 +111,62 @@ class ShotTest {
         )
     }
 
+    /** Three box-blur passes at quarter scale: close to the soft blur Android draws behind a window. */
+    private fun softBlur(source: Bitmap, scale: Int = 4, radius: Int = 11): Bitmap {
+        val small = Bitmap.createScaledBitmap(source, maxOf(1, source.width / scale), maxOf(1, source.height / scale), true)
+        val w = small.width; val h = small.height
+        var px = IntArray(w * h).also { small.getPixels(it, 0, w, 0, 0, w, h) }
+        fun pass(src: IntArray, across: Boolean): IntArray {
+            val dst = IntArray(src.size); val lines = if (across) h else w; val len = if (across) w else h; val n = 2 * radius + 1
+            for (line in 0 until lines) {
+                fun at(i: Int) = i.coerceIn(0, len - 1).let { src[if (across) line * w + it else it * w + line] }
+                val sum = IntArray(4)
+                fun add(c: Int, sign: Int) { sum[0] += sign * (c ushr 24); sum[1] += sign * ((c shr 16) and 255); sum[2] += sign * ((c shr 8) and 255); sum[3] += sign * (c and 255) }
+                for (i in -radius..radius) add(at(i), 1)
+                for (i in 0 until len) {
+                    dst[if (across) line * w + i else i * w + line] = ((sum[0] / n) shl 24) or ((sum[1] / n) shl 16) or ((sum[2] / n) shl 8) or (sum[3] / n)
+                    add(at(i + radius + 1), 1); add(at(i - radius), -1)
+                }
+            }
+            return dst
+        }
+        repeat(3) { px = pass(pass(px, true), false) }
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).apply { setPixels(px, 0, w, 0, 0, w, h) }
+        return Bitmap.createScaledBitmap(out, source.width, source.height, true)
+    }
+
+    /**
+     * A floating window drawn where Android places it: at the bottom, above a
+     * gesture navigation bar, over [backdrop]. Android blurs what is behind the
+     * sheet; the render approximates that blur with [softBlur].
+     */
+    private fun shootSheet(name: String, activity: android.app.Activity, backdrop: Bitmap) {
+        val decor = activity.window.decorView
+        val attrs = activity.window.attributes
+        fun place() {
+            decor.measure(View.MeasureSpec.makeMeasureSpec(attrs.width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST))
+            decor.layout(0, 0, decor.measuredWidth, decor.measuredHeight)
+        }
+        place(); org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle(); place()
+        decor.viewTreeObserver.dispatchOnPreDraw()
+        val screen = Bitmap.createScaledBitmap(backdrop, width, height, true)
+        val bitmap = screen.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(bitmap)
+        val left = (width - decor.measuredWidth) / 2
+        val top = height - decor.context.dp(24) - attrs.y - decor.measuredHeight
+        val area = android.graphics.Rect(left, top, left + decor.measuredWidth, top + decor.measuredHeight)
+        val soft = softBlur(screen)
+        val radius = decor.context.dp(28).toFloat()
+        canvas.save()
+        canvas.clipPath(android.graphics.Path().apply { addRoundRect(android.graphics.RectF(area), radius, radius, android.graphics.Path.Direction.CW) })
+        canvas.drawBitmap(soft, area, area, null)
+        canvas.restore()
+        canvas.save(); canvas.translate(left.toFloat(), top.toFloat()); decor.draw(canvas); canvas.restore()
+        val dir = File("build/screenshots").apply { mkdirs() }
+        File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        assertTrue("$name sheet is empty", decor.measuredHeight >= decor.context.dp(52))
+    }
+
     @Test
     fun `the chat screen, empty`() {
         Chat.clear(RuntimeEnvironment.getApplication())
@@ -586,15 +642,23 @@ class ShotTest {
         AudioNotes.dir(app).deleteRecursively()
     }
 
-    @Test fun `assistant panel over another app`() {
+    @Test fun `assistant panel over another app`() = assistantShots("")
+    @Test @Config(qualifiers = "w411dp-h914dp-night-xxhdpi") fun `assistant panel over another app in dark mode`() = assistantShots("-night")
+
+    /** The frosted sheet over a stand-in Sheets screen whose rows run under it, so the glass shows what it blurs. */
+    private fun assistantShots(suffix: String) {
         val app=RuntimeEnvironment.getApplication()
-        val rows=listOf("SEO task","Hemsidetyp?","Har ni jobbat med byrå tidigare?","Kan ni ge en bakgrund om er hemsida","Viktigaste tjänsterna?","Vilka sökord tror ni är viktigast?","Målgrupp?","Säsonger?")
+        val rows=listOf("SEO task","Hemsidetyp?","Har ni jobbat med byrå tidigare?","Kan ni ge en bakgrund om er hemsida","Viktigaste tjänsterna?","Vilka sökord tror ni är viktigast?","Målgrupp?","Säsonger?",
+            "Andra typer av marknadsföring?","Har ni tidigare SEO-arbeten?","Några andra domäner?","Vilka sociala medier har ni?","Hur enkelt är det att ändra hemsidan?","Förkunskaper hos de inblandade?","Vem gör implementationerna?","Vem är kontaktperson?","Budget per månad?","Önskad start?","Konkurrenter?")
         val shot=android.graphics.Bitmap.createBitmap(1080,2400,android.graphics.Bitmap.Config.ARGB_8888).also { b ->
-            val c=android.graphics.Canvas(b); c.drawColor(android.graphics.Color.WHITE)
-            val p=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textSize=40f; color=android.graphics.Color.rgb(32,33,36) }
-            val line=android.graphics.Paint().apply { color=android.graphics.Color.rgb(218,220,224); strokeWidth=3f }
+            // In dark mode the app behind is dark too, as Sheets follows the system theme.
+            val dark=suffix.isNotEmpty()
+            val c=android.graphics.Canvas(b); c.drawColor(if (dark) android.graphics.Color.rgb(31,31,31) else android.graphics.Color.WHITE)
+            val p=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textSize=40f; color=if (dark) android.graphics.Color.rgb(227,227,227) else android.graphics.Color.rgb(32,33,36) }
+            val line=android.graphics.Paint().apply { color=if (dark) android.graphics.Color.rgb(60,64,67) else android.graphics.Color.rgb(218,220,224); strokeWidth=3f }
+            val green=android.graphics.Paint().apply { color=if (dark) android.graphics.Color.rgb(23,58,36) else android.graphics.Color.rgb(230,244,234) }
             c.drawRect(0f,0f,1080f,220f,android.graphics.Paint().apply { color=android.graphics.Color.rgb(11,87,208) })
-            rows.forEachIndexed { i,r -> val y=320f+i*110f; c.drawText(r,40f,y,p); c.drawLine(0f,y+40f,1080f,y+40f,line) }
+            rows.forEachIndexed { i,r -> val y=320f+i*110f; if (i%4==1) c.drawRect(700f,y-70f,1080f,y+40f,green); c.drawText(r,40f,y,p); c.drawLine(0f,y+40f,1080f,y+40f,line) }
             c.drawLine(700f,220f,700f,2400f,line)
         }
         val answer="Förslag, en rad per fråga:\n1. Hemsidetyp – e-handel, tjänsteföretag eller lokal verksamhet.\n2. Tidigare byrå – vilka byråer och vad som fungerade.\n3. Bakgrund – affärsidé, historik och var sidan står i dag.\n4. Viktigaste tjänster – de 3–5 som ska ranka först.\n5. Sökord – kundens egna gissningar, att jämföra mot data."
@@ -605,18 +669,19 @@ class ShotTest {
             override fun seesImages(context:android.content.Context)=true
             override fun run(context:android.content.Context,task:Task,input:String,instruction:String,onPartial:(String)->Unit,onResult:(BrainResult)->Unit)=onResult(BrainResult(answer,true))
         })
+        AssistantActivity.blurForTest=true
         try {
             val activity=Robolectric.buildActivity(AssistantActivity::class.java,AssistantActivity.intent(app)).setup()
             ScreenContexts.text("com.google.android.apps.docs.editors.sheets",rows.joinToString("\n")); ScreenContexts.screenshot(shot)
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
             val root=activity.get().window.decorView
-            shoot("assistant-ready",root,backdrop=shot)
+            shootSheet("assistant-ready$suffix",activity.get(),shot)
             (root.findViewWithTag<android.widget.EditText>("assistant-input")).setText("Fyll i beskrivningar för raderna")
             root.findViewWithTag<View>("assistant-ask").performClick()
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-            shoot("assistant-panel",root,backdrop=shot)
+            shootSheet("assistant-panel$suffix",activity.get(),shot)
             activity.pause().stop().destroy()
-        } finally { Brains.useForTest(null); ScreenContexts.begin() }
+        } finally { Brains.useForTest(null); ScreenContexts.begin(); AssistantActivity.blurForTest=null }
     }
 
     @Test fun `agent voice with a proposal`() {

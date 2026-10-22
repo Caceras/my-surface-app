@@ -9,9 +9,22 @@ Use it when you want any OpenRouter model, server-side speech, or screen sharing
 | Part | Where | What it does |
 |---|---|---|
 | Phone (Nano build) | Your Pixel | Joins a LiveKit room, publishes the microphone, plays the agent, shows transcripts, answers the agent's note tools and shows its suggestions. The conversation runs in a visible foreground service (notification with *Stop & save*) so it continues while you share another app's screen. |
-| LiveKit | LiveKit Cloud (free *Build* plan) or your own `livekit-server` | Real-time audio and video between phone and agent (WebRTC). |
+| LiveKit | Your own `livekit-server` (already running at aegentica.se), or LiveKit Cloud (free *Build* plan) | Real-time audio and video between phone and agent (WebRTC). |
 | Agent | `agent/` in this repository, as a Docker container | LiveKit Agents 1.8.8: speech-to-text, an OpenRouter model, text-to-speech; or Gemini Live in `realtime` mode. |
 | Token endpoint | Same image, second container | Checks your access code and returns a 10-minute ticket for a fresh room that dispatches the agent. The LiveKit secret stays here; the phone never has it. |
+
+## How it runs for you
+
+You already host LiveKit at `wss://aegentica.se/livekit` (Dokploy → *agents* → *Ægentica LiveKit*), so Agent voice uses it instead of LiveKit Cloud:
+
+- **The app:** Dokploy → *agents* → *Ægentica agent voice*, built from [`agent/compose.dokploy.yaml`](../agent/compose.dokploy.yaml).
+- **LiveKit's key:** the agent reads it from LiveKit's own config file, mounted read-only (`LIVEKIT_KEYS_FILE`). The key is never copied into another file, app or chat.
+- **Connections:** the agent reaches LiveKit over Dokploy's private network. The phone gets the public address (`LIVEKIT_PUBLIC_URL`).
+- **Token endpoint:** `https://aegentica.se/voice-agent/token`. It shares the site's existing certificate, so no DNS change is needed.
+- **The app's Environment holds two values:**
+  - `OPENROUTER_API_KEY`: a key with a monthly credit limit.
+  - `AEGENTICA_ACCESS_CODE`: the code the phone sends.
+- **On the phone:** AI page → *Talk with your agent* → *Agent server settings*. Enter `https://aegentica.se/voice-agent/token` and the access code.
 
 ## Costs (October 2026; check before relying on them)
 

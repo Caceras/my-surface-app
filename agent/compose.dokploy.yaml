@@ -1,0 +1,47 @@
+# The agent as it runs on the owner's Dokploy server, next to the self-hosted
+# LiveKit at wss://aegentica.se/livekit. Paste into a Dokploy "Compose" app
+# (source: Raw). Dokploy writes the app's Environment to .env; that holds only
+# OPENROUTER_API_KEY and AEGENTICA_ACCESS_CODE. LiveKit's own key is read from
+# its config file, mounted read-only, and is never copied anywhere.
+x-agent: &agent
+  build:
+    context: https://github.com/Caceras/my-surface-app.git#main:agent
+  image: aegentica-voice-agent:main
+  env_file: .env
+  environment:
+    # Inside the server: straight to the LiveKit container on Dokploy's network.
+    LIVEKIT_URL: ws://aegentica-livekit-u2evb8-livekit-1:7880
+    LIVEKIT_PUBLIC_URL: wss://aegentica.se/livekit
+    LIVEKIT_KEYS_FILE: /livekit/livekit.yaml
+    AEGENTICA_MODE: pipeline
+  volumes:
+    - type: volume
+      source: livekit-config
+      target: /livekit
+      read_only: true
+      volume:
+        subpath: livekit
+  networks: [dokploy-network]
+  restart: unless-stopped
+
+services:
+  agent:
+    <<: *agent
+  token:
+    <<: *agent
+    command: ["python", "-m", "aegentica_agent.token_server"]
+    environment:
+      LIVEKIT_URL: ws://aegentica-livekit-u2evb8-livekit-1:7880
+      LIVEKIT_PUBLIC_URL: wss://aegentica.se/livekit
+      LIVEKIT_KEYS_FILE: /livekit/livekit.yaml
+      AEGENTICA_MODE: pipeline
+      PORT: "8080"
+
+volumes:
+  livekit-config:
+    external: true
+    name: eve-chat-data
+
+networks:
+  dokploy-network:
+    external: true

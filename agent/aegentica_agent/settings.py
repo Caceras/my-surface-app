@@ -9,11 +9,40 @@ from typing import Mapping
 AGENT_NAME = "aegentica"
 
 
+def keys_from_file(path: str) -> tuple[str, str]:
+    """The first API key and secret under `keys:` in a livekit-server config file.
+
+    Lets the agent share a self-hosted LiveKit server's keys by mounting its
+    config read-only, so the secret is never copied into another place.
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except OSError as e:
+        raise ValueError(f"LIVEKIT_KEYS_FILE cannot be read ({e.strerror})") from None
+    inside = False
+    for line in lines:
+        text = line.split("#", 1)[0].rstrip()
+        if not text.strip():
+            continue
+        if not line[:1].isspace():
+            inside = text.strip() == "keys:"
+            continue
+        if inside and ":" in text:
+            key, secret = (part.strip().strip("'\"") for part in text.split(":", 1))
+            if key and secret:
+                return key, secret
+    raise ValueError("LIVEKIT_KEYS_FILE has no key under keys:")
+
+
 @dataclass(frozen=True)
 class Settings:
     livekit_url: str
     livekit_api_key: str
     livekit_api_secret: str
+    # The address the phone connects to, when the agent reaches LiveKit
+    # another way (for example over a private Docker network).
+    public_url: str = ""
     # "pipeline": speech-to-text, an OpenRouter model, text-to-speech.
     # "realtime": Gemini Live speech-to-speech with the owner's Google key.
     mode: str = "pipeline"
@@ -32,10 +61,14 @@ class Settings:
         def get(name: str, default: str = "") -> str:
             return env.get(name, default).strip()
 
+        key, secret = get("LIVEKIT_API_KEY"), get("LIVEKIT_API_SECRET")
+        if not (key and secret) and get("LIVEKIT_KEYS_FILE"):
+            key, secret = keys_from_file(get("LIVEKIT_KEYS_FILE"))
         s = Settings(
             livekit_url=get("LIVEKIT_URL"),
-            livekit_api_key=get("LIVEKIT_API_KEY"),
-            livekit_api_secret=get("LIVEKIT_API_SECRET"),
+            livekit_api_key=key,
+            livekit_api_secret=secret,
+            public_url=get("LIVEKIT_PUBLIC_URL") or get("LIVEKIT_URL"),
             mode=get("AEGENTICA_MODE", "pipeline").lower(),
             openrouter_api_key=get("OPENROUTER_API_KEY"),
             google_api_key=get("GOOGLE_API_KEY"),
@@ -50,8 +83,10 @@ class Settings:
         problems = []
         if not s.livekit_url.startswith(("wss://", "ws://")):
             problems.append("LIVEKIT_URL must be the wss:// address of your LiveKit project or server")
+        if need_access_code and not s.public_url.startswith("wss://"):
+            problems.append("LIVEKIT_PUBLIC_URL (or LIVEKIT_URL) must be a wss:// address the phone can reach")
         if not s.livekit_api_key or not s.livekit_api_secret:
-            problems.append("LIVEKIT_API_KEY and LIVEKIT_API_SECRET are required")
+            problems.append("LIVEKIT_API_KEY and LIVEKIT_API_SECRET (or LIVEKIT_KEYS_FILE) are required")
         if s.mode not in ("pipeline", "realtime"):
             problems.append("AEGENTICA_MODE must be pipeline or realtime")
         if s.mode == "pipeline" and not s.openrouter_api_key and not need_access_code:
