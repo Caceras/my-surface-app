@@ -14,7 +14,7 @@ Build 183 had these gaps:
 
 ## Repair
 
-- **Phone assistant:** `VoiceInteractionService` role, a session that hands screen text and screenshot to a glass assistant panel, and Nano image input.
+- **Phone assistant:** `VoiceInteractionService` role, a session that hands screen text and screenshot to an ask-bar panel, and Nano image input.
 - **Assistant safety:**
   - screen content is marked as data;
   - one tap leaves the screen out;
@@ -31,12 +31,14 @@ Build 183 had these gaps:
 
 ## Review findings fixed before push
 
-The owner reviewed the first assistant render as "horrible" and pointed to their own glass ask bars (EmmaDiaz `AskBar`, awesome-SEO `AskBar`). The panel was rebuilt to match:
-- a floating rounded glass prompt bar with an Æ context chip and a round send button;
-- suggestions and the answer in glass cards above it, with text actions;
-- a light bottom shade instead of a dark scrim.
+The owner reviewed the assistant renders twice as "horrible" and pointed to their own ask bars (EmmaDiaz `AskBar`, then specifically the awesome-SEO `AskBar` in `apps/web/src/app/ask/AskBar.tsx`). The panel now follows the awesome-SEO bar's own tokens and measurements:
+- square "strong glass" panels: a near-white fill, a hairline ink ring and a soft wide shadow;
+- a neutral ink palette (`ask_*` colours, with dark-mode equivalents) instead of the app's sky-blue accents;
+- a 48dp bar with a grey context chip (the Æ mark on an ink square, then the app name), a 16sp prompt, a microphone and a 36dp round send button (ink with a white arrow when there is text, grey when empty, a stop square while answering);
+- a suggestions panel ("Ask about Sheets") and a conversation panel with an "Asked from Sheets" header, hide and clear buttons, the question as a grey bubble on the right, the answer at 14sp and bordered *Copy* and *Save to notes* buttons followed by plain text actions;
+- no shade over the other app, and at most 680dp wide on large screens.
 
-Renders now show a stand-in app behind the panel instead of the test's empty background. Without a cross-window blur, the glass is nearly opaque so answers stay legible over busy screens.
+Renders show a stand-in Sheets screen behind the panel. Android cannot blur another app behind a single view, so the glass is slightly more opaque than the web bar to keep answers legible over busy screens. Compact controls draw at the web's 32dp but keep 48dp touch areas.
 
 Preflight caught two problems, both fixed:
 - service classes must live in their own files;

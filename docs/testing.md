@@ -81,7 +81,7 @@ Both APKs also pass Android `apksigner verify`; certificate fingerprints are ret
 
 ## Narrow lint exceptions
 
-Two source-local exceptions are documented beside the code: the Intent tile overload is used only under an explicit runtime API < 34 check because the PendingIntent overload does not exist there; `PresenceView` deliberately extends the framework ImageView and applies its own tint despite Nano's transitive AppCompat dependency. Neither exception disables lint globally. Other errors/fatals still block the release.
+Three source-local exceptions are documented beside the code: the Intent tile overload is used only under an explicit runtime API < 34 check because the PendingIntent overload does not exist there; `PresenceView` deliberately extends the framework ImageView and applies its own tint despite Nano's transitive AppCompat dependency; the Nano manifest's `tools:node="remove"` marker for LiveKit's camera permission is read by lint as a camera permission (`PermissionImpliesUnsupportedChromeOsHardware`), so that one element carries a local ignore. None of these exceptions disables lint globally. Other errors/fatals still block the release.
 
 Screenshot capture drains immediate dialog layout work, remeasures the frame and verifies shared-header close controls before drawing. This catches missing or clipped exits that a painted-pixel threshold alone cannot detect.
 

@@ -31,7 +31,8 @@ class AgentService : Service(), AgentConversation.Listener {
 
     private fun foreground(): Boolean = try {
         getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(CHANNEL, "Agent voice", NotificationManager.IMPORTANCE_LOW))
-        startForeground(ID, notification(this, conversation), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+        if (android.os.Build.VERSION.SDK_INT >= 30) startForeground(ID, notification(this, conversation), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+        else startForeground(ID, notification(this, conversation))
         true
     } catch (_: Exception) { false }
 

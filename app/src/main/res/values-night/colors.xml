@@ -19,4 +19,16 @@
     <color name="presence_bg">#173E55</color>
     <color name="scrim">#F20C1720</color>
     <color name="listening">#91DAFF</color>
+    <color name="ask_ink">#F4F4F5</color>
+    <color name="ask_ink_2">#D4D4D8</color>
+    <color name="ask_ink_3">#A1A1AA</color>
+    <color name="ask_ink_4">#71717A</color>
+    <color name="ask_sunken">#27272A</color>
+    <color name="ask_line_strong">#3F3F46</color>
+    <color name="ask_surface">#18181B</color>
+    <color name="ask_on_ink">#111114</color>
+    <color name="ask_glass">#F218181B</color>
+    <color name="ask_ring">#1FFFFFFF</color>
+    <color name="ask_divider">#14FFFFFF</color>
+    <color name="ask_press">#1FFFFFFF</color>
 </resources>

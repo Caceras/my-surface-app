@@ -154,7 +154,9 @@ object AgentTools {
  * the transcript in order (interim segments are replaced by final ones),
  * answers tool calls and saves the final words verbatim when it ends.
  */
-class AgentConversation(private val context: Context, private val listener: Listener) {
+class AgentConversation(context: Context, private val listener: Listener) {
+    /** Application context: the service keeps this conversation in a static field. */
+    private val context: Context = context.applicationContext
     enum class State { CONNECTING, LISTENING, THINKING, SPEAKING, ENDED }
     interface Listener {
         fun changed(conversation: AgentConversation)

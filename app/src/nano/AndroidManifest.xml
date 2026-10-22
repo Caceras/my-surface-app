@@ -2,8 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- LiveKit declares the camera; Agent voice never uses it, so the Nano build does not ask for it. -->
-    <uses-permission android:name="android.permission.CAMERA" tools:node="remove" />
+    <!--
+        LiveKit declares the camera; Agent voice never uses it, so the Nano build
+        removes it. Lint reads this removal marker as a camera permission without
+        a camera <uses-feature>, hence the single, local ignore.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" tools:node="remove"
+        tools:ignore="PermissionImpliesUnsupportedChromeOsHardware" />
 
     <application>
 

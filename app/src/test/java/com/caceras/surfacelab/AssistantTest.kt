@@ -118,6 +118,13 @@ class AssistantTest {
         byTag(root, "assistant-ask").performClick(); idle()
         assertNull(brain.looked); assertEquals("Explain what is on this screen.", brain.instruction); assertEquals(sheet, brain.input)
         brain.finish!!(BrainResult("Ett kalkylark.", true)); idle()
+        // The chevron tucks the answer behind the bar; the cross clears it and brings the suggestions back.
+        byTag(root, "assistant-minimise").performClick(); idle()
+        assertEquals(View.GONE, byTag(root, "assistant-card").visibility); assertEquals(View.VISIBLE, byTag(root, "assistant-show").visibility)
+        byTag(root, "assistant-show").performClick(); idle()
+        assertEquals(View.VISIBLE, byTag(root, "assistant-card").visibility)
+        byTag(root, "assistant-close").performClick(); idle()
+        assertEquals(View.GONE, byTag(root, "assistant-card").visibility); assertEquals(View.VISIBLE, byTag(root, "assistant-suggestions").visibility)
         // One tap on the context chip leaves the screen out of the next question entirely.
         byTag(root, "assistant-screen").performClick(); idle()
         assertEquals("Screen off", (byTag(root, "assistant-seen") as TextView).text.toString())
