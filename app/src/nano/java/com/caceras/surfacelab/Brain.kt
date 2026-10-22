@@ -1,6 +1,7 @@
 package com.caceras.surfacelab
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import com.google.common.util.concurrent.ListenableFuture
@@ -93,6 +94,28 @@ private object NanoBrain : SurfaceBrain {
         instruction: String,
         onPartial: (String) -> Unit,
         onResult: (BrainResult) -> Unit
+    ) = start(task, input, instruction, null, onPartial, onResult)
+
+    /** Gemini Nano takes images together with text (ML Kit Prompt API, up to 10 images). */
+    override fun seesImages(context: Context) = true
+
+    override fun look(
+        context: Context,
+        task: Task,
+        input: String,
+        instruction: String,
+        image: Bitmap,
+        onPartial: (String) -> Unit,
+        onResult: (BrainResult) -> Unit
+    ) = start(task, input, instruction, image, onPartial, onResult)
+
+    private fun start(
+        task: Task,
+        input: String,
+        instruction: String,
+        image: Bitmap?,
+        onPartial: (String) -> Unit,
+        onResult: (BrainResult) -> Unit
     ) {
         cancel()
         val token = generation
@@ -109,7 +132,7 @@ private object NanoBrain : SurfaceBrain {
             if (!active()) return@checked
             when (checked.getOrNull()) {
                 FeatureStatus.AVAILABLE ->
-                    generate(client, task, prompt, active, { pending = it }, onPartial, onResult)
+                    generate(client, task, prompt, image, active, { pending = it }, onPartial, onResult)
 
                 FeatureStatus.DOWNLOADABLE ->
                     client.download(object : DownloadCallback {
@@ -117,7 +140,7 @@ private object NanoBrain : SurfaceBrain {
                         override fun onDownloadProgress(bytes: Long) {}
 
                         override fun onDownloadCompleted() {
-                            main.post { if (active()) generate(client, task, prompt, active, { pending = it }, onPartial, onResult) }
+                            main.post { if (active()) generate(client, task, prompt, image, active, { pending = it }, onPartial, onResult) }
                         }
 
                         override fun onDownloadFailed(e: GenAiException) {
@@ -152,6 +175,7 @@ private fun generate(
     client: GenerativeModelFutures,
     task: Task,
     prompt: String,
+    image: Bitmap?,
     active: () -> Boolean,
     track: (ListenableFuture<*>) -> Unit,
     onPartial: (String) -> Unit,
@@ -169,9 +193,9 @@ private fun generate(
         val text = if (useSystem || instruction.isEmpty()) prompt
                    else instruction + "\n\n" + prompt
 
-        val builder = GenerateContentRequest.Builder(
-            listOf(Content.Builder().text(text).build())
-        )
+        // The picture comes first, then the request about it.
+        val content = Content.Builder().apply { if (image != null) image(image) }.text(text).build()
+        val builder = GenerateContentRequest.Builder(listOf(content))
         // Low temperature: these are transformations of the user's own text,
         // not creative writing. Raise it for the Ask preset if you disagree.
         builder.temperature = if (task == Task.ASK) 0.7f else 0.2f

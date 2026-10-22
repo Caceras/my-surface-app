@@ -9,7 +9,7 @@ import javax.net.ssl.HttpsURLConnection
 /** One persisted dispatcher. Occurrences are claimed durably before network I/O; uncertain sends never retry. */
 class RoutineJobService:JobService() {
     @Volatile private var stopped=false
-    @Volatile private var connection:HttpsURLConnection?=null
+    @Volatile private var connection:ConnectedAI.Call?=null
     override fun onStartJob(params:JobParameters):Boolean {
         stopped=false
         Thread {
@@ -65,7 +65,7 @@ class RoutineJobService:JobService() {
         val open=PendingIntent.getActivity(this,0,WorkspaceActivity.intent(this,"library",id).setData(Uri.Builder().scheme("aegentica").authority("result").appendPath(id).build()),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         manager.notify(id,2,Notification.Builder(this,Reminders.CHANNEL).setSmallIcon(R.drawable.ic_surface).setContentTitle("Ægentica AI").setContentText("Your AI routine has a result in Library.").setContentIntent(open).setVisibility(Notification.VISIBILITY_PRIVATE).setAutoCancel(true).build())
     }
-    override fun onStopJob(params:JobParameters):Boolean { stopped=true; connection?.disconnect(); return false }
+    override fun onStopJob(params:JobParameters):Boolean { stopped=true; connection?.cancel(); return false }
     companion object {
         private const val JOB=8041
         private val activeClaims=java.util.Collections.synchronizedSet(mutableSetOf<String>())

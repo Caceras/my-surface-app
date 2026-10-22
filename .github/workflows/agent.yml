@@ -1,0 +1,27 @@
+name: LiveKit agent tests
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["agent/**", ".github/workflows/agent.yml"]
+  pull_request:
+    paths: ["agent/**", ".github/workflows/agent.yml"]
+
+# Tests never need repository write access.
+permissions:
+  contents: read
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Install pinned dependencies
+        working-directory: agent
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet -r requirements-test.txt
+      - name: Run agent tests
+        working-directory: agent
+        run: .venv/bin/python -m pytest -q

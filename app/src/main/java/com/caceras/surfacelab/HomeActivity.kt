@@ -199,6 +199,9 @@ class HomeActivity : Activity() {
         if(Live.available()) parent.addView(actionRow("Talk live with Gemini") { startActivity(LiveActivity.intent(this, start = true)) }.apply {
             tag="home-live"; contentDescription="Start a real-time voice conversation with Gemini about your notes"
         },LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(16); bottomMargin=dp(4) })
+        if(AgentRooms.available()) parent.addView(actionRow("Talk with your agent · LiveKit") { startActivity(AgentActivity.intent(this, start = AgentConfig.configured(this))) }.apply {
+            tag="home-agent"; contentDescription="Real-time voice with your own LiveKit agent, which can see a screen you share"
+        },LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(4) })
         val turns=Chat.load(this)
         if(turns.isEmpty()) {
             muted(parent,"Your conversation lives here. The same AI bar stays available on every page.")

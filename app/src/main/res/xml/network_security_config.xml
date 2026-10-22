@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    HTTPS everywhere. The one exception is the owner's own Tailscale network:
+    *.ts.net names resolve only inside the tailnet, and Tailscale encrypts
+    that traffic end to end, so a local Ollama or LM Studio server on the Mac
+    can be reached without its own certificate.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">ts.net</domain>
+    </domain-config>
+</network-security-config>

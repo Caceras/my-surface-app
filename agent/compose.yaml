@@ -1,0 +1,17 @@
+# Two services from one image. Only the token endpoint needs a public HTTPS
+# address (put it behind your reverse proxy, e.g. Dokploy/Traefik); the agent
+# only connects out to LiveKit. Secrets come from .env, never from git.
+services:
+  agent:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+  token:
+    build: .
+    env_file: .env
+    command: ["python", "-m", "aegentica_agent.token_server"]
+    environment:
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped

@@ -111,6 +111,47 @@ On Pixel: export first; install and verify version; create/dictate/edit a note; 
 
 On the Pixel, record: engine label shown (Gemini on-device vs Android), Swedish and English accuracy on the same 5-minute passage, a 30–60 minute session with the screen locked (lines keep arriving; notification Pause/Stop work), behaviour during an incoming call, start sounds between segments, battery drop per hour, Polish quality with Nano, recall on a known phrase, Gemini preset with a real key, and the Markdown vault in a local folder opened by Obsidian. JVM tests cannot establish any of these.
 
+## Assistant, providers and agent acceptance
+
+`ProvidersTest` covers:
+- streaming with OpenRouter keep-alive comments;
+- errors inside a 200 stream, and 402, 403 and 200-with-error bodies;
+- servers that ignore `stream`;
+- per-provider request options (OpenRouter privacy routing and reasoning, Gemini reasoning, local `max_tokens`);
+- images only for models that see them;
+- the Gemini key surviving a switch to OpenRouter (legacy installs included);
+- Tailscale-only plain HTTP;
+- voice using the connected model only after its opt-in;
+- model-list parsing;
+- the settings presets.
+
+`AssistantTest` covers:
+- screen text reading order, with password fields skipped;
+- the screen marked as data with the request last;
+- the panel sending the screenshot only to a model that sees images, and offering explicit follow-ups;
+- the chip leaving the screen out;
+- leaving the panel cancelling generation and dropping late results;
+- the direct-open explanation;
+- the follow-up detector;
+- Gemini Live receiving the screen text and exactly one frame.
+
+`AgentTest` covers:
+- room tickets and errors;
+- tool validation and size limits;
+- transcript order with interim text replaced;
+- proposals that run only when tapped;
+- the verbatim save;
+- the service's Stop action.
+
+`agent/tests` (CI job *LiveKit agent tests*) covers the token endpoint's access code, rate limit and ticket claims, tool forwarding and checks, settings validation and both voice modes. `ShotTest` renders `assistant-ready`, `assistant-panel` (over a stand-in app screenshot) and `agent-voice`.
+
+On the Pixel:
+- choose Ægentica as digital assistant and invoke it with the corner swipe and power button, over Sheets, Gmail and a banking app (which should arrive empty);
+- Nano answering about a screenshot in Swedish;
+- OpenRouter with a real key: streaming, the model picker, and a spent credit limit;
+- a local Ollama server over Tailscale;
+- Agent voice end to end on LiveKit Cloud: Swedish turn-taking, sharing another app's screen, a timer proposal, Stop from the notification.
+
 ## Recorded audio acceptance
 
 `AudioTest` drives `TranscriptionService` in record mode with Robolectric's `MediaRecorder` and a scripted Gemini HTTP seam: parts listed with durations, rollover at 25 minutes, paused time excluded, permanent deletion removing files, no empty note for an empty recording, recovery of unlisted parts after process death (empty files removed, unknown files untouched), Gemini request shape, part offsets, upload deletion on success/error/cancel, cancel on leaving the note with the late result dropped, editor transcription into an empty note, speaker renaming in the working text only, and shared audio import with an untrusted file name. `ShotTest` renders `transcribe-record-ready` and `recording-note`.
