@@ -3,6 +3,7 @@ import json
 import pytest
 from livekit.agents import ToolError
 
+from aegentica_agent import agent
 from aegentica_agent.agent import Assistant, build_session, instructions
 from aegentica_agent.settings import Settings
 
@@ -53,3 +54,15 @@ async def test_both_modes_build_without_network():
     assert pipeline.llm is not None and pipeline.stt is not None and pipeline.tts is not None
     realtime = build_session(Settings.from_env({**BASE, "AEGENTICA_MODE": "realtime", "GOOGLE_API_KEY": "g"}))
     assert realtime.llm is not None
+
+
+def test_the_image_build_downloads_models_without_keys_but_running_needs_them(monkeypatch):
+    for name in ("LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "LIVEKIT_KEYS_FILE", "OPENROUTER_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    ran = []
+    monkeypatch.setattr(agent.cli, "run_app", lambda server: ran.append(server))
+    agent.main(["download-files"])
+    assert ran == [agent.server]
+    with pytest.raises(ValueError, match="LIVEKIT_URL"):
+        agent.main(["start"])
+    assert len(ran) == 1

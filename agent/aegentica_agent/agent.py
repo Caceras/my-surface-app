@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from datetime import date
 from typing import Awaitable, Callable
 
@@ -241,11 +242,14 @@ async def entrypoint(ctx: JobContext) -> None:
     await session.generate_reply(instructions="Greet the owner in one short sentence in Swedish.")
 
 
-def main() -> None:
-    settings = Settings.from_env()  # fail fast with a readable message
-    # The worker reads its LiveKit credentials from the environment; keys taken
-    # from LIVEKIT_KEYS_FILE stay in this process only.
-    os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"] = settings.livekit_api_key, settings.livekit_api_secret
+def main(argv: list[str] | None = None) -> None:
+    # The image build runs `download-files` to bake in the voice-activity
+    # model; it needs no keys, which only exist where the agent runs.
+    if "download-files" not in (sys.argv[1:] if argv is None else argv):
+        settings = Settings.from_env()  # fail fast with a readable message
+        # The worker reads its LiveKit credentials from the environment; keys
+        # taken from LIVEKIT_KEYS_FILE stay in this process only.
+        os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"] = settings.livekit_api_key, settings.livekit_api_secret
     cli.run_app(server)
 
 
