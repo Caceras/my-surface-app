@@ -7,6 +7,9 @@ x-agent: &agent
   build:
     context: https://github.com/Caceras/my-surface-app.git#main:agent
   image: aegentica-voice-agent:main
+  # LiveKit's config folder belongs to uid 1000 (mode 700): read it as that
+  # user, still not root.
+  user: "1000:1000"
   env_file: .env
   environment:
     # Inside the server: straight to the LiveKit container on Dokploy's network.
