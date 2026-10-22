@@ -14,7 +14,7 @@ permissions:
 jobs:
   agent:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Install pinned dependencies
@@ -25,3 +25,7 @@ jobs:
       - name: Run agent tests
         working-directory: agent
         run: .venv/bin/python -m pytest -q
+      # The server builds this image; build it here too so a broken build step
+      # fails the pull request instead of the deploy.
+      - name: Build the agent image
+        run: docker build --quiet --tag aegentica-voice-agent:ci agent
