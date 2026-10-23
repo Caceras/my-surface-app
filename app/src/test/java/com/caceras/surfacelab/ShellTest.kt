@@ -4,6 +4,9 @@ import android.Manifest
 import android.app.Application
 import android.content.ClipData
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.net.Uri
 import android.os.Looper
 import android.webkit.PermissionRequest
@@ -16,6 +19,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowSystemClock
 import java.net.Socket
 import java.time.Duration
 
@@ -110,6 +115,85 @@ class ShellTest {
         assertEquals(1, sent.size)
         bridge.receive("""{"t":"hello"}""")
         assertEquals("Kept for the next page", sent.last().getString("text"))
+    }
+
+    @Test fun `a screen goes to the page with its screenshot, and the protocol stays version 1`() {
+        val (bridge, _, sent) = bridge()
+        val shot = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+        bridge.context("screen", text = "Hej Riki", title = "My screen in Messages", app = "Messages", screenshot = shot)
+        bridge.context("screen", text = "Not a picture", screenshot = "javascript:alert(1)")
+        bridge.context("screen", text = "Too big", screenshot = "data:image/jpeg;base64," + "A".repeat(ScreenContexts.MAX_DATA_URL))
+        bridge.context("share", text = "No picture at all")
+        bridge.receive("""{"t":"hello","v":1}""")
+        assertEquals(ShellBridge.APP, sent[0].getString("app"))
+        assertEquals("pages still find the app by the same user agent", "AegenticaShell/1", ShellActivity.USER_AGENT)
+        val screen = sent[1]
+        assertEquals("screen", screen.getString("kind"))
+        assertEquals("Hej Riki", screen.getString("text"))
+        assertEquals("My screen in Messages", screen.getString("title"))
+        assertEquals("Messages", screen.getString("app"))
+        assertEquals(shot, screen.getString("screenshot"))
+        assertFalse("only a JPEG data URL goes along", sent[2].has("screenshot"))
+        assertEquals("Not a picture", sent[2].getString("text"))
+        assertFalse("an oversized one is left out", sent[3].has("screenshot"))
+        assertFalse(sent[4].has("screenshot"))
+    }
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `the screenshot travels as a JPEG of at most 1280 pixels and about 1,5 MB, smaller when busy`() {
+        // A Pixel 10 Pro XL screen, portrait.
+        val screen = Bitmap.createBitmap(1344, 2992, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }
+        val url = ScreenContexts.dataUrl(screen)!!
+        assertTrue(url.startsWith("data:image/jpeg;base64,/9j/"))
+        assertTrue(url.length <= ScreenContexts.MAX_DATA_URL)
+        val picture = decode(url)
+        assertEquals(1280, picture.height)
+        assertEquals(574, picture.width)
+
+        // Noise compresses badly: under a tight limit it is compressed harder, then made smaller.
+        val random = java.util.Random(7)
+        val busy = Bitmap.createBitmap(1280, 576, Bitmap.Config.ARGB_8888).apply {
+            setPixels(IntArray(width * height) { random.nextInt() or 0xFF000000.toInt() }, 0, width, 0, 0, width, height)
+        }
+        val full = ScreenContexts.dataUrl(busy)!!
+        val tight = ScreenContexts.dataUrl(busy, maxChars = full.length / 4)!!
+        assertTrue(tight.length <= full.length / 4)
+        assertTrue("still a picture", decode(tight).width in 1..1280)
+        assertNull("nothing fits in a few bytes", ScreenContexts.dataUrl(busy, maxChars = 100))
+    }
+
+    private fun decode(url: String): Bitmap {
+        val bytes = android.util.Base64.decode(url.substringAfter(","), android.util.Base64.DEFAULT)
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    }
+
+    @Test fun `the assistant's screen opens aegentica-se once, held in memory and never in the intent`() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        val shot = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+        val open = ShellActivity.handOver(AegenticaActivity.intent(context),
+            ShellActivity.Handed("screen", "Hej Riki", "My screen in Messages", "Messages", shot))
+        assertTrue("the intent carries no data", open.extras?.isEmpty ?: true)
+        val controller = Robolectric.buildActivity(AegenticaActivity::class.java, open).setup()
+        val activity = controller.get()
+        val queued = activity.bridge.queued().map { JSONObject(it) }
+        assertEquals("kept until the page says hello", 1, queued.size)
+        assertEquals("screen", queued[0].getString("kind"))
+        assertEquals("Hej Riki", queued[0].getString("text"))
+        assertEquals("My screen in Messages", queued[0].getString("title"))
+        assertEquals(shot, queued[0].getString("screenshot"))
+        assertEquals(Intent.ACTION_MAIN, activity.intent.action)
+
+        // Another app sending the same action, or the same start again, hands over nothing.
+        controller.newIntent(Intent(ShellActivity.ACTION_CONTEXT).setClass(context, AegenticaActivity::class.java))
+        assertEquals(1, activity.bridge.queued().size)
+
+        // A hand-over the shell never picked up is dropped after a minute.
+        ShellActivity.handOver(Intent(), ShellActivity.Handed("screen", "Old", null, null, null))
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(61))
+        controller.newIntent(Intent(ShellActivity.ACTION_CONTEXT).setClass(context, AegenticaActivity::class.java))
+        assertEquals(1, activity.bridge.queued().size)
+        assertNull(ShellActivity.take())
+        controller.pause().stop().destroy()
     }
 
     @Test fun `sign-in listens on localhost for OpenRouter's redirect and takes its code`() {

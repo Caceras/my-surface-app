@@ -33,7 +33,11 @@ class ShellBridge(private val send: (String) -> Unit, private val phone: Phone) 
         connected = false
     }
 
-    /** Hand the page what another app shared; kept until the page says hello. */
+    /**
+     * Hand the page what another app shared, or the screen the assistant saw; kept until the page
+     * says hello. [screenshot] is an optional JPEG data URL (protocol version 1 still: pages that
+     * do not know the field ignore it).
+     */
     fun context(kind: String, text: String? = null, url: String? = null, title: String? = null,
                 app: String? = null, screenshot: String? = null) {
         val m = JSONObject().put("t", "context").put("kind", kind)
@@ -41,9 +45,13 @@ class ShellBridge(private val send: (String) -> Unit, private val phone: Phone) 
         url?.let { m.put("url", it) }
         title?.let { m.put("title", it.take(300)) }
         app?.let { m.put("app", it.take(100)) }
-        screenshot?.let { m.put("screenshot", it) }
+        screenshot?.takeIf { it.startsWith("data:image/jpeg;base64,") && it.length <= ScreenContexts.MAX_DATA_URL }
+            ?.let { m.put("screenshot", it) }
         if (connected) send(m.toString()) else waiting.addLast(m.toString())
     }
+
+    /** Messages held until the page says hello, for tests. */
+    internal fun queued(): List<String> = waiting.toList()
 
     fun receive(raw: String) {
         val m = runCatching { JSONObject(raw) }.getOrNull() ?: return

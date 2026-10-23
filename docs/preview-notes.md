@@ -1,6 +1,9 @@
 # Current preview changes
 
 **New in this build:**
+- **Chat about your screen on aegentica.se.** In the phone's assistant (swipe up from a bottom corner), tap **Chat about this**: a new chat opens on aegentica.se with the screen's text in the message box and the screenshot attached, so the AI sees what you see. Add your question and send; nothing is sent before you do. After an answer, the pencil icon does the same. A selection goes along as text.
+
+**Earlier in build 213:**
 - **Ægentica opens aegentica.se.** The phone and the computer are now one Ægentica: the same chats, agents, tasks, memory and models, from your own server. What only the phone can add is lent to the site:
   - **Read aloud** uses your phone's offline voices (HayaiTTS and your other voice apps) when Settings → Voice on aegentica.se is set to *This device*: free, without pauses, in the reply's language. *Phone voice → Choose* opens the phone's voice picker.
   - **The microphone** uses the phone's own offline dictation.

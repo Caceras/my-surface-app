@@ -233,6 +233,9 @@ class AssistantActivity : Activity() {
         if (!visible) return
         fun add(view: View) = chips.addView(view, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) })
         val picked = selection
+        if (!context().empty) add(chipView("Chat about this", "assistant-chat", R.drawable.ic_compose) { chatAbout() }.apply {
+            contentDescription = "Chat about this on aegentica.se: a new chat opens with the " + (if (picked != null) "selection" else "screen") + " in the message box"
+        })
         if (picked == null) { SUGGESTIONS.forEach { s -> add(chipView(s, null) { input.setText(s); ask(s, false) }) }; return }
         SELECTION_SUGGESTIONS.forEach { (title, request) -> add(chipView(title, null) { ask(request, false, shown = title) }) }
         add(chipView("Listen", "assistant-listen", R.drawable.ic_volume) { ReadingService.start(this, picked); finish() })
@@ -360,6 +363,7 @@ class AssistantActivity : Activity() {
         }
         add(R.drawable.ic_share_line, "Share", "assistant-share") { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, Markdown.strip(reply)), "Share answer")) }
         add(R.drawable.ic_volume, "Read aloud", "assistant-read") { (mouth ?: Mouth(this).also { mouth = it }).apply { begin(Ears(this@AssistantActivity).locale()); finish(Markdown.strip(reply)) } }
+        if (!context().empty) add(R.drawable.ic_compose, "Chat about this on aegentica.se", "assistant-continue") { chatAbout() }
         if (Live.available() && ConnectedAI.geminiConfigured(this)) add(R.drawable.ic_waves, "Talk live about this screen", "assistant-live") {
             Live.pendingScreen = context().takeIf { !it.empty }
             startActivity(LiveActivity.intent(this, start = true)); finish()
@@ -374,6 +378,25 @@ class AssistantActivity : Activity() {
 
     private fun open(intent: Intent) {
         try { startActivity(intent) } catch (_: Exception) { toast("No app on this phone can open that.") }
+    }
+
+    /**
+     * A new chat on aegentica.se with this screen (its text and a smaller copy of the screenshot)
+     * or the selection in the message box. Nothing is sent there until the owner sends it.
+     */
+    private fun chatAbout() {
+        val screen = context()
+        if (screen.empty) return
+        val app = appName(screen.app).ifBlank { null }
+        val picked = selection != null
+        val what = ShellActivity.Handed(
+            kind = if (picked) "selection" else "screen",
+            text = screen.text,
+            title = (if (picked) "Selected text" else "My screen") + (app?.let { " in $it" } ?: ""),
+            app = app,
+            screenshot = if (picked) null else screen.screenshot?.let { ScreenContexts.dataUrl(it) })
+        startActivity(ShellActivity.handOver(AegenticaActivity.intent(this), what))
+        finish()
     }
 
     private fun listen() {

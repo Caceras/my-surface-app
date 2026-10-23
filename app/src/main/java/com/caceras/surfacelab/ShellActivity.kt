@@ -67,7 +67,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
     protected lateinit var web: WebView
     private lateinit var offline: View
     private val main = Handler(Looper.getMainLooper())
-    private val bridge = ShellBridge({ json -> port?.postMessage(WebMessage(json)) }, this)
+    internal val bridge = ShellBridge({ json -> port?.postMessage(WebMessage(json)) }, this)
     private var channel: Array<WebMessagePort>? = null
     private val port get() = channel?.get(0)
     private var postedForLoad = false
@@ -129,8 +129,16 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
         accept(intent)
     }
 
-    /** What another app handed over: a share (link or text). A return link carries nothing. */
+    /**
+     * What another app handed over: a share (link or text), or the screen the assistant saw
+     * ([handOver]). A return link carries nothing.
+     */
     private fun accept(intent: Intent?) {
+        if (intent?.action == ACTION_CONTEXT) {
+            take()?.let { bridge.context(it.kind, text = it.text, title = it.title, app = it.app, screenshot = it.screenshot) }
+            intent.action = Intent.ACTION_MAIN
+            return
+        }
         if (intent?.action != Intent.ACTION_SEND) return
         val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
         if (text.isEmpty()) return
@@ -376,12 +384,37 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
         },
     )
 
+    /** The assistant's screen (or selection) for the page: text, a title, and a JPEG data URL. */
+    class Handed(val kind: String, val text: String, val title: String?, val app: String?, val screenshot: String?)
+
     companion object {
         /** Pages read this to know they are inside the app; every capability still needs the channel. */
         const val USER_AGENT = "AegenticaShell/1"
         const val HANDSHAKE = "aegentica-shell"
+        /** Opens the shell with what [handOver] left; the intent itself carries nothing. */
+        const val ACTION_CONTEXT = "com.caceras.surfacelab.action.SHELL_CONTEXT"
         private const val PICK_FILES = 31
         private const val MIC = 32
+        /** A hand-over the shell never picked up (the start failed) is dropped after this long. */
+        private const val HANDED_MS = 60_000L
+
+        @Volatile private var handed: Pair<Long, Handed>? = null
+
+        /**
+         * Leave [what] for the shell [intent] opens; it is held in memory only, taken once by the
+         * shell and never stored. The intent carries no data, so another app sending the same
+         * action finds nothing to hand over.
+         */
+        fun handOver(intent: Intent, what: Handed): Intent {
+            handed = android.os.SystemClock.elapsedRealtime() to what
+            return intent.setAction(ACTION_CONTEXT)
+        }
+
+        internal fun take(): Handed? {
+            val (at, what) = handed ?: return null
+            handed = null
+            return what.takeIf { android.os.SystemClock.elapsedRealtime() - at <= HANDED_MS }
+        }
 
         /** One file or several (a page's multiple file input), or none when cancelled. */
         fun chosenFiles(resultCode: Int, data: Intent?): Array<Uri>? {

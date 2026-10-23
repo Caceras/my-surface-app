@@ -112,4 +112,28 @@ object ScreenContexts {
     }
 
     fun jpeg(bitmap: Bitmap, quality: Int = 80): ByteArray = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.JPEG, quality, it) }.toByteArray()
+
+    /** Longest screenshot data URL handed to aegentica.se: about 1.5 MB of message. */
+    const val MAX_DATA_URL = 1_500_000
+    private const val JPEG_URL = "data:image/jpeg;base64,"
+
+    /**
+     * The screenshot as a JPEG data URL for a page in the app (aegentica.se's new chat): at most
+     * [MAX_SIDE] pixels on the long side and [maxChars] characters. A busy screen that does not
+     * fit is compressed harder, then made smaller; null when even that does not fit.
+     */
+    fun dataUrl(bitmap: Bitmap, maxChars: Int = MAX_DATA_URL): String? {
+        var image = scaled(bitmap)
+        repeat(4) {
+            for (quality in intArrayOf(80, 65, 50)) {
+                val bytes = jpeg(image, quality)
+                // Base64 writes four characters for every three bytes.
+                if (JPEG_URL.length + (bytes.size + 2) / 3 * 4 <= maxChars) {
+                    return JPEG_URL + android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                }
+            }
+            image = scaled(image, maxOf(image.width, image.height) * 3 / 4)
+        }
+        return null
+    }
 }

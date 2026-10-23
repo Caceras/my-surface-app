@@ -133,7 +133,8 @@ On the Pixel, record: engine label shown (Gemini on-device vs Android), Swedish 
 - leaving the panel cancelling generation and dropping late results;
 - the direct-open explanation;
 - the follow-up detector;
-- Gemini Live receiving the screen text and exactly one frame.
+- Gemini Live receiving the screen text and exactly one frame;
+- *Chat about this* opening aegentica.se with the screen text and a 1280 px JPEG screenshot (not offered before the screen arrives or with the screen left out), and a selection going as text alone, also after an answer.
 
 `AgentTest` covers:
 - room tickets and errors;
@@ -160,7 +161,7 @@ On the Pixel:
 
 ## Ægentica home acceptance
 
-`ShellTest` covers the bridge (context kept until the page says hello, speech with pause and resume, dictation, sign-in, the voice picker and menu, malformed requests and non-http links ignored, a new page load must say hello again), the localhost sign-in on a real socket (OpenRouter's redirect, the code, the reply page), the Ægentica shell (aegentica.se loads, the user agent names the shell, file access is off, only `aegentica.se` and `www.aegentica.se` stay in the app, a share is consumed once), the microphone rule (aegentica.se after Android's prompt, never the camera, never another site, never Glimt's page), Glimt's shell, and the file picker returning one file, several or none. `ReaderRepairTest` checks that a Swedish reply is read with a Swedish voice, that the reading state reaches the page, and that a pause keeps the reading open while closing the reader ends it. The site's side is tested in `Caceras/aegentica-app` (`scripts/test-phone-app.mjs` and `scripts/test-phone-app-browser.mjs`); Glimt's in `Caceras/awesomeseo-monorepo` (`apps/chatbar/tests/android.test.ts`).
+`ShellTest` covers the bridge (context kept until the page says hello, a screen with its JPEG screenshot under protocol version 1, a screenshot that is not a JPEG data URL or is too large left out, speech with pause and resume, dictation, sign-in, the voice picker and menu, malformed requests and non-http links ignored, a new page load must say hello again), the screenshot as a data URL (a Pixel-sized screen becomes a JPEG of at most 1280 px; a busy one is compressed harder and made smaller to fit, or dropped), the assistant's hand-over to aegentica.se (held in memory, never in the intent, taken once, dropped after a minute), the localhost sign-in on a real socket (OpenRouter's redirect, the code, the reply page), the Ægentica shell (aegentica.se loads, the user agent names the shell, file access is off, only `aegentica.se` and `www.aegentica.se` stay in the app, a share is consumed once), the microphone rule (aegentica.se after Android's prompt, never the camera, never another site, never Glimt's page), Glimt's shell, and the file picker returning one file, several or none. `ReaderRepairTest` checks that a Swedish reply is read with a Swedish voice, that the reading state reaches the page, and that a pause keeps the reading open while closing the reader ends it. The site's side is tested in `Caceras/aegentica-app` (`scripts/test-phone-app.mjs` and `scripts/test-phone-app-browser.mjs`); Glimt's in `Caceras/awesomeseo-monorepo` (`apps/chatbar/tests/android.test.ts`).
 
 On a Pixel:
 
