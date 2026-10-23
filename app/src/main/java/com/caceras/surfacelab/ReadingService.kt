@@ -41,6 +41,8 @@ class ReadingService : Service() {
     private var text = ""
     private var playing = false
     private var error = ""
+    /** The text was read to its end (or the reader closed), not merely paused. */
+    private var ended = false
     private var persistedText: String? = null
     private var persistedIndex = -1
     private var persistedSpeed = -1f
@@ -114,7 +116,7 @@ class ReadingService : Service() {
             else -> {
                 val incoming=intent?.getStringExtra("text")
                 if(incoming!=null) {
-                    error=""; pause(); discardRenders(); text=incoming.take(200000); chunks=segments(text); index=0
+                    error=""; ended=false; pause(); discardRenders(); text=incoming.take(200000); chunks=segments(text); index=0
                     val wanted=intent?.getStringExtra("language")?.takeIf { it.isNotBlank() }?.let { Locale.forLanguageTag(it) }
                     if(wanted?.language!=language?.language) {
                         // Another language needs another voice, maybe another voice app.
@@ -195,7 +197,7 @@ class ReadingService : Service() {
     }
     private fun speak() {
         if(!playing) return
-        if(index>=chunks.size) { index=0; pause(); return }
+        if(index>=chunks.size) { index=0; ended=true; pause(); return }
         if(!ready) {
             if(initialized) { error="Choose an installed offline voice before playing."; pause() }
             else publish()
@@ -219,7 +221,7 @@ class ReadingService : Service() {
         if(initialized && !ready) { error="Choose an installed offline voice before playing."; pause(); return }
         focusHeld=audio.requestAudioFocus(focus)==AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         if(!focusHeld) { error="Audio is in use. Tap Play when it is free."; pause(); return }
-        error=""; generation++; queuedUntil=index; playing=true; startForeground(42,notification())
+        error=""; ended=false; generation++; queuedUntil=index; playing=true; startForeground(42,notification())
         // A sentence paused halfway continues where it stopped.
         val paused=player
         if(paused!=null) { paused.start(); render(); publish() } else speak()
@@ -244,7 +246,7 @@ class ReadingService : Service() {
         speech?.reopen()
     }
     private fun publish() {
-        snapshot=ReadingSnapshot(text,index,chunks.size,playing,speed,error)
+        snapshot=ReadingSnapshot(text,index,chunks.size,playing,speed,error,ended)
         if(persistedText!=text || persistedIndex!=index || persistedSpeed!=speed) WorkspaceStore(this).use {
             if(persistedText!=text) it.put("reading-text",text)
             if(persistedIndex!=index) it.put("reading-index",index.toString())
@@ -272,7 +274,7 @@ class ReadingService : Service() {
         generation++; playing=false; tts?.stop(); speech?.close()
         discardRenders(); cache.deleteRecursively()
         if(focusHeld) audio.abandonAudioFocusRequest(focus)
-        snapshot=snapshot.copy(playing=false)
+        snapshot=snapshot.copy(playing=false,ended=true)
         listener?.invoke(snapshot)
         unregisterReceiver(noisy); session.release(); active=null
         getSystemService(NotificationManager::class.java).cancel(42)
@@ -302,6 +304,13 @@ class ReadingService : Service() {
         fun stop(context:Context) {
             if(active!=null) context.startService(Intent(context,ReadingService::class.java).setAction("stop"))
         }
+        /** Pause or continue what is being read, as the notification's button does. */
+        fun pause(context:Context) {
+            if(active!=null) context.startService(Intent(context,ReadingService::class.java).setAction("pause"))
+        }
+        fun resume(context:Context) {
+            if(active!=null) context.startForegroundService(Intent(context,ReadingService::class.java).setAction("play"))
+        }
         fun start(context:Context,text:String) {
             context.startForegroundService(Intent(context,ReadingService::class.java).putExtra("text",Markdown.strip(text)))
             context.startActivity(Intent(context,ReadingActivity::class.java))
@@ -319,4 +328,4 @@ class ReadingService : Service() {
         }
     }
 }
-data class ReadingSnapshot(val text:String="",val index:Int=0,val count:Int=0,val playing:Boolean=false,val speed:Float=1f,val error:String="")
+data class ReadingSnapshot(val text:String="",val index:Int=0,val count:Int=0,val playing:Boolean=false,val speed:Float=1f,val error:String="",val ended:Boolean=false)

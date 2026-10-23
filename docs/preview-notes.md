@@ -1,6 +1,15 @@
 # Current preview changes
 
 **New in this build:**
+- **Ægentica opens aegentica.se.** The phone and the computer are now one Ægentica: the same chats, agents, tasks, memory and models, from your own server. What only the phone can add is lent to the site:
+  - **Read aloud** uses your phone's offline voices (HayaiTTS and your other voice apps) when Settings → Voice on aegentica.se is set to *This device*: free, without pauses, in the reply's language. *Phone voice → Choose* opens the phone's voice picker.
+  - **The microphone** uses the phone's own offline dictation.
+  - **Share to Ægentica** from any app: the text becomes a new chat's draft, never sent by itself.
+  - **Live voice** can use the microphone after Android asks once.
+  - **Phone** in the side menu opens Glimt for browsing, notes and tasks, recording and transcription, hands-free voice, the reading voice and the phone settings.
+  - aegentica.se's design and features come from your server, so improvements arrive without reinstalling the app. Your chats live on the server, so reinstalling the app loses nothing but the sign-in.
+
+**Earlier in build 209:**
 - **Ægentica opens into Glimt.** The app's home is now Glimt, the chat bar from AwesomeSEO: the same design, models, memory and page reading as Glimt Web, with what only the phone can add.
   - **Read aloud** uses your phone's voices (HayaiTTS and your other voice apps), without pauses between sentences.
   - **The microphone** uses the phone's own offline dictation: words appear as you speak, free.
