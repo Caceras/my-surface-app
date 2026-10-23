@@ -39,9 +39,18 @@ object SpeechVoices {
         sameLanguage(it.locale, locale) && !it.isNetworkConnectionRequired &&
             TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in it.features.orEmpty()
     }.sortedWith(compareByDescending<Voice> { it.quality }
+        .thenBy { family(it) }
         .thenByDescending { it.locale == locale }
         .thenByDescending { it.locale.country == locale.country }
         .thenBy { it.latency }.thenBy { it.name })
+
+    /**
+     * sherpa-onnx engines such as HayaiTTS report every voice as normal
+     * quality; prefer the stronger open model families by name.
+     */
+    private val families = listOf("kokoro", "supertonic", "kitten", "zipvoice", "pocket", "matcha", "piper")
+    private fun family(voice: Voice): Int =
+        families.indexOfFirst { it in voice.name.lowercase(Locale.ROOT) }.let { if (it < 0) families.size else it }
 
     fun choose(voices: Collection<Voice>, locale: Locale, preferred: String? = null): Voice? {
         val available = ranked(voices, locale)
@@ -75,7 +84,7 @@ object SpeechVoices {
         ReadingService.pauseForCapture()
         val locale = Ears(activity).locale()
         val main = Handler(Looper.getMainLooper())
-        val engines = SpeechEngines.installed(activity)
+        val engines = SpeechEngines.installed(activity).sortedBy { it.name == SpeechEngines.GOOGLE }
         val info = activity.label("Loading installed voices...", 14f, true)
         val apps = RadioGroup(activity)
         val list = ListView(activity).apply { choiceMode = ListView.CHOICE_MODE_SINGLE }
@@ -183,14 +192,16 @@ object SpeechVoices {
                     save.isEnabled = true; sample.isEnabled = true
                     return
                 }
-                val other = if (engines.size > 1) " Choose another voice app above." else " Add a voice in Android voice settings."
-                info.text = (if (code != TextToSpeech.SUCCESS) "$app did not start." else "$app has no offline voice for ${locale.displayLanguage}.") + other
+                val other = if (engines.size > 1) " Choose another voice app above, or add a voice in $app." else " Add a voice in $app."
+                val listed = runCatching { tts.voices?.size ?: 0 }.getOrDefault(0)
+                info.text = (if (code != TextToSpeech.SUCCESS) "$app did not start."
+                    else "$app lists $listed ${if (listed == 1) "voice" else "voices"}, none offline for ${locale.displayLanguage}.") + other
                 return
             }
             selected = choose(voices, locale, preferred(activity, name, locale))
-            info.text = "${locale.displayName}. These voices work offline."
+            info.text = "$app \u00b7 ${voices.size} offline ${if (voices.size == 1) "voice" else "voices"} for ${locale.displayLanguage}"
             list.adapter = ArrayAdapter(activity, android.R.layout.simple_list_item_single_choice,
-                voices.mapIndexed { n, voice -> "Voice ${n + 1} \u00b7 ${quality(voice)}\n${voice.locale.displayName}" })
+                voices.map { voice -> "${displayName(voice)}\n${voice.locale.displayName} \u00b7 ${quality(voice)}" })
             list.setItemChecked(voices.indexOf(selected), true)
             save.isEnabled = true; sample.isEnabled = true
         }
@@ -212,7 +223,15 @@ object SpeechVoices {
             // Checking the engine that just loaded must not load it again.
             (group.findViewById<RadioButton>(id)?.tag as? String)?.let { if (it != engineName) load(it) }
         }
-        load(SpeechEngines.chosen(activity)?.takeIf { chosen -> engines.any { it.name == chosen } })
+        load(SpeechEngines.order(engines.map { it.name }, SpeechEngines.chosen(activity)).firstOrNull())
+    }
+
+    /** A readable name. HayaiTTS names multi-speaker voices "model#id#speaker". */
+    fun displayName(voice: Voice): String {
+        val parts = voice.name.split("#", limit = 3)
+        val model = parts[0].replace('_', ' ').replace('-', ' ').trim()
+        val speaker = parts.getOrNull(2)?.trim()?.takeIf { it.isNotEmpty() }
+        return if (speaker != null) "$speaker \u00b7 $model" else model
     }
 
     private fun quality(voice: Voice) = when {
@@ -244,20 +263,28 @@ object SpeechEngines {
         context.getSharedPreferences("surfacelab", Context.MODE_PRIVATE).edit().putString(KEY, engine).apply()
     }
 
-    /** The next engine to try: Google's (on every Pixel) first, then the others in install order. */
-    fun next(installed: List<String>, tried: Collection<String>): String? =
-        (listOf(GOOGLE) + installed).firstOrNull { it in installed && it !in tried }
+    /**
+     * Engines to try, best first: the one chosen in Ægentica, then the
+     * open-source engines the owner installed (HayaiTTS and the like). Google's
+     * engine is used only when chosen, or when it is the only one installed.
+     */
+    fun order(installed: List<String>, chosen: String?): List<String> {
+        val open = installed.filter { it != GOOGLE }
+        return when {
+            chosen != null && chosen in installed -> listOf(chosen) + open.filter { it != chosen }
+            open.isNotEmpty() -> open
+            else -> installed
+        }
+    }
 }
 
 /**
- * Opens a speech engine that can speak offline.
- *
- * Tries the engine chosen in Ægentica (else Android's default) first. When an
- * engine fails to start or has no usable voice for the language, it moves on
- * to Google's engine and then the other installed ones, so one voice app's
- * problem does not silence Read aloud. [done] runs once per opening, on the
- * main thread, with the working engine, or with null and whether any engine
- * started at all.
+ * Opens a speech engine that can speak offline, in [SpeechEngines.order]: the
+ * engine chosen in Ægentica, then the installed open-source engines. When one
+ * fails to start or has no usable voice for the language, the next is tried.
+ * Android's own default is used only when no engine can be listed. [done] runs
+ * once per opening, on the main thread, with the working engine, or with null
+ * and whether any engine started at all.
  */
 class VoiceOutput(
     context: Context,
@@ -273,7 +300,14 @@ class VoiceOutput(
     /** Package of the engine in use. */
     var name: String? = null; private set
 
-    init { open(SpeechEngines.chosen(app)) }
+    private var plan = emptyList<String>()
+
+    init { start() }
+
+    private fun start() {
+        plan = SpeechEngines.order(SpeechEngines.installed(app).map { it.name }, SpeechEngines.chosen(app))
+        open(plan.firstOrNull())
+    }
 
     private fun open(engine: String?) {
         lateinit var created: TextToSpeech
@@ -293,7 +327,7 @@ class VoiceOutput(
         tried += actual
         engine.shutdown()
         tts = null
-        val next = SpeechEngines.next(SpeechEngines.installed(app).map { it.name }, tried)
+        val next = plan.firstOrNull { it !in tried }
         if (next != null) open(next) else done(null, started)
     }
 
@@ -303,7 +337,7 @@ class VoiceOutput(
         tts?.shutdown()
         tts = null; name = null; started = false
         tried.clear()
-        open(SpeechEngines.chosen(app))
+        start()
     }
 
     fun close() {

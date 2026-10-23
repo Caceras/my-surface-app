@@ -139,14 +139,20 @@ class ReaderRepairTest {
         controller.destroy()
     }
 
-    @Test fun `when the default voice app cannot start, reading moves on to Google's engine`() {
-        val google = android.content.pm.ResolveInfo().apply {
+    private fun installEngine(name: String) {
+        val engine = android.content.pm.ResolveInfo().apply {
             serviceInfo = android.content.pm.ServiceInfo().apply {
-                packageName = SpeechEngines.GOOGLE; name = "GoogleTtsService"
-                applicationInfo = android.content.pm.ApplicationInfo().apply { packageName = SpeechEngines.GOOGLE }
+                packageName = name; this.name = "TtsService"
+                applicationInfo = android.content.pm.ApplicationInfo().apply { packageName = name }
             }
         }
-        shadowOf(context.packageManager).addResolveInfoForIntent(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), google)
+        shadowOf(context.packageManager).addResolveInfoForIntent(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), engine)
+    }
+
+    @Test fun `when one open-source voice app cannot start, reading moves on to the next and never to Google`() {
+        installEngine(SpeechEngines.GOOGLE)
+        installEngine("dev.ahmedmohamed.hayaitts")
+        installEngine("com.k2fsa.sherpa.onnx.tts.engine")
         val controller = Robolectric.buildService(ReadingService::class.java).create()
         controller.get().onStartCommand(Intent(context, ReadingService::class.java).putExtra("text", "First sentence. Second sentence."), 0, 1)
         val failing = ShadowTextToSpeech.getLastTextToSpeechInstance()
@@ -155,7 +161,7 @@ class ReaderRepairTest {
         val fallback = ShadowTextToSpeech.getLastTextToSpeechInstance()
         assertNotSame(failing, fallback)
         assertTrue(shadowOf(failing).isShutdown)
-        ShadowTextToSpeech.addVoice(Voice("google", Locale.getDefault(), Voice.QUALITY_HIGH, 100, false, emptySet()))
+        ShadowTextToSpeech.addVoice(Voice("kokoro#3#af_heart", Locale.getDefault(), Voice.QUALITY_NORMAL, 100, false, emptySet()))
         shadowOf(fallback).onInitListener.onInit(TextToSpeech.SUCCESS)
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals("", ReadingService.snapshot.error)
@@ -164,11 +170,46 @@ class ReaderRepairTest {
         controller.destroy()
     }
 
-    @Test fun `engines are tried Google first after the default, and each only once`() {
-        assertEquals(SpeechEngines.GOOGLE, SpeechEngines.next(listOf("com.hayai.tts", SpeechEngines.GOOGLE), listOf("com.hayai.tts")))
-        assertEquals("com.other", SpeechEngines.next(listOf("com.hayai.tts", "com.other", SpeechEngines.GOOGLE), listOf("com.hayai.tts", SpeechEngines.GOOGLE)))
-        assertNull(SpeechEngines.next(listOf("com.hayai.tts"), listOf("com.hayai.tts")))
-        assertNull(SpeechEngines.next(emptyList(), emptyList()))
+    @Test fun `when every open-source voice app fails, reading stops with a message instead of using Google`() {
+        installEngine(SpeechEngines.GOOGLE)
+        installEngine("dev.ahmedmohamed.hayaitts")
+        installEngine("com.k2fsa.sherpa.onnx.tts.engine")
+        val controller = Robolectric.buildService(ReadingService::class.java).create()
+        controller.get().onStartCommand(Intent(context, ReadingService::class.java).putExtra("text", "Keep this text."), 0, 1)
+        val first = ShadowTextToSpeech.getLastTextToSpeechInstance()
+        shadowOf(first).onInitListener.onInit(TextToSpeech.ERROR)
+        shadowOf(Looper.getMainLooper()).idle()
+        val second = ShadowTextToSpeech.getLastTextToSpeechInstance()
+        assertNotSame(first, second)
+        shadowOf(second).onInitListener.onInit(TextToSpeech.ERROR)
+        shadowOf(Looper.getMainLooper()).idle()
+        // No third engine (Google's) was opened.
+        assertSame(second, ShadowTextToSpeech.getLastTextToSpeechInstance())
+        assertFalse(ReadingService.snapshot.playing)
+        assertTrue(ReadingService.snapshot.error.isNotBlank())
+        controller.destroy()
+    }
+
+    @Test fun `engine order puts the chosen and open-source engines first and uses Google only when chosen or alone`() {
+        val hayai = "dev.ahmedmohamed.hayaitts"
+        val sherpa = "com.k2fsa.sherpa.onnx.tts.engine"
+        assertEquals(listOf(hayai, sherpa), SpeechEngines.order(listOf(SpeechEngines.GOOGLE, hayai, sherpa), null))
+        assertEquals(listOf(sherpa, hayai), SpeechEngines.order(listOf(SpeechEngines.GOOGLE, hayai, sherpa), sherpa))
+        assertEquals(listOf(SpeechEngines.GOOGLE, hayai), SpeechEngines.order(listOf(SpeechEngines.GOOGLE, hayai), SpeechEngines.GOOGLE))
+        assertEquals(listOf(SpeechEngines.GOOGLE), SpeechEngines.order(listOf(SpeechEngines.GOOGLE), null))
+        assertEquals(emptyList<String>(), SpeechEngines.order(emptyList(), null))
+    }
+
+    @Test fun `among equally rated open-source voices the stronger model family is the default`() {
+        val piper = Voice("en_US-amy-medium", Locale.US, Voice.QUALITY_NORMAL, 300, false, emptySet())
+        val kokoro = Voice("kokoro-multi-lang-v1_0#3#af_heart", Locale.US, Voice.QUALITY_NORMAL, 300, false, emptySet())
+        assertEquals(kokoro, SpeechVoices.choose(listOf(piper, kokoro), Locale.US))
+        assertEquals(piper, SpeechVoices.choose(listOf(piper, kokoro), Locale.US, "en_US-amy-medium"))
+    }
+
+    @Test fun `voice names show the speaker and model`() {
+        assertEquals("af_heart \u00b7 kokoro multi lang v1 0", SpeechVoices.displayName(Voice("kokoro-multi-lang-v1_0#3#af_heart", Locale.US, 300, 300, false, emptySet())))
+        assertEquals("en us x tpf local", SpeechVoices.displayName(Voice("en-us-x-tpf-local", Locale.US, 300, 300, false, emptySet())))
     }
 
     @Test fun `failed reader initialization stays stopped on play instead of appearing to play silently`() {

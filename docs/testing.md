@@ -150,7 +150,7 @@ On the Pixel:
 - check that the sheet blurs the app behind it, turns nearly opaque in battery saver, rises above the keyboard and closes on a tap outside;
 - with a third-party offline voice app (for example HayaiTTS), confirm the reading-voice picker lists its voices and that a long text reads without pauses between sentences;
 - with the phone language set to English (Sweden), tap the microphone in chat and in the assistant sheet: it should switch to an installed English pack and listen, without a "not ready yet" message;
-- if the default voice app fails or has no voice for the language, confirm Read aloud still plays with Google's voice, and that the picker lists each voice app;
+- with Google as Android's default and HayaiTTS installed, confirm Read aloud uses a HayaiTTS voice, the picker lists HayaiTTS first with voice names, and Google's voice is never used unless picked;
 - select text in Chrome: *Ægentica* opens the sheet; on editable text, *Replace selection* replaces it; *Listen* reads it;
 - turn on *Ægentica keys*, switch to it in Messages and Gmail: Fix and Translate with Nano and with the connected model (Nano may refuse when Ægentica is not the foreground app), Replace and Insert, *Reply to copied*, dictation, the keyboard icon back to Gboard, and a password field showing the panel as off;
 - Nano answering about a screenshot in Swedish;

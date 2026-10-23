@@ -2,7 +2,7 @@
 
 **New in this build:**
 - **A new look, matching aegentica.se.** White and black instead of sky blue, a clean header with icons, "What should we work on?" on an empty chat, and one rounded message box: + for Actions, a bookmark to save a note, the microphone, and a round button that starts Voice when the box is empty and sends when you have typed. Answers get a small row of icons, and the bottom tabs have icons.
-- **Read aloud always finds a voice.** If your voice app does not start or has no voice for your language, Ægentica moves on to Google's voice (on every Pixel) and then any other voice app you have. Settings → *Choose reading voice* now lists your voice apps, so you can pick one and hear a sample.
+- **Your open-source voices come first.** Read aloud now uses the voice app you choose in Ægentica, then the open-source voice apps you installed, such as HayaiTTS, even when Android's default is Google's. Google's voice is used only if you pick it, or if it is the only voice app on the phone. Settings → *Choose reading voice* lists your voice apps and each voice by name (for example Kokoro or Piper speakers), with a sample.
 - **The microphone works with English (Sweden).** Android has no offline speech pack called English (Sweden). Ægentica now switches to an installed English pack, such as English (US), and listens again.
 
 **Earlier in build 198:**
