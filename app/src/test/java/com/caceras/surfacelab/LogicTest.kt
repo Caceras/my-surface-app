@@ -52,7 +52,8 @@ class LogicTest {
 
     @Test
     fun `every task that can reach a model has a system instruction`() {
-        Task.entries.filter { it != Task.UPPERCASE }.forEach {
+        // Uppercase and Listen never reach a model.
+        Task.entries.filter { it != Task.UPPERCASE && it != Task.LISTEN }.forEach {
             assertTrue("$it has no system instruction", Prompts.system(it).isNotBlank())
         }
     }

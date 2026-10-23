@@ -46,7 +46,7 @@ object Prompts {
                 "something on the screen, give the result ready to copy, one item per line, in the screen's order. " +
                 "You cannot tap, type into or change other apps, send messages or change settings; say what the user " +
                 "can do instead. Say when the screen does not show enough to answer."
-        Task.UPPERCASE -> ""
+        Task.UPPERCASE, Task.LISTEN -> ""
     }
 
     /** What actually gets sent, given the selection and the user's own words. */

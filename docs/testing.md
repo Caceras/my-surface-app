@@ -148,6 +148,8 @@ On the Pixel, record: engine label shown (Gemini on-device vs Android), Swedish 
 On the Pixel:
 - choose Ægentica as digital assistant and invoke it with the corner swipe and power button, over Sheets, Gmail and a banking app (which should arrive empty);
 - check that the sheet blurs the app behind it, turns nearly opaque in battery saver, rises above the keyboard and closes on a tap outside;
+- with a third-party offline voice app (for example HayaiTTS), confirm the reading-voice picker lists its voices and that a long text reads without pauses between sentences;
+- select text in Chrome: *Ægentica* opens the sheet; on editable text, *Replace selection* replaces it; *Listen* reads it;
 - Nano answering about a screenshot in Swedish;
 - OpenRouter with a real key: streaming, the model picker, and a spent credit limit;
 - a local Ollama server over Tailscale;

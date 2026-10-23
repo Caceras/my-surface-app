@@ -102,6 +102,9 @@ enum class Task(val alias: String) {
     /** Readable text from dictation or a transcript; the caller keeps the verbatim original. */
     POLISH("Polish"),
 
+    /** Reads the selection aloud with the reader; no model involved. */
+    LISTEN("Listen"),
+
     /**
      * The screen assistant: a request about what is on another app's screen.
      * An empty alias means the task has no text-selection menu entry.

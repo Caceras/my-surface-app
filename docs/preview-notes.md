@@ -1,6 +1,9 @@
 # Current preview changes
 
-**New in this build:** the assistant is now one frosted glass sheet: Android blurs the app behind it, so it floats over what you are doing. Agent voice now runs on the LiveKit server you already host at aegentica.se, so it needs no LiveKit Cloud account.
+**New in this build:**
+- **Your voices work.** Offline voice apps that name languages with three-letter codes, such as HayaiTTS, now show their installed voices; an app that lists none uses its own voice.
+- **Read aloud without pauses.** The next sentences are prepared while one plays, so slow offline voices no longer stop after every sentence.
+- **Ægentica in the selection menu.** Select text in any app and choose *Ægentica*: the frosted sheet opens over the app with Translate, Explain, Summarize, Draft a reply and Improve. In a text field, *Replace selection* puts the answer back. *Listen* reads the selection aloud.
 
 **Your phone's assistant, any model, real-time voice.** Ægentica can now be your *Digital assistant app*: it reads the screen you are on when you ask, and answers with Gemini Nano on the phone, any OpenRouter model, or a model on your own Mac. Agent voice adds a real-time LiveKit agent that can see a screen you share. Guides: [second brain](https://github.com/Caceras/my-surface-app/blob/main/docs/second-brain.md) · [agent voice](https://github.com/Caceras/my-surface-app/blob/main/docs/agent.md).
 

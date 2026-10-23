@@ -21,8 +21,19 @@ import java.util.Locale
 
 /** Shared quality-first, installed-only policy for chat, Voice and the saved-text reader. */
 object SpeechVoices {
+    /**
+     * Engines name languages differently: "en", "eng", or a malformed "en_US".
+     * Offline engines built on older APIs (for example sherpa-onnx based ones)
+     * often report three-letter codes, which a plain comparison never matched.
+     */
+    fun sameLanguage(a: Locale, b: Locale): Boolean = language(a) == language(b)
+    private fun language(locale: Locale): String {
+        val code = locale.language.lowercase(Locale.ROOT).substringBefore('_').substringBefore('-')
+        return runCatching { Locale.forLanguageTag(code).isO3Language }.getOrNull()?.takeIf { it.isNotEmpty() } ?: code
+    }
+
     fun ranked(voices: Collection<Voice>, locale: Locale): List<Voice> = voices.filter {
-        it.locale.language == locale.language && !it.isNetworkConnectionRequired &&
+        sameLanguage(it.locale, locale) && !it.isNetworkConnectionRequired &&
             TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in it.features.orEmpty()
     }.sortedWith(compareByDescending<Voice> { it.quality }
         .thenByDescending { it.locale == locale }
@@ -39,9 +50,20 @@ object SpeechVoices {
         context.getSharedPreferences("surfacelab", Context.MODE_PRIVATE).getString(key(tts, locale), null)
 
     fun apply(context: Context, tts: TextToSpeech, locale: Locale): Boolean = try {
-        val voice = choose(tts.voices.orEmpty(), locale, preferred(context, tts, locale))
-        voice != null && tts.setVoice(voice) == TextToSpeech.SUCCESS
+        val voice = choose(runCatching { tts.voices }.getOrNull().orEmpty(), locale, preferred(context, tts, locale))
+        if (voice != null) tts.setVoice(voice) == TextToSpeech.SUCCESS else engineDefault(tts, locale)
     } catch (_: Exception) { false }
+
+    /**
+     * Some engines list no voices at all and only answer language checks. Use
+     * the engine's own voice for the language then, unless it reports that the
+     * voice is missing or needs the network.
+     */
+    fun engineDefault(tts: TextToSpeech, locale: Locale): Boolean {
+        if (tts.setLanguage(locale) < TextToSpeech.LANG_AVAILABLE) return false
+        val voice = runCatching { tts.voice }.getOrNull() ?: return true
+        return !voice.isNetworkConnectionRequired && TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in voice.features.orEmpty()
+    }
 
     /** Preview is explicit, uses no user text, and stops on pause, dismissal or loss of focus. */
     fun showPicker(activity: Activity, changed: () -> Unit = {}) {
@@ -124,7 +146,28 @@ object SpeechVoices {
             if (closed) return@post
             val tts = engine ?: return@post
             val voices = if (code == TextToSpeech.SUCCESS) runCatching { ranked(tts.voices.orEmpty(), locale) }.getOrDefault(emptyList()) else emptyList()
+            tts.setAudioAttributes(attributes)
+            tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(id: String?) = Unit
+                override fun onDone(id: String?) { main.post { if (!closed && id == "voice-preview:$sampleGeneration") stopSample() } }
+                @Deprecated("Framework callback") override fun onError(id: String?) { main.post { if (!closed && id == "voice-preview:$sampleGeneration") { stopSample(); info.text = "This voice could not play. Try another voice." } } }
+            })
             if (voices.isEmpty()) {
+                if (code == TextToSpeech.SUCCESS && runCatching { engineDefault(tts, locale) }.getOrDefault(false)) {
+                    // The engine speaks the language but lists no voices: offer its own voice.
+                    info.text = "${locale.displayName}. Your voice app uses its own voice for this language."
+                    save.setOnClickListener {
+                        activity.getSharedPreferences("surfacelab", Context.MODE_PRIVATE).edit().remove(key(tts, locale)).apply()
+                        dialog.dismiss(); changed()
+                    }
+                    sample.setOnClickListener {
+                        stopSample()
+                        focusHeld = audio.requestAudioFocus(focus) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+                        if (focusHeld) tts.speak(if (locale.language == "sv") "Det h\u00e4r \u00e4r ett r\u00f6stprov." else "This is a voice preview.", TextToSpeech.QUEUE_FLUSH, null, "voice-preview:$sampleGeneration")
+                    }
+                    save.isEnabled = true; sample.isEnabled = true
+                    return@post
+                }
                 info.text = "No installed offline voice for ${locale.displayLanguage}. Add a voice in Android voice settings."
                 return@post
             }
@@ -134,12 +177,6 @@ object SpeechVoices {
                 voices.mapIndexed { n, voice -> "Voice ${n + 1} \u00b7 ${quality(voice)}\n${voice.locale.displayName}" })
             list.setItemChecked(voices.indexOf(selected), true)
             list.setOnItemClickListener { _, _, position, _ -> stopSample(); selected = voices[position] }
-            tts.setAudioAttributes(attributes)
-            tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(id: String?) = Unit
-                override fun onDone(id: String?) { main.post { if (!closed && id == "voice-preview:$sampleGeneration") stopSample() } }
-                @Deprecated("Framework callback") override fun onError(id: String?) { main.post { if (!closed && id == "voice-preview:$sampleGeneration") { stopSample(); info.text = "This voice could not play. Try another voice." } } }
-            })
             save.isEnabled = true; sample.isEnabled = true
         } }
     }
