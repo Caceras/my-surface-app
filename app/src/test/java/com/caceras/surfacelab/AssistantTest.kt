@@ -136,6 +136,42 @@ class AssistantTest {
         activity.stop().destroy()
     }
 
+    @Test fun `a selection opens the sheet with its own context and an answer can replace an editable selection`() {
+        val brain = StubBrain(images = true); Brains.useForTest(brain)
+        ScreenContexts.text("com.example.mail", "Shared screen"); idle()
+        val before = ScreenContexts.invocation
+        val launch = Intent(Intent.ACTION_PROCESS_TEXT).setClassName(context, "com.caceras.surfacelab.AssistantActivity")
+            .putExtra(Intent.EXTRA_PROCESS_TEXT, "Vi ses i morgon").putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false)
+        val activity = Robolectric.buildActivity(AssistantActivity::class.java, launch).setup()
+        val root = activity.get().window.decorView
+        assertEquals("Selection", (byTag(root, "assistant-seen") as TextView).text.toString())
+        views(root).first { it is TextView && it.text.toString() == "Translate" }.performClick(); idle()
+        assertEquals("Vi ses i morgon", brain.input)
+        assertTrue(brain.instruction.contains("translate it into English"))
+        assertNull("a selection never sends a screenshot", brain.looked)
+        assertEquals("Translate", (byTag(root, "assistant-question") as TextView).text.toString())
+        brain.finish!!(BrainResult("**See you tomorrow**", true)); idle()
+        byTag(root, "assistant-replace").performClick(); idle()
+        val result = shadowOf(activity.get())
+        assertEquals(android.app.Activity.RESULT_OK, result.resultCode)
+        assertEquals("See you tomorrow", result.resultIntent.getStringExtra(Intent.EXTRA_PROCESS_TEXT))
+        activity.pause().stop().destroy()
+        assertEquals("closing a selection leaves the shared screen alone", "Shared screen", ScreenContexts.current.text)
+        assertEquals(before, ScreenContexts.invocation)
+    }
+
+    @Test fun `a read-only selection offers no replace`() {
+        val brain = StubBrain(images = false); Brains.useForTest(brain)
+        val launch = Intent(Intent.ACTION_PROCESS_TEXT).setClassName(context, "com.caceras.surfacelab.AssistantActivity")
+            .putExtra(Intent.EXTRA_PROCESS_TEXT, "Hello").putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
+        val activity = Robolectric.buildActivity(AssistantActivity::class.java, launch).setup()
+        val root = activity.get().window.decorView
+        views(root).first { it is TextView && it.text.toString() == "Explain" }.performClick(); idle()
+        brain.finish!!(BrainResult("A greeting.", true)); idle()
+        assertNull(views(root).firstOrNull { it.tag == "assistant-replace" })
+        activity.pause().stop().destroy()
+    }
+
     @Test fun `opened from settings it explains how to share the screen`() {
         val activity = Robolectric.buildActivity(AssistantActivity::class.java, AssistantActivity.intent(context, direct = true)).setup()
         val root = activity.get().window.decorView

@@ -63,7 +63,8 @@ The Pixel 10 Pro XL is listed in Google's Prompt API support table. Availability
 | Launcher shortcuts | Transcribe, Voice, History and Capture note; Chat/Voice can be pinned | Long-press the launcher icon |
 | Transcribe | Long-form verbatim transcription with a Pause / Stop & save notification | Today or Notes → Transcribe |
 | Share sheet | Stages shared **plain text** in the composer for review | Share text → Ægentica AI |
-| Text selection | Ask, Summarise, Proofread, Make professional or Polish dictation in the Nano build | Select text in a supporting app → overflow menu |
+| Ægentica keys | AI panel beside your keyboard: fix, improve, shorten, translate, continue, reply to copied text, dictate | Settings → Ægentica keys, then the keyboard switcher in any text field |
+| Text selection | *Ægentica* (a frosted sheet with Translate, Explain, Summarize, Reply, Improve and Replace), *Listen*, Summarise, Proofread, Make professional or Polish dictation in the Nano build | Select text in a supporting app → overflow menu |
 
 Ægentica AI does not implement a wake word, autonomous phone automation, background Nano inference, web browsing, Wear OS, or Android Auto. Calendar and Beeper are optional permission-gated integrations. Background connected routines require explicit provider and routine approval. [Ægentica AI behavior and limits](docs/surfaces.md).
 

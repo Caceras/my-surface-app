@@ -12,7 +12,8 @@ Every entry opens a foreground activity. The widget and tile do not run model in
 | Widget | `SurfaceWidgetProvider`, `widget.xml` | Optional last-answer preview, off by default; compact/full Type/Talk layouts; launcher controls placement |
 | App shortcuts | Flavor-specific `shortcuts.xml` | Android launcher entries; API-qualified files expose voice where supported |
 | Share target | MainActivity SEND filter, `text/plain` | Appends supplied text to a reviewed draft; does not fetch a shared URL |
-| Text selection | Flavor aliases → `ProcessTextActivity` | Nano offers Ask/Summarise/Proofread/Make professional/Polish dictation; core offers Uppercase |
+| Ægentica keys | `AegenticaKeyboard` (input method) | Turned on in Android keyboard settings; the owner switches to it from Gboard. Reads the focused field only when an action is tapped, never in password fields; writes only on *Replace* or *Insert*. |
+| Text selection | Flavor aliases → `AssistantActivity`, `ReadingActivity` and `ProcessTextActivity` | *Ægentica* opens the frosted sheet with the selection (Translate, Explain, Summarize, Draft a reply, Improve, and *Replace selection* in editable fields; Nano build). *Listen* reads the selection aloud (both builds). Nano also offers Summarise/Proofread/Make professional/Polish dictation; core offers Uppercase. |
 | Transcribe | `TranscribeActivity` + `TranscriptionService` (microphone foreground service) | Started only from visible UI (Today, Notes, launcher shortcut, Quick Settings *Transcribe* tile via the visible screen); persistent notification with Pause and Stop & save |
 | Live voice | `LiveActivity` (Nano) | AI page → Talk live with Gemini; foreground only, ends on leaving the screen |
 | Digital assistant | `AssistantService` + `AssistantSessionService` → `AssistantActivity` | Chosen in Default apps → Digital assistant app; corner swipe or power button in any app; screen text and screenshot only on invocation |

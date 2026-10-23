@@ -684,6 +684,45 @@ class ShotTest {
         } finally { Brains.useForTest(null); ScreenContexts.begin(); AssistantActivity.blurForTest=null }
     }
 
+    @Test fun `keyboard panel with an answer`() = keyboardShot("")
+    @Test @Config(qualifiers = "w411dp-h914dp-night-xxhdpi") fun `keyboard panel with an answer in dark mode`() = keyboardShot("-night")
+
+    /** Ægentica keys where Android puts a keyboard: at the bottom, under a messaging field. */
+    private fun keyboardShot(suffix: String) {
+        val app = RuntimeEnvironment.getApplication()
+        var finish: ((BrainResult) -> Unit)? = null
+        Brains.useForTest(object : SurfaceBrain {
+            override val tasks = listOf(Task.KEYBOARD)
+            override fun status(context: android.content.Context, onStatus: (BrainStatus) -> Unit) = onStatus(BrainStatus("Test", true))
+            override fun prepare(context: android.content.Context, onStatus: (BrainStatus) -> Unit) = status(context, onStatus)
+            override fun run(context: android.content.Context, task: Task, input: String, instruction: String, onPartial: (String) -> Unit, onResult: (BrainResult) -> Unit) { finish = onResult }
+        })
+        try {
+            val field = android.widget.EditText(app).apply { setText("hej jag kan inte komma imorgon pga jobbet men kanske på fredag istället") }
+            val connection = field.onCreateInputConnection(android.view.inputmethod.EditorInfo())
+            val panel = KeyboardPanel(app, object : KeyboardPanel.Host {
+                override fun connection() = connection
+                override fun editor() = android.view.inputmethod.EditorInfo().apply { inputType = android.text.InputType.TYPE_CLASS_TEXT }
+                override fun backToKeyboard() = Unit
+            })
+            panel.view.findViewWithTag<View>("keys-actions").let { (it as android.view.ViewGroup).getChildAt(1) }.performClick()
+            finish!!(BrainResult("Hej! Jag kan tyvärr inte komma i morgon på grund av jobbet, men kanske på fredag i stället?", true))
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            val view = panel.view
+            view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST))
+            view.layout(0, 0, view.measuredWidth, view.measuredHeight)
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(if (suffix.isEmpty()) Color.rgb(246, 248, 251) else Color.rgb(15, 17, 21))
+            val bubble = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(11, 87, 208) }
+            canvas.drawRoundRect(android.graphics.RectF(width * 0.3f, 300f, width - 40f, 520f), 60f, 60f, bubble)
+            canvas.save(); canvas.translate(0f, (height - view.measuredHeight).toFloat()); view.draw(canvas); canvas.restore()
+            val dir = File("build/screenshots").apply { mkdirs() }
+            File(dir, "keyboard-panel$suffix.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            assertTrue(view.measuredHeight > view.context.dp(200))
+        } finally { Brains.useForTest(null) }
+    }
+
     @Test fun `agent voice with a proposal`() {
         val app=RuntimeEnvironment.getApplication()
         app.getSharedPreferences("agent-voice",0).edit().clear().putString("endpoint","https://agent.example.se/token").commit()

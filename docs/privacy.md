@@ -64,6 +64,8 @@ No broad storage, contacts, direct-call, location, notification-listener, access
 
 Widget previews default off; enabling them can show a pinned note or last answer to anyone viewing the home screen. Compact widgets omit content. Private screen protects app windows/Recents using FLAG_SECURE; it does not encrypt files or protect other apps opened through handoffs. Clipboard copies set sensitive-preview metadata. Editors request no personalized learning, but the keyboard controls its own behavior.
 
+**Ægentica keys** is an input method, so Android warns when it is turned on that a keyboard can read what you type. It reads the focused field (or its selection) only when you tap an action, never in password fields, and sends that text only to the model chosen for the assistant (Gemini Nano, or the connected model after its opt-in). *Reply to copied* reads the clipboard only when tapped. Nothing is written to the field until you tap *Replace* or *Insert*, and nothing typed is stored.
+
 Media metadata and reminder/result notification text are generic. The reader still displays the full chosen text inside the app. Headset disconnection and audio-focus loss pause playback. Streamed foreground answers stop on leaving their original screen; explicit reader playback has its own lifecycle.
 
 ## External actions

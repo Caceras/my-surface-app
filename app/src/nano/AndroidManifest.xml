@@ -12,9 +12,10 @@
 
     <application>
 
+        <!-- "Ægentica" in the selection menu opens the frosted assistant sheet with the selection. -->
         <activity-alias
             android:name=".Ask"
-            android:targetActivity=".ProcessTextActivity"
+            android:targetActivity=".AssistantActivity"
             android:exported="true"
             android:icon="@drawable/ic_surface"
             android:label="@string/task_ask">

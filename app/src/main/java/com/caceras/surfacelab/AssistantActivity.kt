@@ -63,11 +63,23 @@ class AssistantActivity : Activity() {
     private var reply = ""
     private var settled = false
     private var invocation = 0
+    /** Text selected in another app (the selection menu's "Ægentica"); null for the assistant gesture. */
+    private var selection: String? = null
+    /** The selection came from an editable field, so an answer can replace it. */
+    private var editable = false
+    private var source = ""
 
     private fun prefs() = getSharedPreferences("surfacelab", 0)
     /** The owner can leave the screen out of a question with one tap on the context chip. */
     private fun screenOn() = prefs().getBoolean("assistant_screen", true)
-    private fun hint() = if (!ScreenContexts.current.empty && screenOn()) "Ask about this screen" else "Ask anything"
+    private fun hint() = when {
+        selection != null -> "Ask about the selection"
+        !ScreenContexts.current.empty && screenOn() -> "Ask about this screen"
+        else -> "Ask anything"
+    }
+    /** What the next question includes: the selection, or the shared screen unless the owner left it out. */
+    private fun context(): ScreenContext = selection?.let { ScreenContext(source, it, null, true) }
+        ?: ScreenContexts.current.takeIf { screenOn() } ?: ScreenContext()
 
     private fun press() = ColorStateList.valueOf(ink(R.color.ask_press))
     private fun pill(fill: Int?, radius: Int) = GradientDrawable().apply { fill?.let { setColor(ink(it)) }; cornerRadius = dp(radius).toFloat() }
@@ -219,7 +231,11 @@ class AssistantActivity : Activity() {
         val visible = question.isEmpty() && input.text.isBlank()
         suggestions.visibility = if (visible) View.VISIBLE else View.GONE
         if (!visible) return
-        SUGGESTIONS.forEach { s -> chips.addView(chipView(s, null) { input.setText(s); ask(s, false) }, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) }) }
+        fun add(view: View) = chips.addView(view, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) })
+        val picked = selection
+        if (picked == null) { SUGGESTIONS.forEach { s -> add(chipView(s, null) { input.setText(s); ask(s, false) }) }; return }
+        SELECTION_SUGGESTIONS.forEach { (title, request) -> add(chipView(title, null) { ask(request, false, shown = title) }) }
+        add(chipView("Listen", "assistant-listen", R.drawable.ic_volume) { ReadingService.start(this, picked); finish() })
     }
 
     /** The cross ends the current question and returns to the suggestions. */
@@ -230,6 +246,7 @@ class AssistantActivity : Activity() {
     }
 
     private fun chipTapped() {
+        if (selection != null) return
         val c = ScreenContexts.current
         if (c.empty) { if (settled) setup(this); return }
         prefs().edit().putBoolean("assistant_screen", !screenOn()).apply()
@@ -239,8 +256,13 @@ class AssistantActivity : Activity() {
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); stop(); start(intent) }
 
     private fun start(intent: Intent?) {
-        invocation = ScreenContexts.invocation
-        settled = intent?.getBooleanExtra(DIRECT, false) == true
+        selection = intent?.takeIf { it.action == Intent.ACTION_PROCESS_TEXT }
+            ?.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.takeIf { it.isNotBlank() }?.take(ScreenContexts.MAX_TEXT)
+        editable = selection != null && intent?.getBooleanExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false) == false
+        source = callingPackage ?: referrer?.host.orEmpty()
+        // A selection is not a screen invocation: closing must not clear a shared screen.
+        invocation = if (selection != null) -1 else ScreenContexts.invocation
+        settled = selection != null || intent?.getBooleanExtra(DIRECT, false) == true
         if (!settled) main.postDelayed({ settled = true; showContext() }, 2500)
         question = ""; reply = ""; answer.text = ""; asked.text = ""; status.text = ""; actions.removeAllViews(); follows.removeAllViews(); input.setText("")
         card.visibility = View.GONE
@@ -255,6 +277,14 @@ class AssistantActivity : Activity() {
 
     /** The chip says what the next question will include. */
     private fun showContext() {
+        if (selection != null) {
+            seen.text = "Selection"
+            chip.contentDescription = "Including the text you selected" + appName(source).let { if (it.isBlank()) "" else " in $it" }
+            chip.alpha = 1f
+            if (input.hint != "Listening…") input.hint = hint()
+            updateSend(); showSuggestions()
+            return
+        }
         val c = ScreenContexts.current
         val on = screenOn()
         val app = appName(c.app).ifBlank { "Screen" }
@@ -276,9 +306,9 @@ class AssistantActivity : Activity() {
         updateSend(); showSuggestions()
     }
 
-    private fun ask(raw: String, aloud: Boolean) {
-        val screen = ScreenContexts.current.takeIf { screenOn() } ?: ScreenContext()
-        val question = raw.trim().ifEmpty { if (screen.empty) { toast("Type or speak a question."); return } else "Explain what is on this screen." }
+    private fun ask(raw: String, aloud: Boolean, shown: String? = null) {
+        val screen = context()
+        val question = raw.trim().ifEmpty { if (screen.empty) { toast("Type or speak a question."); return } else if (selection != null) "Explain this." else "Explain what is on this screen." }
         stop()
         val chosen = ConnectedAI.assistantBrain(this)
         brain = chosen
@@ -287,9 +317,9 @@ class AssistantActivity : Activity() {
         val image = screen.screenshot?.takeIf { chosen.seesImages(this) }
         val token = ++request
         this.question = question; reply = ""; answer.text = ""; actions.removeAllViews(); follows.removeAllViews()
-        asked.text = question; input.setText("")
+        asked.text = shown ?: question; input.setText("")
         card.visibility = View.VISIBLE; showSuggestions(); updateSend()
-        status.text = (if (screen.empty) "Thinking" else "Reading the screen") + " · " + modelLabel() + if (image != null) " · sees the screenshot" else ""
+        status.text = (if (screen.empty) "Thinking" else if (selection != null) "Reading the selection" else "Reading the screen") + " · " + modelLabel() + if (image != null) " · sees the screenshot" else ""
         val voice = if (aloud) (mouth ?: Mouth(this).also { mouth = it }).apply { begin(Ears(this@AssistantActivity).locale()) } else null
         val partial = { p: String ->
             if (token == request && !isFinishing) {
@@ -323,7 +353,7 @@ class AssistantActivity : Activity() {
             toast("Copied. Paste it where you need it.")
         }
         add(R.drawable.ic_bookmark, "Save to notes", "assistant-save") {
-            val app = appName(ScreenContexts.current.app)
+            val app = appName(context().app)
             WorkspaceStore(this).use { it.save(Record(title = ("Assistant · " + question).take(120), body = Markdown.strip(reply),
                 source = "Assistant · ${modelLabel()}" + if (app.isNotBlank()) " · about $app" else "")) }
             toast("Saved to Notes.")
@@ -331,9 +361,12 @@ class AssistantActivity : Activity() {
         add(R.drawable.ic_share_line, "Share", "assistant-share") { startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, Markdown.strip(reply)), "Share answer")) }
         add(R.drawable.ic_volume, "Read aloud", "assistant-read") { (mouth ?: Mouth(this).also { mouth = it }).apply { begin(Ears(this@AssistantActivity).locale()); finish(Markdown.strip(reply)) } }
         if (Live.available() && ConnectedAI.geminiConfigured(this)) add(R.drawable.ic_waves, "Talk live about this screen", "assistant-live") {
-            Live.pendingScreen = ScreenContexts.current.takeIf { !it.empty && screenOn() }
+            Live.pendingScreen = context().takeIf { !it.empty }
             startActivity(LiveActivity.intent(this, start = true)); finish()
         }
+        if (editable) follows.addView(chipView("Replace selection", "assistant-replace", R.drawable.ic_arrow_up_right) {
+            setResult(RESULT_OK, Intent().putExtra(Intent.EXTRA_PROCESS_TEXT, Markdown.strip(reply))); finish()
+        }, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) })
         AssistantActions.detect(reply).forEach { (title, intent) ->
             follows.addView(chipView(title, "assistant-follow", R.drawable.ic_arrow_up_right) { open(intent) }, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) })
         }
@@ -403,6 +436,13 @@ class AssistantActivity : Activity() {
         internal var blurForTest: Boolean? = null
         private const val REQUEST = 46
         val SUGGESTIONS = listOf("Explain this", "Summarize", "Fill in what's missing", "Draft a reply", "Translate to English")
+        /** Chips for selected text: what the owner sees, then what the model is asked. */
+        val SELECTION_SUGGESTIONS = listOf(
+            "Translate" to "Translate this text. If it is in Swedish, translate it into English; otherwise translate it into Swedish. Reply with the translation only.",
+            "Explain" to "Explain this in plain words.",
+            "Summarize" to "Summarize this in a few short lines.",
+            "Draft a reply" to "Draft a short, friendly reply to this, ready to send.",
+            "Improve" to "Rewrite this so it reads clearly and naturally, keeping its meaning and language. Reply with the rewritten text only.")
         fun intent(context: Context, direct: Boolean = false) = Intent(context, AssistantActivity::class.java).putExtra(DIRECT, direct)
 
         /** How to make Ægentica the phone's assistant, with a shortcut to the right settings page. */

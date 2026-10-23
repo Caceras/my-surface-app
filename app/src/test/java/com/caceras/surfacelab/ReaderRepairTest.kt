@@ -94,19 +94,48 @@ class ReaderRepairTest {
         assertNull(SpeechVoices.choose(voices, Locale.forLanguageTag("sv-SE")))
     }
 
-    @Test fun `saved reader selects the higher quality voice and queues rather than flushes sentences`() {
-        val locale = Locale.getDefault()
-        val high = Voice("high", locale, Voice.QUALITY_HIGH, 300, false, emptySet())
-        ShadowTextToSpeech.addVoice(Voice("basic", locale, Voice.QUALITY_LOW, 100, false, emptySet()))
-        ShadowTextToSpeech.addVoice(high)
+    @Test fun `voices reported with three-letter language codes count, and an engine without a voice list still reads`() {
+        val iso3 = Voice("hayai-en", Locale("eng", "USA"), Voice.QUALITY_NORMAL, 300, false, emptySet())
+        assertEquals(iso3, SpeechVoices.choose(listOf(iso3), Locale.US))
+        assertTrue(SpeechVoices.sameLanguage(Locale("en_us"), Locale.UK))
+        assertFalse(SpeechVoices.sameLanguage(Locale("swe"), Locale.US))
+        // No voices listed, but the engine speaks the language: use its own voice.
+        ShadowTextToSpeech.addLanguageAvailability(Locale.US)
+        val engine = TextToSpeech(context) {}
+        assertTrue(SpeechVoices.apply(context, engine, Locale.US))
+        assertFalse(SpeechVoices.apply(context, engine, Locale.forLanguageTag("sv-SE")))
+    }
+
+    private fun startReader(text: String): Pair<org.robolectric.android.controller.ServiceController<ReadingService>, TextToSpeech> {
+        ShadowTextToSpeech.addVoice(Voice("basic", Locale.getDefault(), Voice.QUALITY_LOW, 100, false, emptySet()))
         val controller = Robolectric.buildService(ReadingService::class.java).create()
         val engine = ShadowTextToSpeech.getLastTextToSpeechInstance()
-        controller.get().onStartCommand(Intent(context, ReadingService::class.java).putExtra("text", "First sentence. Second sentence. Third sentence. Fourth sentence."), 0, 1)
+        controller.get().onStartCommand(Intent(context, ReadingService::class.java).putExtra("text", text), 0, 1)
+        return controller to engine
+    }
+
+    @Test fun `saved reader selects the higher quality voice and renders sentences ahead instead of speaking one at a time`() {
+        val high = Voice("high", Locale.getDefault(), Voice.QUALITY_HIGH, 300, false, emptySet())
+        ShadowTextToSpeech.addVoice(high)
+        val (controller, engine) = startReader("First sentence. Second sentence. Third sentence. Fourth sentence. Fifth sentence.")
         shadowOf(engine).onInitListener.onInit(TextToSpeech.SUCCESS)
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(high, shadowOf(engine).currentVoice)
+        // Four sentences are requested as audio files while the first plays; nothing waits on the speak queue.
+        assertEquals("Fourth sentence. ", shadowOf(engine).lastSynthesizeToFileText)
+        assertTrue(shadowOf(engine).spokenTextList.isEmpty())
+        assertTrue(ReadingService.snapshot.playing)
+        controller.destroy()
+    }
+
+    @Test fun `an engine that cannot render files falls back to the queued speech`() {
+        val (controller, engine) = startReader("First sentence. Second sentence. Third sentence. Fourth sentence.")
+        shadowOf(engine).simulateSynthesizeToFileResult(TextToSpeech.ERROR)
+        shadowOf(engine).onInitListener.onInit(TextToSpeech.SUCCESS)
+        shadowOf(Looper.getMainLooper()).idle()
         assertEquals(TextToSpeech.QUEUE_ADD, shadowOf(engine).queueMode)
         assertEquals("First sentence. Second sentence. Third sentence. Fourth sentence.", shadowOf(engine).spokenTextList.joinToString(""))
+        assertEquals("", ReadingService.snapshot.error)
         controller.destroy()
     }
 

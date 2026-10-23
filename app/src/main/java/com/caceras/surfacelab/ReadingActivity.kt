@@ -19,6 +19,10 @@ class ReadingActivity:Activity() {
     private val refresh=object:Runnable { override fun run() { update(); handler.postDelayed(this,300) } }
     override fun onCreate(state:Bundle?) {
         super.onCreate(state)
+        // "Listen" in another app's selection menu: read the selected text.
+        if(state==null && intent?.action==Intent.ACTION_PROCESS_TEXT) intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.takeIf { it.isNotBlank() }?.let {
+            startForegroundService(Intent(this,ReadingService::class.java).putExtra("text",Markdown.strip(it)))
+        }
         val root=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; padDp(20,12,20,12); setBackgroundColor(ink(R.color.chat_bg)) }
         root.addView(sheetHeader("Read aloud") { finish() })
         status=label("",13f,true).apply { accessibilityLiveRegion=android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE; padDp(0,12,0,12) }
