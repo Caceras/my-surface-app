@@ -1,6 +1,6 @@
 # Native actions and access
 
-Ægentica AI uses Android's established app handoffs for everyday actions. Open **Actions** below the composer, or use its launcher shortcut. Chat keeps the direct Actions entry alongside Voice and History. None of these actions is inferred or executed automatically from an AI response.
+Ægentica AI uses Android's established app handoffs for everyday actions. Open **Actions** with the + button in the message box, or use its launcher shortcut. None of these actions is inferred or executed automatically from an AI response.
 
 ## What each action does
 

@@ -1,6 +1,6 @@
 # Working on Ægentica AI
 
-Read `README.md`, `docs/architecture.md`, and `docs/iteration-workflow.md` before an implementation pass. The app is native Android; do not replace it with a web mockup. Preserve the Æ signum, sky-blue tokens, package IDs and compatible conversation backups unless the user explicitly requests a migration.
+Read `README.md`, `docs/architecture.md`, and `docs/iteration-workflow.md` before an implementation pass. The app is native Android; do not replace it with a web mockup. Preserve the Æ signum, the aegentica.se neutral palette (sky blue stays on the launcher icon), package IDs and compatible conversation backups unless the user explicitly requests a migration.
 
 ## Iteration contract
 

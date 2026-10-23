@@ -703,12 +703,33 @@ internal fun EditText.afterChange(block:(String)->Unit) { addTextChangedListener
     override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int) { block(s?.toString().orEmpty()) }
     override fun afterTextChanged(s:Editable?) {}
 }) }
+/** Quiet bottom tabs in the aegentica.se style: line icon over label, the current one in full ink. */
 fun Activity.workspaceNavigation(selected:String):View = LinearLayout(this).apply {
-    gravity=Gravity.CENTER_VERTICAL; padDp(0,8,0,4)
+    orientation=LinearLayout.VERTICAL
+    addView(View(this@workspaceNavigation).apply { setBackgroundColor(ink(R.color.glass_outline)) },LinearLayout.LayoutParams(-1,dp(1)))
+    val row=LinearLayout(this@workspaceNavigation).apply { gravity=Gravity.CENTER_VERTICAL; padDp(4,4,4,2) }
+    addView(row,LinearLayout.LayoutParams(-1,-2))
     val order=listOf("today","calendar","ai","tasks","library")
+    val icons=mapOf("today" to R.drawable.ic_nav_today,"calendar" to R.drawable.ic_nav_calendar,"ai" to R.drawable.ic_surface,"tasks" to R.drawable.ic_nav_tasks,"library" to R.drawable.ic_nav_notes)
     for((key,title) in listOf("today" to "Today","calendar" to "Calendar","ai" to "AI","tasks" to "Tasks","library" to "Notes")) {
-        addView(pill(title,key==selected) {
-            if(key!=selected) {
+        val current=key==selected
+        val tint=ink(if(current) R.color.text_primary else R.color.text_dim)
+        row.addView(label(title,11f).apply {
+            if(current) medium()
+            setTextColor(tint)
+            gravity=Gravity.CENTER
+            maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END
+            minHeight=dp(56)
+            padDp(2,6,2,6)
+            compoundDrawablePadding=dp(3)
+            val icon=getDrawable(icons.getValue(key))!!.mutate().apply { setTint(tint); setBounds(0,0,dp(22),dp(22)) }
+            setCompoundDrawables(null,icon,null,null)
+            background=android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(ink(R.color.outline)),null,surface(R.color.chip_bg,16))
+            isSelected=current; tag="nav-$key"; isFocusable=true; buttonSemantics()
+            if(current && Build.VERSION.SDK_INT>=30) stateDescription="Current page"
+            setOnClickListener {
+                if(key==selected) return@setOnClickListener
+                performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
                 val direction=if(order.indexOf(key) > order.indexOf(selected)) 1 else -1
                 if(key=="ai") {
                     startActivity(Intent(this@workspaceNavigation,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
@@ -720,6 +741,6 @@ fun Activity.workspaceNavigation(selected:String):View = LinearLayout(this).appl
                     smoothPageTransition(direction)
                 }
             }
-        }.apply { isSelected=key==selected; tag="nav-$key"; textSize=12f; padDp(3,10,3,10) },LinearLayout.LayoutParams(0,-2,1f).apply { marginStart=dp(1); marginEnd=dp(1) })
+        },LinearLayout.LayoutParams(0,-2,1f))
     }
 }

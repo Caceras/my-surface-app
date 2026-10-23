@@ -22,12 +22,12 @@ import org.robolectric.shadows.ShadowSpeechRecognizer
 class CoherenceTest {
     private val context get() = RuntimeEnvironment.getApplication()
     private fun children(v: View): List<View> = listOf(v) + if (v is ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
-    private fun tap(v: View, text: String) = children(v).filterIsInstance<TextView>().first { it.text == text }.performClick()
+    private fun tap(v: View, text: String) = children(v).first { (it as? TextView)?.text == text || it.contentDescription == text }.performClick()
     @Before fun clear() { context.getSharedPreferences("surfacelab", 0).edit().clear().commit() }
     @After fun reset() { Brains.useForTest(null) }
 
     @Test fun `every navigation sheet stops hidden generation and preserves the question`() {
-        for (entry in listOf("Settings", "History", "Actions")) {
+        for (entry in listOf("Settings", "Saved conversations", "Actions")) {
             val brain = StreamingBrain(); Brains.useForTest(brain)
             val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
             val activity = controller.get()
@@ -55,7 +55,7 @@ class CoherenceTest {
         val field = children(root).filterIsInstance<EditText>().first()
         field.setText("My existing thought")
         children(root).first { it.contentDescription == activity.getString(R.string.mic) }.performClick()
-        tap(root, "History")
+        tap(root, "Saved conversations")
         assertEquals("My existing thought", Chat.draft(activity))
         assertEquals(activity.getString(R.string.chat_hint), field.hint)
         assertFalse(children(root).any { it.contentDescription == activity.getString(R.string.finish_dictation) })
