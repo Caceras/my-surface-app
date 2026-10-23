@@ -8,6 +8,11 @@ Owner report from the Pixel (build 195), with screenshots of the reader, HayaiTT
 | Read aloud spoke one sentence, then paused before the next. | Android's speak queue lets an engine run only about 500 ms ahead of playback, so a slow on-device engine starts each sentence after the previous ends. | The reader renders the next four sentences to audio files (`synthesizeToFile`) and plays them itself; rendering overlaps playback. Engines that cannot render files fall back to the old queue. A paused sentence resumes mid-sentence. |
 | The owner wanted Ægentica where Google shows its translate sheet on selected text. | Screenshots of Google's selection sheet over Chrome. | The selection menu's *Ægentica* opens the frosted assistant sheet with the selection as context (marked as data) and selection chips. *Replace selection* returns the answer to editable fields through `EXTRA_PROCESS_TEXT`. *Listen* reads a selection aloud. A selection never clears a shared assistant screen. |
 
-Not changeable from the app: Gboard has no extension API. The keyboard idea is a separate input method that opens next to Gboard; see the follow-up work.
+Gboard has no extension API, so the keyboard idea is a separate input method, **Ægentica keys** (`AegenticaKeyboard`, panel in `KeyboardPanel`), that the owner switches to from Gboard and back. Design choices:
+- **Reading and writing.** It reads the field (or its selection) only when an action is tapped, never in password fields, and writes only on *Replace* or *Insert*.
+- **Prompting.** Field text is sent as marked data with a dedicated `Task.KEYBOARD` prompt that returns only the edited text.
+- **Replies.** *Reply to copied* answers the clipboard's message; it is inserted at the cursor, never replacing the field.
+- **Dictation.** It uses the same on-device recogniser as the rest of the app.
+- **Model.** It uses the assistant's model choice, so the connected model needs its existing opt-in. Gemini Nano may refuse while another app is in front; that is a device check.
 
-Device checks still needed: HayaiTTS voice list and preview, gap-free reading with a large voice, selection *Ægentica* in Chrome on read-only and editable text, *Replace selection*, *Listen*.
+Device checks still needed: HayaiTTS voice list and preview, gap-free reading with a large voice, selection *Ægentica* in Chrome on read-only and editable text, *Replace selection*, *Listen*, and Ægentica keys in Messages and Gmail (Nano and connected model, dictation, switching back).

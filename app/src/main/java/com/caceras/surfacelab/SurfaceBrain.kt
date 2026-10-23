@@ -105,6 +105,9 @@ enum class Task(val alias: String) {
     /** Reads the selection aloud with the reader; no model involved. */
     LISTEN("Listen"),
 
+    /** Ægentica keys: an edit of the text the owner is typing in another app. No selection-menu entry. */
+    KEYBOARD(""),
+
     /**
      * The screen assistant: a request about what is on another app's screen.
      * An empty alias means the task has no text-selection menu entry.
