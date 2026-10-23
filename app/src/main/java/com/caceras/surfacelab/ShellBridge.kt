@@ -3,33 +3,37 @@ package com.caceras.surfacelab
 import org.json.JSONObject
 
 /**
- * What Glimt may ask of the phone, and what the phone tells Glimt, over the message channel
- * [GlimtActivity] hands to Glimt's page. Messages are JSON strings; anything unknown or malformed
- * is ignored. The page is Glimt's own code from its server, but every request is still checked:
- * links leave only as http(s), text is bounded, and no answer is ever run as a command.
+ * What a page in the app may ask of the phone, and what the phone tells it, over the message
+ * channel [ShellActivity] hands to the page (Ægentica's own site, or Glimt). Messages are JSON
+ * strings; anything unknown or malformed is ignored. The pages are the owner's own code from
+ * their server, but every request is still checked: links leave only as http(s), text is
+ * bounded, and no answer is ever run as a command.
  */
-class GlimtBridge(private val send: (String) -> Unit, private val phone: Phone) {
+class ShellBridge(private val send: (String) -> Unit, private val phone: Phone) {
 
     /** The phone's side of each request, so the bridge can be tested without a phone. */
     interface Phone {
         fun speak(text: String, language: String, done: (error: String?) -> Unit)
+        fun pauseSpeaking()
+        fun resumeSpeaking()
         fun stopSpeaking()
         fun listen(words: (text: String, final: Boolean) -> Unit, done: (error: String?) -> Unit)
         fun stopListening()
         fun signIn(challenge: String, done: (code: String?, error: String?) -> Unit)
         fun openOutside(url: String)
+        fun chooseVoice()
         fun menu()
     }
 
     private var connected = false
     private val waiting = ArrayDeque<String>()
 
-    /** A new page load: Glimt says hello again before it hears anything. */
+    /** A new page load: the page says hello again before it hears anything. */
     fun reset() {
         connected = false
     }
 
-    /** Hand Glimt what another app shared; kept until Glimt says hello. */
+    /** Hand the page what another app shared; kept until the page says hello. */
     fun context(kind: String, text: String? = null, url: String? = null, title: String? = null,
                 app: String? = null, screenshot: String? = null) {
         val m = JSONObject().put("t", "context").put("kind", kind)
@@ -59,6 +63,8 @@ class GlimtBridge(private val send: (String) -> Unit, private val phone: Phone) 
                         .apply { error?.let { put("message", it) } }.toString())
                 }
             }
+            "pause" -> phone.pauseSpeaking()
+            "resume" -> phone.resumeSpeaking()
             "stop" -> phone.stopSpeaking()
             "listen" -> {
                 val id = m.optInt("id", -1)
@@ -87,6 +93,7 @@ class GlimtBridge(private val send: (String) -> Unit, private val phone: Phone) 
                 val url = m.optString("url")
                 if (url.startsWith("https://") || url.startsWith("http://")) phone.openOutside(url)
             }
+            "voices" -> phone.chooseVoice()
             "menu" -> phone.menu()
         }
     }

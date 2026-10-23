@@ -234,6 +234,20 @@ class ReaderRepairTest {
         }
     }
 
+    @Test fun `a pause from the page keeps the reading open and closing the reader ends it`() {
+        val (controller, engine) = startReader("First sentence. Second sentence. Third sentence.")
+        shadowOf(engine).onInitListener.onInit(TextToSpeech.SUCCESS)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(ReadingService.snapshot.playing)
+        controller.get().onStartCommand(Intent(context, ReadingService::class.java).setAction("pause"), 0, 2)
+        assertFalse(ReadingService.snapshot.playing)
+        assertFalse("a pause is not the end of the reading", ReadingService.snapshot.ended)
+        controller.get().onStartCommand(Intent(context, ReadingService::class.java).setAction("play"), 0, 3)
+        assertTrue(ReadingService.snapshot.playing)
+        controller.destroy()
+        assertTrue(ReadingService.snapshot.ended)
+    }
+
     @Test fun `failed reader initialization stays stopped on play instead of appearing to play silently`() {
         val controller = Robolectric.buildService(ReadingService::class.java).create()
         controller.get().onStartCommand(Intent(context, ReadingService::class.java).putExtra("text", "Keep this text."), 0, 1)

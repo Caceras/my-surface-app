@@ -47,11 +47,11 @@
 
         <activity android:name=".WorkspaceActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
         <!--
-            Ægentica's home: Glimt (the AwesomeSEO chat bar, as a web app) full screen, with the
-            phone's voices, dictation, sign-in and shares lent over a private message channel.
+            Ægentica's home: aegentica.se, the owner's own agent, full screen, with the phone's
+            voices, dictation, shares, microphone and tools lent over a private message channel.
         -->
         <activity
-            android:name=".GlimtActivity"
+            android:name=".AegenticaActivity"
             android:theme="@style/Launch"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation"
@@ -66,6 +66,18 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+        <!-- Glimt, for browsing with an assistant: opened from Ægentica's Phone menu. -->
+        <activity
+            android:name=".GlimtActivity"
+            android:theme="@style/Launch"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true">
             <!-- OpenRouter's sign-in, finished in Chrome, links back here. It carries nothing. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -73,11 +85,8 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="aegentica" android:host="open" />
             </intent-filter>
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
         </activity>
-        <!-- Notes, tasks, calendar and the classic chat: reached from Glimt's menu and the shortcuts. -->
+        <!-- Notes, tasks, calendar and the classic chat: reached from the Phone menu and the shortcuts. -->
         <activity
             android:name=".HomeActivity"
             android:theme="@style/Launch"
