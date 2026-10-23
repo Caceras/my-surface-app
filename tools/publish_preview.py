@@ -116,17 +116,24 @@ Legacy pixel-surface-lab APK names are identical aliases. This is a personal pre
     if not current_head(repo, branch, sha):
         report_download(meta, url, False)
         return
+    # The immutable build-specific release is the canonical download. Keep the
+    # rolling release as metadata only; do not upload/download the same assets twice.
     existing = release(repo, rolling)
+    rolling_notes = folder.parent / "rolling-release-notes.md"
+    rolling_notes.write_text(
+        f"Latest verified Ægentica AI preview: build **{meta['build']}**.\n\n"
+        f"[Download Nano build {meta['build']}]({url})\n\n"
+        f"Source: \`{sha}\`. The immutable build-specific release contains the verified assets.\n"
+    )
     if not existing:
-        gh("release", "create", rolling, "--repo", repo, "--target", sha, *( ["--latest=true"] if branch == "main" else ["--prerelease", "--latest=false"] ),
-           "--title", f"Ægentica AI preview · build {meta['build']}", "--notes-file", str(notes), *map(str, assets))
+        gh("release", "create", rolling, "--repo", repo, "--target", sha,
+           *(["--latest=true"] if branch == "main" else ["--prerelease", "--latest=false"]),
+           "--title", f"Ægentica AI preview · build {meta['build']}", "--notes-file", str(rolling_notes))
     else:
-        gh("release", "upload", rolling, "--repo", repo, "--clobber", *map(str, assets))
         gh("api", f"repos/{repo}/git/refs/tags/{rolling}", "--method", "PATCH", "--input", "-",
            input_data=json.dumps(dict(sha=sha, force=True)))
         gh("release", "edit", rolling, "--repo", repo, "--target", sha,
-           "--title", f"Ægentica AI preview · build {meta['build']}", "--notes-file", str(notes))
-    verify_download(repo, rolling, assets)
+           "--title", f"Ægentica AI preview · build {meta['build']}", "--notes-file", str(rolling_notes))
     report_download(meta, url, True)
 
 

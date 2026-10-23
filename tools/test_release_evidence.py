@@ -63,7 +63,7 @@ class EvidenceTests(unittest.TestCase):
     def test_tampered_missing_or_traversing_files_block(self):
         for path in ("missing.apk", "../outside", "tampered.apk"):
             (self.root / "tampered.apk").write_bytes(b"wrong data")
-            required = {f"{prefix}-{flavor}.apk" for prefix in ("aegentica-ai", "pixel-surface-lab") for flavor in ("core", "nano")}
+            required = {f"aegentica-ai-{flavor}.apk" for flavor in ("core", "nano")}
             required |= {f"screenshots/{name}.png" for name in REQUIRED_SHOTS}
             required |= {"review.html", "reports/apk-signature-core.txt", "reports/apk-signature-nano.txt"}
             files = {path: "0" * 64, **{name: "0" * 64 for name in required}}
@@ -73,7 +73,7 @@ class EvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Artifact mismatch"): verify(self.root)
 
     def test_unlisted_files_and_symlinks_block_before_apk_parsing(self):
-        required = {f"{prefix}-{flavor}.apk" for prefix in ("aegentica-ai", "pixel-surface-lab") for flavor in ("core", "nano")}
+        required = {f"aegentica-ai-{flavor}.apk" for flavor in ("core", "nano")}
         required |= {f"screenshots/{name}.png" for name in REQUIRED_SHOTS}
         required |= {"review.html", "reports/apk-signature-core.txt", "reports/apk-signature-nano.txt"}
         for name in required:

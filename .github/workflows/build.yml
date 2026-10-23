@@ -2,22 +2,24 @@ name: Build Ægentica AI APKs
 
 on:
   push:
-    branches: ["main", "improve-pixel-assistant"]
+    branches: ["main"]
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
-# Compilation/tests never need repository write access.
 permissions:
   contents: read
+
+# One cancellation policy for the whole candidate. A newer commit replaces every
+# queued/running job for the same PR/branch instead of leaving stale jobs behind.
+concurrency:
+  group: aegentica-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
     outputs:
       android: ${{ steps.scope.outputs.android }}
-    concurrency:
-      group: preflight-${{ github.ref }}
-      cancel-in-progress: true
     name: Static pre-flight
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -32,14 +34,52 @@ jobs:
         id: scope
         run: python tools/ci_scope.py
 
-  quality:
-    concurrency:
-      group: quality-${{ github.ref }}
-      cancel-in-progress: true
-    name: Android quality
+  pr-android:
+    name: Fast Android validation
     needs: verify
-    if: needs.verify.outputs.android == 'true'
+    if: github.event_name == 'pull_request' && needs.verify.outputs.android == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+      - name: Ensure pinned Android SDK
+        shell: bash
+        run: |
+          if [ ! -d "$ANDROID_HOME/platforms/android-36" ] || [ ! -d "$ANDROID_HOME/build-tools/36.0.0" ]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          fi
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+        with:
+          gradle-version: "9.7.1"
+          cache-read-only: true
+      - name: Test core logic and compile installable Nano APK
+        run: gradle testCoreDebugUnitTest assembleNanoDebug -PbuildNumber=${{ github.run_number }} --no-daemon
+      - name: Keep diagnostics on failure
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: android-fast-diagnostics
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+
+  release-android:
+    name: Release Android validation
+    needs: verify
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && needs.verify.outputs.android == 'true'
+    # Main releases use the private HostUp runner. Manual runs stay on GitHub-hosted
+    # Ubuntu. Pull-request code never runs on the private runner.
+    runs-on: ${{ github.event_name == 'push' && 'hostup' || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -58,9 +98,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
         with:
           gradle-version: "9.7.1"
-          cache-read-only: ${{ github.event_name == 'pull_request' }}
+          cache-read-only: false
       - name: Restore private preview key
-        if: github.event_name != 'pull_request'
         env:
           SURFACE_KEYSTORE_BASE64: ${{ secrets.SURFACE_KEYSTORE_BASE64 }}
         run: |
@@ -70,21 +109,20 @@ jobs:
             printf '%s' "$SURFACE_KEYSTORE_BASE64" | base64 --decode > "$key_path"
             echo "SURFACE_KEYSTORE_FILE=$key_path" >> "$GITHUB_ENV"
           fi
-      - name: Test, lint and build both variants
+      - name: Full release gate
         env:
-          SURFACE_KEYSTORE_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.SURFACE_KEYSTORE_PASSWORD || '' }}
-          SURFACE_KEY_ALIAS: ${{ github.event_name != 'pull_request' && secrets.SURFACE_KEY_ALIAS || '' }}
-          SURFACE_KEY_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.SURFACE_KEY_PASSWORD || '' }}
-        run: gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug -PbuildNumber=${{ github.run_number }} --continue --no-daemon --stacktrace
+          SURFACE_KEYSTORE_PASSWORD: ${{ secrets.SURFACE_KEYSTORE_PASSWORD }}
+          SURFACE_KEY_ALIAS: ${{ secrets.SURFACE_KEY_ALIAS }}
+          SURFACE_KEY_PASSWORD: ${{ secrets.SURFACE_KEY_PASSWORD }}
+        run: gradle testCoreDebugUnitTest lintCoreDebug lintNanoDebug assembleCoreDebug assembleNanoDebug -PbuildNumber=${{ github.run_number }} --no-daemon --stacktrace
       - name: Verify APK signatures
         run: |
           for flavor in core nano; do
             "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk" > "app/build/reports/apk-signature-$flavor.txt"
           done
       - name: Collect verified release evidence
-        # Reads app/build/outputs/apk/ plus JUnit, lint and native render outputs.
         run: python tools/release_evidence.py collect dist/evidence
-      - name: Keep test and lint diagnostics
+      - name: Keep diagnostics
         if: failure() || cancelled()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -108,15 +146,11 @@ jobs:
         run: rm -f "$RUNNER_TEMP/aegentica-personal.jks"
 
   preview:
-    # Finish active uploads; a newer candidate waits and rechecks branch HEAD.
-    concurrency:
-      group: publish-${{ github.ref }}
-      cancel-in-progress: false
     name: Publish verified preview
-    needs: quality
+    needs: release-android
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 8
     permissions:
       contents: write
     steps:
