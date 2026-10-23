@@ -6,12 +6,13 @@ Every entry opens a foreground activity. The widget and tile do not run model in
 
 | Entry | Implementation | Behavior and limits |
 |---|---|---|
-| Typed chat | `MainActivity` | Launcher entry; restores current history and draft |
+| Home (Glimt) | `GlimtActivity` (WebView) + `GlimtBridge`, `LoopbackSignIn` | Launcher entry. Loads Glimt Web from the owner's server; only that origin loads in the view, other links open in the browser. A message channel posted to Glimt's origin lends read aloud (`ReadingService`, installed offline voices), on-device dictation (`Ears`), OpenRouter sign-in in Chrome (localhost callback) and shares. The mark beside the address opens notes and tasks (`HomeActivity`), recording, hands-free voice, the reading voice and settings |
+| Typed chat | `MainActivity` | The classic chat; reached from settings and shortcuts; restores current history and draft |
 | Voice / assistant gesture | `VoiceActivity` with ASSIST and VOICE_COMMAND filters | Foreground voice; Android decides supported assistant selection/gesture behavior |
 | Quick Settings tile | `SurfaceTileService` | Opens Voice using the platform's appropriate activity-launch API |
 | Widget | `SurfaceWidgetProvider`, `widget.xml` | Optional last-answer preview, off by default; compact/full Type/Talk layouts; launcher controls placement |
 | App shortcuts | Flavor-specific `shortcuts.xml` | Android launcher entries; API-qualified files expose voice where supported |
-| Share target | MainActivity SEND filter, `text/plain` | Appends supplied text to a reviewed draft; does not fetch a shared URL |
+| Share target | `GlimtActivity` SEND filter, `text/plain` | A shared link opens as a page in Glimt (fetched by Glimt's server); other text becomes a page to ask about |
 | Ægentica keys | `AegenticaKeyboard` (input method) | Turned on in Android keyboard settings; the owner switches to it from Gboard. Reads the focused field only when an action is tapped, never in password fields; writes only on *Replace* or *Insert*. |
 | Text selection | Flavor aliases → `AssistantActivity`, `ReadingActivity` and `ProcessTextActivity` | *Ægentica* opens the frosted sheet with the selection (Translate, Explain, Summarize, Draft a reply, Improve, and *Replace selection* in editable fields; Nano build). *Listen* reads the selection aloud (both builds). Nano also offers Summarise/Proofread/Make professional/Polish dictation; core offers Uppercase. |
 | Transcribe | `TranscribeActivity` + `TranscriptionService` (microphone foreground service) | Started only from visible UI (Today, Notes, launcher shortcut, Quick Settings *Transcribe* tile via the visible screen); persistent notification with Pause and Stop & save |
@@ -20,7 +21,7 @@ Every entry opens a foreground activity. The widget and tile do not run model in
 | Agent voice | `AgentActivity` + `AgentService` (Nano) | AI page → Talk with your agent; microphone foreground service with Stop; optional MediaProjection screen share |
 | Audio share target | `AudioShareActivity`, SEND `audio/*` | Copies one shared audio file (≤300 MB, Gemini-supported formats) into a private recording note and opens it; uploads nothing |
 
-Text-selection actions depend on the source app supporting Android's process-text contract. Editable preset results may replace the selection when appropriate; Ask results remain available for review. Ægentica AI receives the selected text, not the entire source app or page. Shared plain text goes to the AI draft; shared audio becomes a recording note. No other share types are registered.
+Text-selection actions depend on the source app supporting Android's process-text contract. Editable preset results may replace the selection when appropriate; Ask results remain available for review. Ægentica AI receives the selected text, not the entire source app or page. Shared plain text goes to Glimt; shared audio becomes a recording note. No other share types are registered.
 
 ## Add an entry
 

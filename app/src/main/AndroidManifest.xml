@@ -46,17 +46,44 @@
         android:theme="@style/Chat">
 
         <activity android:name=".WorkspaceActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <!--
+            Ægentica's home: Glimt (the AwesomeSEO chat bar, as a web app) full screen, with the
+            phone's voices, dictation, sign-in and shares lent over a private message channel.
+        -->
         <activity
-            android:name=".HomeActivity"
+            android:name=".GlimtActivity"
             android:theme="@style/Launch"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation"
             android:windowSoftInputMode="adjustResize"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- OpenRouter's sign-in, finished in Chrome, links back here. It carries nothing. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="aegentica" android:host="open" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+        <!-- Notes, tasks, calendar and the classic chat: reached from Glimt's menu and the shortcuts. -->
+        <activity
+            android:name=".HomeActivity"
+            android:theme="@style/Launch"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true" />
         <activity android:name=".ReadingActivity" android:exported="false" />
         <service android:name=".ReadingService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
         <activity android:name=".TranscribeActivity" android:exported="false" android:launchMode="singleTop" />
@@ -117,16 +144,7 @@
             android:theme="@style/Launch"
             android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
-        </activity>
+            android:exported="true" />
 
         <!--
             Hands-free. Exported because the launcher process starts it from

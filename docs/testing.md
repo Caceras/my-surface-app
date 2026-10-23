@@ -158,6 +158,18 @@ On the Pixel:
 - a local Ollama server over Tailscale;
 - Agent voice end to end on LiveKit Cloud: Swedish turn-taking, sharing another app's screen, a timer proposal, Stop from the notification.
 
+## Glimt home acceptance
+
+`GlimtTest` covers the bridge (context kept until Glimt says hello, speech, dictation and sign-in round trips, malformed requests and non-http links ignored, a new page load must say hello again), the localhost sign-in on a real socket (OpenRouter's redirect, the code, the reply page) and the shell (Glimt's address loads, the user agent names the shell, file access is off, only Glimt's origin stays in the app, a share is consumed once). `ReaderRepairTest` checks that Glimt's Swedish answer is read with a Swedish voice and that the reading state reaches Glimt. Glimt's own side is tested in `Caceras/awesomeseo-monorepo` (`apps/chatbar/tests/android.test.ts` and `test:e2e:web`).
+
+On a Pixel:
+
+- open Ægentica: Glimt loads; sign in with OpenRouter (Chrome opens; *Back to Ægentica* returns, and the bar is signed in);
+- ask a question, then *Read aloud*: a HayaiTTS voice reads it without pauses; a Swedish answer gets a Swedish voice when one is installed;
+- tap the microphone: words appear as you speak, offline;
+- share a link from Chrome, and text from another app, to Ægentica: the link opens as a page; the text becomes a page with general suggestions;
+- the mark beside the address opens the menu; each item opens its screen; Back returns to Glimt.
+
 ## Recorded audio acceptance
 
 `AudioTest` drives `TranscriptionService` in record mode with Robolectric's `MediaRecorder` and a scripted Gemini HTTP seam: parts listed with durations, rollover at 25 minutes, paused time excluded, permanent deletion removing files, no empty note for an empty recording, recovery of unlisted parts after process death (empty files removed, unknown files untouched), Gemini request shape, part offsets, upload deletion on success/error/cancel, cancel on leaving the note with the late result dropped, editor transcription into an empty note, speaker renaming in the working text only, and shared audio import with an untrusted file name. `ShotTest` renders `transcribe-record-ready` and `recording-note`.

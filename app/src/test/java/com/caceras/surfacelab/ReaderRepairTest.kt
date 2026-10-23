@@ -212,6 +212,28 @@ class ReaderRepairTest {
         assertEquals("en us x tpf local", SpeechVoices.displayName(Voice("en-us-x-tpf-local", Locale.US, 300, 300, false, emptySet())))
     }
 
+    @Test fun `Glimt's answer in Swedish is read with a Swedish voice and Glimt hears when it starts and stops`() {
+        val swedish = Voice("sv-piper", Locale.forLanguageTag("sv-SE"), Voice.QUALITY_NORMAL, 100, false, emptySet())
+        ShadowTextToSpeech.addVoice(Voice("en-kokoro", Locale.US, Voice.QUALITY_NORMAL, 100, false, emptySet()))
+        ShadowTextToSpeech.addVoice(swedish)
+        val states = mutableListOf<Boolean>()
+        ReadingService.listener = { states += it.playing }
+        try {
+            val controller = Robolectric.buildService(ReadingService::class.java).create()
+            controller.get().onStartCommand(Intent(context, ReadingService::class.java)
+                .putExtra("text", "Hej. Hur mår du?").putExtra("language", "sv"), 0, 1)
+            val engine = ShadowTextToSpeech.getLastTextToSpeechInstance()
+            shadowOf(engine).onInitListener.onInit(TextToSpeech.SUCCESS)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(swedish, shadowOf(engine).currentVoice)
+            assertTrue(states.contains(true))
+            controller.destroy()
+            assertFalse(states.last())
+        } finally {
+            ReadingService.listener = null
+        }
+    }
+
     @Test fun `failed reader initialization stays stopped on play instead of appearing to play silently`() {
         val controller = Robolectric.buildService(ReadingService::class.java).create()
         controller.get().onStartCommand(Intent(context, ReadingService::class.java).putExtra("text", "Keep this text."), 0, 1)

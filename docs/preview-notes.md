@@ -1,6 +1,15 @@
 # Current preview changes
 
 **New in this build:**
+- **Ægentica opens into Glimt.** The app's home is now Glimt, the chat bar from AwesomeSEO: the same design, models, memory and page reading as Glimt Web, with what only the phone can add.
+  - **Read aloud** uses your phone's voices (HayaiTTS and your other voice apps), without pauses between sentences.
+  - **The microphone** uses the phone's own offline dictation: words appear as you speak, free.
+  - **Sign in to OpenRouter** opens Chrome, where your usual sign-in works (Google included), and comes back by itself.
+  - **Share to Ægentica** from any app: a link opens as a page Glimt reads; text becomes a page to ask about.
+  - **The mark** beside the address opens notes and tasks, recording and transcription, hands-free voice, the reading voice and the phone settings.
+  - Glimt's design comes from its server, so improvements arrive without reinstalling the app.
+
+**Earlier in build 206:**
 - **A new look, matching aegentica.se.** White and black instead of sky blue, a clean header with icons, "What should we work on?" on an empty chat, and one rounded message box: + for Actions, a bookmark to save a note, the microphone, and a round button that starts Voice when the box is empty and sends when you have typed. Answers get a small row of icons, and the bottom tabs have icons.
 - **Your open-source voices come first.** Read aloud now uses the voice app you choose in Ægentica, then the open-source voice apps you installed, such as HayaiTTS, even when Android's default is Google's. Google's voice is used only if you pick it, or if it is the only voice app on the phone. Settings → *Choose reading voice* lists your voice apps and each voice by name (for example Kokoro or Piper speakers), with a sample.
 - **The microphone works with English (Sweden).** Android has no offline speech pack called English (Sweden). Ægentica now switches to an installed English pack, such as English (US), and listens again.

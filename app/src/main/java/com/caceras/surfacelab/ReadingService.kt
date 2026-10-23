@@ -26,6 +26,8 @@ class ReadingService : Service() {
     private val tts: TextToSpeech? get() = speech?.tts
     private var ready = false
     private var resumeAfterVoice = false
+    /** The language Glimt asked for (an answer in Swedish); null means the speech language. */
+    private var language: Locale? = null
     private var initialized = false
     private var queuedUntil = 0
     private var generation = 0
@@ -69,7 +71,7 @@ class ReadingService : Service() {
         }
         if(Build.VERSION.SDK_INT>=33) registerReceiver(noisy,IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY),RECEIVER_NOT_EXPORTED)
         else { @Suppress("DEPRECATION") registerReceiver(noisy,IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)) }
-        speech=VoiceOutput(this,{ Ears(this).locale() }) { client,started -> engineReady(client,started) }
+        speech=VoiceOutput(this,{ language ?: Ears(this).locale() }) { client,started -> engineReady(client,started) }
     }
     /** An engine that can speak is ready, or none could ([started]: whether any engine started at all). */
     private fun engineReady(client:TextToSpeech?,started:Boolean) {
@@ -112,7 +114,13 @@ class ReadingService : Service() {
             else -> {
                 val incoming=intent?.getStringExtra("text")
                 if(incoming!=null) {
-                    pause(); discardRenders(); text=incoming.take(200000); chunks=segments(text); index=0
+                    error=""; pause(); discardRenders(); text=incoming.take(200000); chunks=segments(text); index=0
+                    val wanted=intent?.getStringExtra("language")?.takeIf { it.isNotBlank() }?.let { Locale.forLanguageTag(it) }
+                    if(wanted?.language!=language?.language) {
+                        // Another language needs another voice, maybe another voice app.
+                        language=wanted
+                        if(initialized) { initialized=false; ready=false; stream=false; speech?.reopen() }
+                    }
                     WorkspaceStore(this).use { speed=it.value("reading-speed","1.0").toFloatOrNull()?.coerceIn(.5f,2f) ?: 1f }
                 } else if(text.isEmpty()) WorkspaceStore(this).use {
                     text=it.value("reading-text"); chunks=segments(text); index=it.value("reading-index","0").toIntOrNull()?.coerceIn(0,(chunks.size-1).coerceAtLeast(0)) ?: 0
@@ -246,6 +254,7 @@ class ReadingService : Service() {
         session.setPlaybackState(PlaybackState.Builder().setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_STOP or PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS)
             .setState(if(playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,PlaybackState.PLAYBACK_POSITION_UNKNOWN,if(playing) speed else 0f).build())
         getSystemService(NotificationManager::class.java).notify(42,notification())
+        listener?.invoke(snapshot)
     }
     private fun notification():Notification {
         val flags=PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -264,6 +273,7 @@ class ReadingService : Service() {
         discardRenders(); cache.deleteRecursively()
         if(focusHeld) audio.abandonAudioFocusRequest(focus)
         snapshot=snapshot.copy(playing=false)
+        listener?.invoke(snapshot)
         unregisterReceiver(noisy); session.release(); active=null
         getSystemService(NotificationManager::class.java).cancel(42)
         super.onDestroy()
@@ -283,6 +293,15 @@ class ReadingService : Service() {
             context.startForegroundService(Intent(context,ReadingService::class.java))
         }
         fun move(delta:Int) { active?.move(delta) }
+        /** Told every time the reading state changes; Glimt's read-aloud button follows it. */
+        var listener:((ReadingSnapshot)->Unit)?=null
+        /** Read text without opening the reader (Glimt's read aloud); [language] is a BCP-47 tag or blank. */
+        fun play(context:Context,text:String,language:String="") {
+            context.startForegroundService(Intent(context,ReadingService::class.java).putExtra("text",Markdown.strip(text)).putExtra("language",language))
+        }
+        fun stop(context:Context) {
+            if(active!=null) context.startService(Intent(context,ReadingService::class.java).setAction("stop"))
+        }
         fun start(context:Context,text:String) {
             context.startForegroundService(Intent(context,ReadingService::class.java).putExtra("text",Markdown.strip(text)))
             context.startActivity(Intent(context,ReadingActivity::class.java))
