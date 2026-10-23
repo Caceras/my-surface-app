@@ -1,25 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#70CEFA</color>
-    <color name="chat_bg">#F6FAFD</color>
-    <color name="bubble_you">#E0F1FC</color>
-    <color name="bubble_you_text">#142D3D</color>
-    <color name="bubble_ai">#F6FAFD</color>
-    <color name="bubble_ai_text">#142D3D</color>
+    <!-- The aegentica.se palette: white, near-black ink, light grey surfaces. The launcher keeps the sky-blue signum. -->
+    <color name="chat_bg">#FFFFFF</color>
+    <color name="bubble_you">#F3F3F3</color>
+    <color name="bubble_you_text">#0D0D0D</color>
+    <color name="bubble_ai">#FFFFFF</color>
+    <color name="bubble_ai_text">#0D0D0D</color>
     <color name="composer_bg">#FFFFFF</color>
-    <color name="chip_bg">#EAF2F7</color>
-    <color name="text_primary">#142D3D</color>
-    <color name="text_dim">#526B7B</color>
-    <color name="accent">#70CEFA</color>
-    <color name="accent_text">#12618A</color>
-    <color name="on_accent">#072E44</color>
-    <color name="outline">#B8D2E0</color>
-    <color name="glass_surface">#BFFFFFFF</color>
-    <color name="glass_surface_strong">#E6FFFFFF</color>
-    <color name="glass_outline">#CCFFFFFF</color>
-    <color name="presence_bg">#DDF3FF</color>
-    <color name="scrim">#F2F6FAFD</color>
-    <color name="listening">#12618A</color>
+    <color name="chip_bg">#F3F3F3</color>
+    <color name="text_primary">#0D0D0D</color>
+    <color name="text_dim">#606060</color>
+    <color name="accent">#141414</color>
+    <color name="accent_text">#141414</color>
+    <color name="on_accent">#FAFAFA</color>
+    <color name="outline">#E6E6E6</color>
+    <color name="glass_surface">#FFFFFFFF</color>
+    <color name="glass_surface_strong">#FFFFFFFF</color>
+    <color name="glass_outline">#E9E9E9</color>
+    <color name="presence_bg">#F3F3F3</color>
+    <color name="scrim">#F2FFFFFF</color>
+    <color name="listening">#141414</color>
     <!-- Assistant sheet: frosted glass over another app, neutral ink text. -->
     <color name="ask_ink">#111114</color>
     <color name="ask_ink_2">#3F3F46</color>

@@ -180,31 +180,31 @@ class MainActivity : Activity() {
 
     // ------------------------------------------------------------- chrome
 
+    /** The aegentica.se header: conversations on the left, new chat and settings on the right. */
     private fun header(brain: SurfaceBrain): View {
-        val compact = resources.configuration.screenWidthDp < 380 || resources.configuration.fontScale > 1.2f
         val titles = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(label(getString(R.string.app_name), 21f).apply {
-                tag = "brand-title"; medium(); letterSpacing = -0.035f; isAccessibilityHeading = true
+            padDp(4, 0, 4, 0)
+            addView(label(getString(R.string.app_name), 17f).apply {
+                tag = "brand-title"; medium(); letterSpacing = -0.02f; isAccessibilityHeading = true; maxLines = 1
             })
-            status = label("Your on-device assistant", 11f, true).apply {
+            status = label("Your on-device assistant", 12f, true).apply {
                 tag = "assistant-status"
-                maxLines = 2; accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+                maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
             }
             addView(status)
         }
-        val actions = LinearLayout(this).apply {
-            gravity = Gravity.END or Gravity.CENTER_VERTICAL
-            addView(pill(getString(R.string.new_chat)) { newChat() }.apply { tooltipText = "Save this conversation and start a new one" })
-            addView(flatButton(getString(R.string.more)) { showSettings(brain) }.apply { padDp(12, 14, 0, 14) })
-        }
         return LinearLayout(this).apply {
             tag = "chat-header"
-            orientation = if (compact) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            padDp(20, 10, 20, 6)
-            addView(titles, if (compact) wide() else LinearLayout.LayoutParams(0, -2, 1f))
-            addView(actions, if (compact) wide() else LinearLayout.LayoutParams(-2, -2))
+            padDp(6, 6, 6, 6)
+            addView(iconButton(R.drawable.ic_menu, "Saved conversations") { showConversations() }.apply { tag = "history-entry" })
+            addView(titles, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(iconButton(R.drawable.ic_compose, getString(R.string.new_chat)) { newChat() }.apply {
+                tag = "new-chat"; tooltipText = "Save this conversation and start a new one"
+            })
+            addView(iconButton(R.drawable.ic_tune, getString(R.string.more)) { showSettings(brain) }.apply { tag = "settings-entry" })
         }
     }
 
@@ -287,7 +287,7 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             startActivity(Intent(this, VoiceActivity::class.java).putExtra("setup", true))
         })
-        panel.addView(flatButton("Choose reading voice") { SpeechVoices.showPicker(this) })
+        panel.addView(flatButton("Choose reading voice") { SpeechVoices.showPicker(this) { ReadingService.refreshVoice() } })
         panel.addView(flatButton(getString(R.string.voice_settings)) {
             runCatching { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                 .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
@@ -544,11 +544,17 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             padDp(4, 18, 4, 18)
-            addView(presence(44), LinearLayout.LayoutParams(dp(44), dp(44)).apply { bottomMargin = dp(14) })
-            addView(label(getString(R.string.empty_title), 20f).apply {
+            addView(android.widget.ImageView(this@MainActivity).apply {
+                tag = "welcome-mark"
+                setImageResource(R.drawable.ic_surface)
+                imageTintList = android.content.res.ColorStateList.valueOf(color(R.color.text_primary))
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { bottomMargin = dp(18) })
+            addView(label(getString(R.string.empty_title), 26f).apply {
+                medium()
                 minHeight = dp(44)
                 gravity = Gravity.CENTER
-                letterSpacing = -0.015f
+                letterSpacing = -0.025f
             }, wide())
         }
         return blank
@@ -600,26 +606,39 @@ class MainActivity : Activity() {
             padDp(16, 12, 10, 12)
         }
 
+        // One round button, as on aegentica.se: Voice when the draft is empty, Send with a draft, Stop while answering.
         send = ImageButton(this).apply {
-            setImageResource(R.drawable.ic_send)
-            background = getDrawable(R.drawable.send_bg)
-            contentDescription = getString(R.string.send)
-            val pad = dp(10)
-            setPadding(pad, pad, pad, pad)
+            tag = "send"
+            setImageResource(R.drawable.ic_waves)
+            imageTintList = android.content.res.ColorStateList.valueOf(color(R.color.on_accent))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL; setColor(color(R.color.accent))
+            }
+            contentDescription = getString(R.string.voice_mode)
             minimumWidth = dp(48)
             minimumHeight = dp(48)
-            setOnClickListener { if (busy) stopAnswer() else submitDraft() }
+            val pad = dp(12)
+            setPadding(pad, pad, pad, pad)
+            setOnClickListener {
+                when {
+                    busy -> stopAnswer()
+                    input.text.isBlank() && !listening -> startActivity(Intent(this@MainActivity, VoiceActivity::class.java))
+                    else -> submitDraft()
+                }
+            }
         }
 
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            padDp(4, 1, 6, 5)
+            padDp(6, 4, 8, 8)
             background = glassSurface(28, true)
-            elevation = dp(4).toFloat()
+            elevation = dp(3).toFloat()
             addView(input, wide())
         }
 
         val tools = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        tools.addView(iconButton(R.drawable.ic_plus, "Actions", dim = true) { showActions() }.apply { tag = "actions-entry" })
+        tools.addView(iconButton(R.drawable.ic_bookmark, "Save as note", dim = true) { saveDraftAsNote() }.apply { tag = "save-note" })
         composeState = label("On device", 12f, true).apply {
             tag = "compose-state"
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -628,7 +647,8 @@ class MainActivity : Activity() {
         }
         if (ears.available()) {
             val button = ImageButton(this).apply {
-                setImageResource(R.drawable.ic_mic)
+                setImageResource(R.drawable.ic_mic_line)
+                setColorFilter(color(R.color.text_dim))
                 background = null
                 minimumWidth = dp(48)
                 minimumHeight = dp(48)
@@ -643,16 +663,8 @@ class MainActivity : Activity() {
             composeState.text = "Dictate a message"
         }
         tools.addView(composeState, LinearLayout.LayoutParams(0, -2, 1f))
-        tools.addView(pill("Save") {
-            val draft = input.text.toString()
-            if (draft.isNotBlank()) {
-                pauseForNavigation()
-                val record = WorkspaceStore(this@MainActivity).use { it.save(Record(body=draft, title=draft.lineSequence().first().take(80))) }
-                input.setText(""); Chat.saveDraft(this@MainActivity, "")
-                startActivity(WorkspaceActivity.intent(this@MainActivity, "library", record.id))
-            } else startActivity(WorkspaceActivity.intent(this@MainActivity, "library").putExtra("capture", true))
-        }.apply { contentDescription="Save draft as a note"; padDp(10,10,10,10) })
-        tools.addView(send)
+        mic?.let { tools.removeView(it); tools.addView(it) }
+        tools.addView(send, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(4) })
         bar.addView(tools, wide())
         playback = flatButton(getString(R.string.stop_speaking)) { hushPlayback() }.apply {
             gravity = Gravity.CENTER
@@ -665,16 +677,19 @@ class MainActivity : Activity() {
             padDp(16, 2, 16, 8)
             followKeyboardMotion()
             addView(bar, wide())
-            addView(LinearLayout(this@MainActivity).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                addView(flatButton("Voice") {
-                    startActivity(Intent(this@MainActivity, VoiceActivity::class.java))
-                }.apply { tag = "voice-entry"; gravity = Gravity.CENTER; padDp(4, 8, 4, 8) }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(flatButton("History") { showConversations() }.apply { tag = "history-entry"; contentDescription = "Saved conversations"; textSize = 14f; gravity = Gravity.CENTER; padDp(2, 8, 2, 8) }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(flatButton("Actions") { showActions() }.apply { gravity = Gravity.CENTER; padDp(4, 8, 4, 8) }, LinearLayout.LayoutParams(0, -2, 1f))
-            }, wide())
             addView(playback, wide())
         }
+    }
+
+    /** Save the draft as a note and open it; with no draft, open a new note. */
+    private fun saveDraftAsNote() {
+        val draft = input.text.toString()
+        if (draft.isNotBlank()) {
+            pauseForNavigation()
+            val record = WorkspaceStore(this).use { it.save(Record(body=draft, title=draft.lineSequence().first().take(80))) }
+            input.setText(""); Chat.saveDraft(this, "")
+            startActivity(WorkspaceActivity.intent(this, "library", record.id))
+        } else startActivity(WorkspaceActivity.intent(this, "library").putExtra("capture", true))
     }
 
     private fun hushPlayback() {
@@ -755,9 +770,11 @@ class MainActivity : Activity() {
     }
 
     private fun updateSend() {
-        send.setImageResource(if (busy) R.drawable.ic_stop else R.drawable.ic_send)
-        send.contentDescription = getString(if (busy) R.string.stop_response else R.string.send)
-        send.isEnabled = busy || (!listening && input.text.toString().isNotBlank())
+        val draft = input.text.toString().isNotBlank()
+        val voice = !busy && !draft && !listening
+        send.setImageResource(when { busy -> R.drawable.ic_stop; voice -> R.drawable.ic_waves; else -> R.drawable.ic_arrow_up })
+        send.contentDescription = getString(when { busy -> R.string.stop_response; voice -> R.string.voice_mode; else -> R.string.send })
+        send.isEnabled = busy || voice || (!listening && draft)
         send.alpha = if (send.isEnabled) 1f else 0.4f
         if (::composeState.isInitialized && !listening) {
             composeState.text = if (busy) (if(ConnectedAI.enabled(this)) "Thinking · Connected AI" else "Thinking on your phone…") else if (askedAloud) "Review your words, then send" else KnowledgeContext.label(this)
@@ -986,24 +1003,25 @@ class MainActivity : Activity() {
         bubble.isFocusable = true
         val parent = bubble.parent as? LinearLayout
         if (parent != null && parent.findViewWithTag<View>(bubble) == null) {
+            // A quiet icon row under the answer, as in the assistant sheet and on aegentica.se.
             parent.addView(LinearLayout(this).apply {
                 tag = bubble
-                orientation = if (resources.configuration.fontScale > 1.3f || resources.configuration.screenWidthDp < 360)
-                    LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
-                addView(flatButton("Listen") { readAloud(text) }.apply { padDp(4, 10, 18, 10) })
-                addView(flatButton("Copy") {
+                gravity = Gravity.CENTER_VERTICAL
+                padDp(0, 0, 0, 6)
+                addView(iconButton(R.drawable.ic_volume, "Listen", dim = true) { readAloud(text) })
+                addView(iconButton(R.drawable.ic_copy, "Copy", dim = true) {
                     NativePrivacy.copy(this@MainActivity, "Answer", text)
                     Toast.makeText(this@MainActivity, "Copied", Toast.LENGTH_SHORT).show()
-                }.apply { padDp(4, 10, 18, 10) })
-                addView(flatButton("Save") {
+                })
+                addView(iconButton(R.drawable.ic_bookmark, "Save", dim = true) {
                     val question = history.lastOrNull { it.reply == text }?.you.orEmpty()
                     val saved = WorkspaceStore(this@MainActivity).use { it.save(Record(title=question.take(80), body=text, source="AI answer\nQuestion: $question")) }
                     startActivity(WorkspaceActivity.intent(this@MainActivity,"library",saved.id))
-                }.apply { padDp(4,10,12,10) })
-                addView(flatButton("Share") {
+                })
+                addView(iconButton(R.drawable.ic_share_line, "Share", dim = true) {
                     startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
                         .putExtra(Intent.EXTRA_TEXT, text), getString(R.string.share_answer)))
-                }.apply { padDp(4, 10, 12, 10) })
+                })
             }, parent.indexOfChild(bubble) + 1)
         }
         bubble.setOnLongClickListener {

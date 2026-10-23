@@ -29,6 +29,7 @@ import org.robolectric.android.controller.ActivityController
 import org.robolectric.shadows.ShadowDialog
 import org.robolectric.shadows.ShadowSpeechRecognizer
 import org.robolectric.shadows.ShadowTextToSpeech
+import java.util.Locale
 
 /**
  * The voice path, on the JVM.
@@ -452,7 +453,30 @@ class VoiceTest {
         client.triggerOnError(SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE)
         drain()
         assertTrue("microphone connection survived a terminal error", client.isDestroyed)
+        // No installed pack of the same language: the problem is shown.
+        recognizer().triggerSupportResult(android.speech.RecognitionSupport.Builder()
+            .setInstalledOnDeviceLanguages(listOf("sv-SE")).build())
+        drain()
         assertTrue(texts(activity).containsAll(listOf("Type", "Voice setup", "Choose speaking language")))
+    }
+
+    @Test
+    fun `a regional language without its own pack switches to the installed one and listens again`() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        context.getSharedPreferences("surfacelab", Context.MODE_PRIVATE).edit()
+            .putString("speech_language", "en-SE").commit()
+        val activity = open().get()
+        val first = recognizer()
+        first.triggerOnError(SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE)
+        drain()
+        val check = recognizer()
+        check.triggerSupportResult(android.speech.RecognitionSupport.Builder()
+            .setInstalledOnDeviceLanguages(listOf("sv-SE", "en-US")).build())
+        drain()
+        assertTrue(check.isDestroyed)
+        assertEquals("en-US", recognizer().lastRecognizerIntent.getStringExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE))
+        assertEquals(Locale.US, Ears(context).locale())
+        assertFalse(texts(activity).contains("Let’s get voice ready"))
     }
 
     @Test

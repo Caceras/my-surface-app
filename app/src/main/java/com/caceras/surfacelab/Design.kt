@@ -60,6 +60,24 @@ fun Context.pill(value: String, primary: Boolean = false, onClick: () -> Unit) =
         onClick()
     }
 }
+/** A 48 dp line-icon button in the aegentica.se style, labelled for TalkBack and long-press. */
+fun Context.iconButton(icon: Int, description: String, dim: Boolean = false, onClick: () -> Unit) =
+    android.widget.ImageButton(this).apply {
+        setImageResource(icon)
+        imageTintList = ColorStateList.valueOf(ink(if (dim) R.color.text_dim else R.color.text_primary))
+        background = RippleDrawable(ColorStateList.valueOf(ink(R.color.outline)), null,
+            GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Color.WHITE) })
+        contentDescription = description
+        tooltipText = description
+        minimumWidth = dp(48)
+        minimumHeight = dp(48)
+        val pad = dp(12)
+        setPadding(pad, pad, pad, pad)
+        setOnClickListener {
+            performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK)
+            onClick()
+        }
+    }
 fun Context.presence(size: Int = 88) = PresenceView(this, size)
 
 /** Short, interruptible entry motion. Android's remove-animation preference wins. */

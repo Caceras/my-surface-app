@@ -202,8 +202,7 @@ class ShotTest {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         fun children(view: View): List<View> = if (view !is android.view.ViewGroup) listOf(view)
             else listOf(view) + (0 until view.childCount).flatMap { children(view.getChildAt(it)) }
-        children(activity.window.decorView).filterIsInstance<android.widget.TextView>()
-            .first { it.text == activity.getString(R.string.more) }.performClick()
+        children(activity.window.decorView).first { it.contentDescription == activity.getString(R.string.more) }.performClick()
         shoot("chat-settings", org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView)
     }
 
@@ -276,12 +275,11 @@ class ShotTest {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         fun children(view: View): List<View> = if (view !is android.view.ViewGroup) listOf(view)
             else listOf(view) + (0 until view.childCount).flatMap { children(view.getChildAt(it)) }
-        children(activity.window.decorView).filterIsInstance<android.widget.TextView>()
-            .first { it.text == "Listen" }.performClick()
+        children(activity.window.decorView).first { it.contentDescription == "Listen" }.performClick()
         shoot("chat-compact", activity.window.decorView, shotWidth = 960, shotHeight = 1920)
         org.junit.Assert.assertEquals(ReadingActivity::class.java.name, org.robolectric.Shadows.shadowOf(activity).nextStartedActivity.component!!.className)
-        listOf("Voice", "History", "AI").forEach { label ->
-            val control = children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == label }
+        listOf("Voice", "Saved conversations", "AI").forEach { label ->
+            val control = children(activity.window.decorView).first { it.contentDescription == label || (it as? android.widget.TextView)?.text == label }
             val rect = android.graphics.Rect()
             assertTrue("$label is not visible", control.getGlobalVisibleRect(rect))
             assertTrue("$label is clipped", rect.height() >= activity.dp(48))
@@ -326,8 +324,8 @@ class ShotTest {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         shoot("aegentica-large-font", activity.window.decorView)
         fun children(v: View): List<View> = listOf(v) + if (v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
-        listOf("Voice", "History", "Actions").forEach { name ->
-            val button = children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == name }
+        listOf("Voice", "Saved conversations", "Actions").forEach { name ->
+            val button = children(activity.window.decorView).first { it.contentDescription == name }
             val rect = android.graphics.Rect()
             assertTrue("$name missing at large text", button.getGlobalVisibleRect(rect))
             assertTrue("$name clipped at large text", rect.height() >= activity.dp(48))
@@ -367,7 +365,7 @@ class ShotTest {
     fun `settings preserve the design system in dark mode`() {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         fun children(v: View): List<View> = listOf(v) + if (v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
-        children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == "Settings" }.performClick()
+        children(activity.window.decorView).first { it.contentDescription == "Settings" }.performClick()
         shoot("cohesion-settings-night", org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView)
     }
 
@@ -390,7 +388,7 @@ class ShotTest {
     @Test fun `settings feedback stays reachable at the end of the sheet`() {
         val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         fun children(v: View): List<View> = listOf(v) + if (v is android.view.ViewGroup) (0 until v.childCount).flatMap { children(v.getChildAt(it)) } else emptyList()
-        children(activity.window.decorView).filterIsInstance<android.widget.TextView>().first { it.text == "Settings" }.performClick()
+        children(activity.window.decorView).first { it.contentDescription == "Settings" }.performClick()
         val decor = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
         shoot("settings-feedback", decor) {
             val scroll = decor.findViewWithTag<android.widget.ScrollView>("settings")

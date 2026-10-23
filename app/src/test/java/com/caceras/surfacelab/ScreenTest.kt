@@ -161,7 +161,8 @@ class ScreenTest {
     fun `an empty message sends nothing`() {
         val activity = launchMain().get()
         composer(activity).setText("   ")
-        button(activity, activity.getString(R.string.send)).performClick()
+        // A blank draft turns the round button into Voice; nothing is sent.
+        descendants(content(activity)).first { it.tag == "send" }.performClick()
         assertEquals(0, bubbles(activity).size)
     }
 
@@ -172,7 +173,7 @@ class ScreenTest {
         assertTrue(descendants(content(activity)).none { it.tag == "write-message" })
         composer(activity).setText("hello")
         button(activity, activity.getString(R.string.send)).performClick()
-        val voice = descendants(content(activity)).first { it.tag == "voice-entry" }
+        val voice = descendants(content(activity)).first { it.contentDescription == "Voice" }
         assertTrue("voice disappeared in a conversation", showing(voice))
         voice.performClick()
         assertEquals(VoiceActivity::class.java.name, shadowOf(activity).nextStartedActivity.component!!.className)
@@ -207,8 +208,7 @@ class ScreenTest {
     fun `the reference material is one tap away, not in the way`() {
         val activity = launchMain().get()
         val more = descendants(content(activity))
-            .filterIsInstance<TextView>()
-            .first { it.text.toString() == activity.getString(R.string.more) }
+            .first { it.contentDescription == activity.getString(R.string.more) }
 
         more.performClick()
 
@@ -312,8 +312,7 @@ class ScreenTest {
     @Test
     fun `More scrolls without pushing the composer off a compact screen`() {
         val activity = launchMain().get()
-        descendants(content(activity)).filterIsInstance<TextView>()
-            .first { it.text == activity.getString(R.string.more) }.performClick()
+        descendants(content(activity)).first { it.contentDescription == activity.getString(R.string.more) }.performClick()
         val decor = activity.window.decorView
         val width = activity.dp(360)
         val height = activity.dp(640)
@@ -357,7 +356,7 @@ class ScreenTest {
         val bounds = android.graphics.Rect()
         assertTrue("greeting is clipped or missing", greeting.getGlobalVisibleRect(bounds))
         assertTrue("greeting has no measurable height", bounds.height() >= activity.dp(40))
-        descendants(decor).filterIsInstance<TextView>().first { it.text == "Voice" }.performClick()
+        descendants(decor).first { it.contentDescription == "Voice" }.performClick()
         assertEquals(VoiceActivity::class.java.name, shadowOf(activity).nextStartedActivity.component!!.className)
     }
 
@@ -366,8 +365,8 @@ class ScreenTest {
         val activity = launchMain().get()
         composer(activity).setText("hello")
         button(activity, activity.getString(R.string.send)).performClick()
-        val body = visibleTexts(content(activity))
-        assertTrue(body.containsAll(listOf("Listen", "Copy", "Share")))
+        val body = descendants(content(activity)).filter { showing(it) }.map { it.contentDescription?.toString() }
+        assertTrue(body.containsAll(listOf("Listen", "Copy", "Save", "Share")))
     }
 
     @Test
@@ -383,8 +382,7 @@ class ScreenTest {
     @Test
     fun `model preparation result is visible inside Settings`() {
         val activity = launchMain().get()
-        descendants(content(activity)).filterIsInstance<TextView>()
-            .first { it.text == activity.getString(R.string.more) }.performClick()
+        descendants(content(activity)).first { it.contentDescription == activity.getString(R.string.more) }.performClick()
         val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog().window!!.decorView
         descendants(dialog).filterIsInstance<TextView>()
             .first { it.text == activity.getString(R.string.prepare_model) }.performClick()

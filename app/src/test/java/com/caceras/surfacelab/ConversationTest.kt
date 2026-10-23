@@ -53,7 +53,7 @@ class ConversationTest {
     fun `new saves a recoverable conversation and switching preserves the next draft`() {
         val activity = launch().get()
         exchange(activity, "Plan a weekend", "Take a walk.")
-        descendants(content(activity)).filterIsInstance<TextView>().first { it.text == "New" }.performClick()
+        descendants(content(activity)).first { it.contentDescription == "New" }.performClick()
         val saved = Chat.archives(activity).single()
         assertTrue(Chat.load(activity).isEmpty())
         Chat.saveDraft(activity, "A different thought")
@@ -147,7 +147,7 @@ class ConversationTest {
         Chat.archiveCurrent(activity, "")
         Chat.clear(activity)
         composer(activity).setText("Keep my current thought")
-        descendants(content(activity)).filterIsInstance<TextView>().first { it.text == "History" }.performClick()
+        descendants(content(activity)).first { it.contentDescription == "Saved conversations" }.performClick()
         val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog()
         val root = dialog.window!!.decorView
         root.findViewWithTag<EditText>("conversation-search").setText("lake")
@@ -247,8 +247,7 @@ class ConversationTest {
         val activity = launch().get()
         exchange(activity, "give me three ideas", "1. one 2. two 3. three")
 
-        descendants(content(activity)).filterIsInstance<TextView>()
-            .first { it.text.toString() == activity.getString(R.string.new_chat) }
+        descendants(content(activity)).first { it.contentDescription == activity.getString(R.string.new_chat) }
             .performClick()
 
         assertTrue("the bubbles survived New", bubbles(activity).isEmpty())
@@ -333,8 +332,7 @@ class ConversationTest {
         val activity = launch().get()
         composer(activity).setText("old question")
         send(activity)
-        descendants(content(activity)).filterIsInstance<TextView>()
-            .first { it.text == activity.getString(R.string.new_chat) }.performClick()
+        descendants(content(activity)).first { it.contentDescription == activity.getString(R.string.new_chat) }.performClick()
         brain.emit("late partial")
         brain.complete("late answer")
         assertTrue(bubbles(activity).isEmpty())

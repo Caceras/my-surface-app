@@ -44,7 +44,7 @@ Curated native framework illustrations from the original Ægentica AI branding p
 2. Open **Ægentica AI**. Check the build number in **Settings** against the [preview release](https://github.com/Caceras/my-surface-app/releases/tag/preview-improve-pixel-assistant).
 3. Select **Check / prepare on-device model**. Initial model and speech downloads need an internet connection.
 4. Type a short question. Then open **Settings → Set up voice & test playback** to choose your language, download offline speech, and test the speaker.
-5. Tap **Voice**, speak, and pause. Use **Type** to return to the shared chat. Enable **Keep talking** only when you want the microphone to reopen after the reply.
+5. Tap the round **Voice** button in the empty message box, speak, and pause. Use **Type** to return to the shared chat. Enable **Keep talking** only when you want the microphone to reopen after the reply.
 
 If an update reports a package/signature conflict, **export first**, uninstall the existing Ægentica AI, install the new APK, then restore. Do not uninstall to troubleshoot before preserving the data you want. [Update and signing guide](docs/delivery.md).
 

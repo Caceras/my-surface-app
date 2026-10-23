@@ -8,20 +8,28 @@ The launcher has an adaptive foreground/background icon and an Android 13+ monoc
 
 ## Color
 
+The app uses the same palette as [aegentica.se](https://aegentica.se): white, near-black ink and light grey surfaces, with one dark fill for the primary action. The owner asked for this on 2026-10-23, replacing the sky-blue interface. Sky blue stays on the launcher icon and splash, where the signum lives.
+
 | Token | Light | Dark | Purpose |
 |---|---|---|---|
-| Background | `#F6FAFD` | `#0C1720` | Cool, quiet canvas |
-| Primary text | `#142D3D` | `#ECF7FF` | Body and headings |
-| Secondary text | `#526B7B` | `#A6BFCE` | Supporting copy |
-| Sky accent | `#70CEFA` | `#70CEFA` | Primary button and brand fill |
-| Accent text | `#12618A` | `#91DAFF` | Readable links and text controls |
-| On accent | `#072E44` | `#072E44` | Dark text on sky-blue buttons |
-| Composer | `#FFFFFF` | `#142430` | Editable surface |
-| Presence | `#DDF3FF` | `#173E55` | Æ activity mark background |
+| Background (`chat_bg`) | `#FFFFFF` | `#0A0A0A` | Canvas |
+| Primary text | `#0D0D0D` | `#FAFAFA` | Body and headings |
+| Secondary text | `#606060` | `#A1A1A1` | Supporting copy, inactive icons |
+| Primary fill (`accent`) | `#141414` | `#E5E5E5` | Send/Voice button, primary pill, current tab |
+| On primary | `#FAFAFA` | `#171717` | Text and icons on the primary fill |
+| Surface (`glass_surface`, `composer_bg`) | `#FFFFFF` | `#171717` | Message box, cards, pills |
+| Border (`glass_outline`) | `#E9E9E9` | `#2B2B2B` | Card and pill outlines |
+| Muted (`chip_bg`, `bubble_you`) | `#F3F3F3` | `#262626` | Your messages, list buttons |
 
-Sky blue is a fill/accent, not pale body text on white. Secondary colors preserve readable contrast. Contrast checks are calculated from sRGB token pairs; disabled states, anti-aliasing, system switches and every rendered state still require visual/device review.
+Measured token contrast: primary/background 19.44:1 light and 18.97:1 dark; secondary/background 6.29:1 and 7.66:1; secondary on muted 5.67:1 light; on-primary/primary 17.65:1 and 14.23:1. These calculations use the checked-in sRGB values; disabled states, anti-aliasing and system switches still need visual review.
 
-Measured token contrast: primary/body 13.59:1 light and 16.66:1 dark; secondary/body 5.34:1 and 9.46:1; accent-text/body 6.45:1 and 11.80:1; dark text on sky accent 8.02:1. These calculations use the checked-in sRGB values.
+## Chat layout
+
+- **Header:** menu icon (saved conversations), the name and model status, then New chat and Settings icons.
+- **Empty chat:** the Æ mark and "What should we work on?".
+- **Message box:** one rounded card. + opens Actions, the bookmark saves the draft as a note, the source line opens Sources, then the microphone and one round button: Voice when the box is empty, Send with a draft, Stop while answering.
+- **Answers:** a quiet icon row under each answer (Listen, Copy, Save, Share).
+- **Tabs:** line icon over label, the current tab in full ink, under a hairline.
 
 ## Layout and behavior
 

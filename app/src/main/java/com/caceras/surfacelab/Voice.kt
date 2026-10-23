@@ -70,6 +70,14 @@ class Ears(private val context: Context) {
         onPartial: (String) -> Unit = {},
         onFinal: (String) -> Unit = {},
         onStop: (VoiceProblem?) -> Unit = {}
+    ) = start(onLevel, onPartial, onFinal, onStop, retried = false)
+
+    private fun start(
+        onLevel: (Float) -> Unit,
+        onPartial: (String) -> Unit,
+        onFinal: (String) -> Unit,
+        onStop: (VoiceProblem?) -> Unit,
+        retried: Boolean
     ) {
         if (Build.VERSION.SDK_INT < 31 || !available() || listening) return
         ReadingService.pauseForCapture()
@@ -122,6 +130,13 @@ class Ears(private val context: Context) {
                 // failure. Reporting it produces a toast storm.
                 val quiet = error == SpeechRecognizer.ERROR_NO_MATCH ||
                     error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                val missing = error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE ||
+                    error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED
+                // Once per request: move to an installed pack of the same language and listen again.
+                if (missing && !retried && switchToInstalled { switched ->
+                        if (switched) start(onLevel, onPartial, onFinal, onStop, retried = true)
+                        else onStop(describe(error))
+                    }) return
                 onStop(if (quiet) null else describe(error))
             }
         })
@@ -278,6 +293,40 @@ class Ears(private val context: Context) {
         } catch (_: Exception) { download(requested.toLanguageTag()) }
     }
 
+    /**
+     * After a missing-language error, switch to an installed offline pack of
+     * the same language and say whether it switched. A phone set to English
+     * (Sweden) asks for a pack that does not exist, while English (US) is
+     * usually installed. Returns false when the check cannot run at all.
+     */
+    private fun switchToInstalled(onResult: (Boolean) -> Unit): Boolean {
+        if (Build.VERSION.SDK_INT < 33 || !canFetchLanguage()) return false
+        cancelSetup()
+        val token = setupGeneration
+        val client = try { SpeechRecognizer.createOnDeviceSpeechRecognizer(context) } catch (_: Exception) { return false }
+        setupClient = client
+        val requested = locale()
+        fun finish(switched: Boolean) {
+            if (token != setupGeneration) return
+            cancelSetup()
+            onResult(switched)
+        }
+        setupTimeout = Runnable { finish(false) }.also { handler.postDelayed(it, 5_000) }
+        try {
+            client.checkRecognitionSupport(intent(), context.mainExecutor, object : RecognitionSupportCallback {
+                override fun onSupportResult(support: RecognitionSupport) {
+                    val installed = bestLanguage(requested, support.installedOnDeviceLanguages)
+                    val switched = installed != null && !installed.equals(requested.toLanguageTag(), ignoreCase = true)
+                    if (switched) context.getSharedPreferences("surfacelab", Context.MODE_PRIVATE).edit()
+                        .putString("speech_language", installed).apply()
+                    finish(switched)
+                }
+                override fun onError(error: Int) = finish(false)
+            })
+        } catch (_: Exception) { cancelSetup(); return false }
+        return true
+    }
+
     companion object {
         /** Exact region wins; a same-language installed pack beats an unavailable locale. */
         fun bestLanguage(requested: Locale, tags: List<String>): String? =
@@ -293,7 +342,7 @@ class Ears(private val context: Context) {
  */
 class Mouth(context: Context) {
     private val appContext = context.applicationContext
-    private var engine: TextToSpeech? = null
+    private val engine get() = speech.tts
     private var initialized = false
     private var ready = false
     private var closed = false
@@ -323,26 +372,19 @@ class Mouth(context: Context) {
 
     fun speaking(): Boolean = active.isNotEmpty() || pending.isNotEmpty()
 
-    init {
-        engine = TextToSpeech(context.applicationContext) { status ->
-            main.post { started(status == TextToSpeech.SUCCESS) }
-        }
-    }
+    private val speech = VoiceOutput(context, { locale }) { tts, anyStarted -> started(tts, anyStarted) }
 
-    private fun started(ok: Boolean) {
+    private fun started(tts: TextToSpeech?, anyStarted: Boolean) {
         if (closed) return
         initialized = true
-        if (!ok) {
-            fail("Speech output could not start. The answer is still available as text.")
+        if (tts == null) {
+            fail(if (anyStarted) "No installed offline voice for ${locale.displayLanguage}. Add one in Text-to-speech settings."
+                else "Speech output could not start. The answer is still available as text.")
             return
         }
-        engine?.setAudioAttributes(attributes)
-        engine?.setOnUtteranceProgressListener(progress)
-        ready = pickVoice()
-        if (!ready) {
-            fail("No installed offline voice for ${locale.displayLanguage}. Add one in Text-to-speech settings.")
-            return
-        }
+        tts.setAudioAttributes(attributes)
+        tts.setOnUtteranceProgressListener(progress)
+        ready = true
         while (pending.isNotEmpty() && !muted) enqueue(pending.removeFirst())
         idleIfFinished()
     }
@@ -373,9 +415,11 @@ class Mouth(context: Context) {
         finished = false
         spoken = 0
         this.locale = locale
-        if (initialized) {
-            ready = pickVoice()
-            if (!ready) fail("No installed offline voice for ${locale.displayLanguage}. Add one in Text-to-speech settings.")
+        if (initialized && !pickVoice()) {
+            // This engine cannot speak the new language: look for one that can, queueing meanwhile.
+            initialized = false
+            ready = false
+            speech.reopen()
         }
     }
 
@@ -416,8 +460,7 @@ class Mouth(context: Context) {
         onProblem = null
         hush()
         controls.close()
-        engine?.shutdown()
-        engine = null
+        speech.close()
         ready = false
     }
 
@@ -474,7 +517,7 @@ class Mouth(context: Context) {
 
     private fun pickVoice(): Boolean {
         val tts = engine ?: return false
-        return SpeechVoices.apply(appContext, tts, locale)
+        return SpeechVoices.apply(appContext, tts, locale, speech.name.orEmpty())
     }
 
 }

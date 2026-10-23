@@ -55,7 +55,7 @@ Long-press the Ægentica AI launcher icon for Chat, Voice (Android 12+), History
 
 With a hardware keyboard: **Ctrl+Enter** sends, **Ctrl+N** saves the current chat and starts a new one, **Ctrl+L** focuses the composer, and **Ctrl+Shift+M** opens voice. Plain Enter remains available for a new line. Android's keyboard-shortcut help lists these commands.
 
-Use **Actions** for a timer, alarm, calendar draft, place search or phone number. These open the destination Android app; Ægentica AI does not execute commands found in an AI answer. [Action details](native-actions.md).
+Use **Actions** (the + button in the message box) for a timer, alarm, calendar draft, place search or phone number. These open the destination Android app; Ægentica AI does not execute commands found in an AI answer. [Action details](native-actions.md).
 
 ## Privacy controls
 
