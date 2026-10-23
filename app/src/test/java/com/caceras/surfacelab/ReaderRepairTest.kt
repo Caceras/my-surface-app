@@ -139,6 +139,38 @@ class ReaderRepairTest {
         controller.destroy()
     }
 
+    @Test fun `when the default voice app cannot start, reading moves on to Google's engine`() {
+        val google = android.content.pm.ResolveInfo().apply {
+            serviceInfo = android.content.pm.ServiceInfo().apply {
+                packageName = SpeechEngines.GOOGLE; name = "GoogleTtsService"
+                applicationInfo = android.content.pm.ApplicationInfo().apply { packageName = SpeechEngines.GOOGLE }
+            }
+        }
+        shadowOf(context.packageManager).addResolveInfoForIntent(Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), google)
+        val controller = Robolectric.buildService(ReadingService::class.java).create()
+        controller.get().onStartCommand(Intent(context, ReadingService::class.java).putExtra("text", "First sentence. Second sentence."), 0, 1)
+        val failing = ShadowTextToSpeech.getLastTextToSpeechInstance()
+        shadowOf(failing).onInitListener.onInit(TextToSpeech.ERROR)
+        shadowOf(Looper.getMainLooper()).idle()
+        val fallback = ShadowTextToSpeech.getLastTextToSpeechInstance()
+        assertNotSame(failing, fallback)
+        assertTrue(shadowOf(failing).isShutdown)
+        ShadowTextToSpeech.addVoice(Voice("google", Locale.getDefault(), Voice.QUALITY_HIGH, 100, false, emptySet()))
+        shadowOf(fallback).onInitListener.onInit(TextToSpeech.SUCCESS)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals("", ReadingService.snapshot.error)
+        assertTrue(ReadingService.snapshot.playing)
+        assertEquals("Second sentence.", shadowOf(fallback).lastSynthesizeToFileText)
+        controller.destroy()
+    }
+
+    @Test fun `engines are tried Google first after the default, and each only once`() {
+        assertEquals(SpeechEngines.GOOGLE, SpeechEngines.next(listOf("com.hayai.tts", SpeechEngines.GOOGLE), listOf("com.hayai.tts")))
+        assertEquals("com.other", SpeechEngines.next(listOf("com.hayai.tts", "com.other", SpeechEngines.GOOGLE), listOf("com.hayai.tts", SpeechEngines.GOOGLE)))
+        assertNull(SpeechEngines.next(listOf("com.hayai.tts"), listOf("com.hayai.tts")))
+        assertNull(SpeechEngines.next(emptyList(), emptyList()))
+    }
+
     @Test fun `failed reader initialization stays stopped on play instead of appearing to play silently`() {
         val controller = Robolectric.buildService(ReadingService::class.java).create()
         controller.get().onStartCommand(Intent(context, ReadingService::class.java).putExtra("text", "Keep this text."), 0, 1)

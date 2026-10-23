@@ -1,6 +1,10 @@
 # Current preview changes
 
 **New in this build:**
+- **Read aloud always finds a voice.** If your voice app does not start or has no voice for your language, Ægentica moves on to Google's voice (on every Pixel) and then any other voice app you have. Settings → *Choose reading voice* now lists your voice apps, so you can pick one and hear a sample.
+- **The microphone works with English (Sweden).** Android has no offline speech pack called English (Sweden). Ægentica now switches to an installed English pack, such as English (US), and listens again.
+
+**Earlier in build 198:**
 - **Your voices work.** Offline voice apps that name languages with three-letter codes, such as HayaiTTS, now show their installed voices; an app that lists none uses its own voice.
 - **Read aloud without pauses.** The next sentences are prepared while one plays, so slow offline voices no longer stop after every sentence.
 - **Ægentica keys.** An AI panel beside Gboard: in any text field, switch to it with the keyboard button, then Fix, Improve, Shorter, Friendlier, Formal, Translate or Continue what you wrote, *Reply to copied* for a message you copied, or dictate. Nothing is written until you tap *Replace* or *Insert*, and password fields are never read. Turn it on in Settings → *Ægentica keys*.

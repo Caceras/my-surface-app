@@ -287,7 +287,7 @@ class MainActivity : Activity() {
             settingsDialog?.dismiss()
             startActivity(Intent(this, VoiceActivity::class.java).putExtra("setup", true))
         })
-        panel.addView(flatButton("Choose reading voice") { SpeechVoices.showPicker(this) })
+        panel.addView(flatButton("Choose reading voice") { SpeechVoices.showPicker(this) { ReadingService.refreshVoice() } })
         panel.addView(flatButton(getString(R.string.voice_settings)) {
             runCatching { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
                 .onFailure { Toast.makeText(this, getString(R.string.settings_unavailable), Toast.LENGTH_LONG).show() }
