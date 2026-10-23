@@ -41,7 +41,7 @@ Curated native framework illustrations from the original Ægentica AI branding p
 ## Try it on a Pixel
 
 1. Download **`aegentica-ai-nano.apk`** from the preview link above and open it on the phone. Allow installation from your browser if Android asks.
-2. Open **Ægentica AI**. Check the build number in **Settings** against the [preview release](https://github.com/Caceras/my-surface-app/releases/tag/preview-improve-pixel-assistant).
+2. Open **Ægentica AI**: it opens into Glimt. Tap the bar, then *Sign in with OpenRouter* (Chrome opens; sign in, then tap *Back to Ægentica*). The mark beside the address opens notes, recording, voices and settings. Check the build number in **Settings** against the [preview release](https://github.com/Caceras/my-surface-app/releases/tag/preview-improve-pixel-assistant).
 3. Select **Check / prepare on-device model**. Initial model and speech downloads need an internet connection.
 4. Type a short question. Then open **Settings → Set up voice & test playback** to choose your language, download offline speech, and test the speaker.
 5. Tap the round **Voice** button in the empty message box, speak, and pause. Use **Type** to return to the shared chat. Enable **Keep talking** only when you want the microphone to reopen after the reply.
