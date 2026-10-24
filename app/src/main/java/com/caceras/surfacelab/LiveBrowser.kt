@@ -50,10 +50,12 @@ class LiveBrowser(context: Context, private val base: String = "https://aegentic
         Thread({ loop() }, "live-browser").start()
     }
 
+    /** Closes the stream; actions already sent (handing back, say) still go, then the sender ends. */
     fun stop() {
         running = false
         runCatching { reader?.close() }
         connected = false
+        queue.shutdown()
     }
 
     private fun loop() {
@@ -121,7 +123,10 @@ class LiveBrowser(context: Context, private val base: String = "https://aegentic
     /** The owner's actions go one after another, in the order they were made: take over, then tap. */
     private val queue = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "live-browser-input").apply { isDaemon = true } }
 
-    private fun send(path: String, body: JSONObject, done: (String?) -> Unit) { queue.execute { val error = post(path, body); main.post { done(error) } } }
+    private fun send(path: String, body: JSONObject, done: (String?) -> Unit) {
+        val queued = runCatching { queue.execute { val error = post(path, body); main.post { done(error) } } }.isSuccess
+        if (!queued) main.post { done("The live view is closed.") }
+    }
 
     /** The owner takes the browser: the agent waits until it is handed back. */
     fun takeOver(done: (String?) -> Unit = {}) = send("control", JSONObject().put("mode", "human"), done)
