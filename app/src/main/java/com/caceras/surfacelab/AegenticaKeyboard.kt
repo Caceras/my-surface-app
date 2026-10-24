@@ -60,6 +60,7 @@ class AegenticaKeyboard : InputMethodService() {
         }
         override fun pickKeyboard() = getSystemService(InputMethodManager::class.java).showInputMethodPicker()
         override fun open(intent: Intent) { runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } }
+        override fun hide() = requestHideSelf(0)
         override fun language(): String = getSystemService(InputMethodManager::class.java).currentInputMethodSubtype
             ?.let { s -> s.languageTag.ifBlank { @Suppress("DEPRECATION") s.locale } }
             ?.substringBefore('_')?.substringBefore('-').orEmpty().ifBlank { "sv" }
@@ -105,6 +106,8 @@ class KeysPanel(private val context: Context, private val host: Host) {
         fun open(intent: Intent)
         /** The chosen subtype's language: "sv" or "en". */
         fun language(): String
+        /** Hide the keyboard (the genie floats instead). */
+        fun hide() {}
     }
 
     enum class Mode { KEYS, GENIE, PROMPT }
@@ -120,6 +123,13 @@ class KeysPanel(private val context: Context, private val host: Host) {
     private val keyOverlay = KeysOverlay(context)
     private val rabbit: ImageView
     private val ideas: TextView
+    /** The quiet ideas line: completions and next words in the owner's own voice. */
+    private val suggestions: LinearLayout
+    private val words by lazy { WordSuggest(context) }
+    private var typedWord = ""
+    private var typedPrevious: String? = null
+    private var learning = false
+    private val float: ImageButton
     private val clip: ImageButton
     private val mic: ImageButton
     private val barKeys: LinearLayout
@@ -131,6 +141,8 @@ class KeysPanel(private val context: Context, private val host: Host) {
 
     var mode = Mode.KEYS; private set
     private var locked = false
+    /** The owner turned the genie off in this app; the keys and the ideas line still work. */
+    private var genieOff = false
     private var page = "letters"
     private val prompt = StringBuilder()
     private var ears: Ears? = null
@@ -148,6 +160,8 @@ class KeysPanel(private val context: Context, private val host: Host) {
             override fun key(key: Key) = pressed(key)
             override fun text(text: String) = type(text)
             override fun cursor(steps: Int) { if (mode != Mode.PROMPT) engine.cursor(steps) }
+            override fun spaceHeld(): Boolean = holdToSpeak()
+            override fun spaceReleased() { ears?.stop() }
             override fun longPress(key: Key): Boolean = when (key.code) {
                 Keys.SPACE -> { host.pickKeyboard(); true }
                 Keys.GENIE -> { workspace(); true }
@@ -162,6 +176,8 @@ class KeysPanel(private val context: Context, private val host: Host) {
             override fun canReplace() = KeyboardLive.sameField(host.editor()) && KeyboardLive.ask?.field != null
             override fun decide(approval: Approval, allow: Boolean, always: Boolean) { KeyboardLive.work?.decide(approval, allow, always) }
             override fun listen() = listenToGenie()
+            override fun open(intent: Intent) = host.open(intent)
+            override fun offHere() = setGenieOff(true)
         })
         rabbit = ImageView(context).apply {
             tag = "keys-rabbit"; setImageResource(R.drawable.mascot_sitting); scaleType = ImageView.ScaleType.FIT_CENTER
@@ -173,6 +189,14 @@ class KeysPanel(private val context: Context, private val host: Host) {
             tag = "keys-ideas"; setTextColor(ink(R.color.keys_ink_dim)); gravity = Gravity.CENTER_VERTICAL; maxLines = 1; ellipsize = TextUtils.TruncateAt.END
             setPadding(dp(8), 0, dp(8), 0); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
+        suggestions = LinearLayout(context).apply { tag = "keys-suggestions"; gravity = Gravity.CENTER_VERTICAL; visibility = View.GONE }
+        repeat(3) { i ->
+            suggestions.addView(context.label("", 15f).apply {
+                tag = "keys-suggestion"; gravity = Gravity.CENTER; maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+                setTextColor(ink(R.color.keys_ink)); if (i == 0) medium(); buttonSemantics()
+                background = RippleDrawable(press, null, null); setPadding(dp(6), 0, dp(6), 0)
+            }, LinearLayout.LayoutParams(0, -1, 1f))
+        }
         clip = iconButton(R.drawable.ic_clipboard, "Clipboard", "keys-clip") { offerClip() }
         mic = iconButton(R.drawable.ic_mic_line, "Dictate", "keys-mic") { dictate() }
         val globe = iconButton(R.drawable.ic_globe, "Switch keyboard", "keys-globe") { host.switchKeyboard() }.apply {
@@ -180,7 +204,7 @@ class KeysPanel(private val context: Context, private val host: Host) {
         }
         barKeys = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
-            addView(ideas, LinearLayout.LayoutParams(0, -1, 1f))
+            addView(FrameLayout(context).apply { addView(ideas, FrameLayout.LayoutParams(-1, -1)); addView(suggestions, FrameLayout.LayoutParams(-1, -1)) }, LinearLayout.LayoutParams(0, -1, 1f))
             listOf(clip, mic, globe).forEach { addView(it, LinearLayout.LayoutParams(dp(44), dp(44))) }
         }
         status = context.label("", 14f).apply {
@@ -190,6 +214,7 @@ class KeysPanel(private val context: Context, private val host: Host) {
         barGenie = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL; visibility = View.GONE
             addView(status, LinearLayout.LayoutParams(0, -1, 1f))
+            addView(iconButton(R.drawable.ic_float, "Float the genie over the app", "keys-float") { floatGenie() }.also { float = it }, LinearLayout.LayoutParams(dp(44), dp(44)))
             addView(iconButton(R.drawable.ic_expand, "Open the full genie", "keys-expand") { workspace() }, LinearLayout.LayoutParams(dp(44), dp(44)))
             addView(iconButton(R.drawable.ic_keys, "Back to the keys", "keys-close") { setMode(Mode.KEYS) }, LinearLayout.LayoutParams(dp(44), dp(44)))
         }
@@ -252,7 +277,11 @@ class KeysPanel(private val context: Context, private val host: Host) {
         page = if (fieldMode.numeric) "numbers" else "letters"
         showPage()
         keys.enter = Keys.enter(info)
-        keys.genieOff = locked
+        genieOff = !locked && KeyboardPrefs.off(context, info?.packageName)
+        keys.genieOff = locked || genieOff
+        learning = !locked && !fieldMode.email && !fieldMode.url && ((info?.inputType ?: 0) and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) == 0
+        if (learning) words.language(host.language())
+        typedWord = ""; typedPrevious = null; showIdeas(emptyList(), "")
         clip.visibility = if (locked) View.GONE else View.VISIBLE
         mic.visibility = if (locked) View.GONE else View.VISIBLE
         undo = null
@@ -265,11 +294,12 @@ class KeysPanel(private val context: Context, private val host: Host) {
         KeyboardInbox.waiting()?.let { waiting -> notice("Insert Ægentica's text", "keys-inbox-insert") { insert(waiting); KeyboardInbox.clear() }; return }
         ideas.text = if (KeyboardLive.unseen()) "Ægentica's answer is ready · tap the rabbit" else ""
         rabbitPose()
+        refreshIdeas()
     }
 
     fun selection(start: Int, end: Int) { engine.selStart = start; engine.selEnd = end; if (mode != Mode.PROMPT) engine.caps() }
 
-    fun finish() { stopDictation(); keys.reset() }
+    fun finish() { stopDictation(); keys.reset(); if (learning) words.save() }
 
     private fun showPage() {
         val info = host.editor()
@@ -290,7 +320,7 @@ class KeysPanel(private val context: Context, private val host: Host) {
             Keys.TEXT -> type(key.text)
             Keys.SPACE -> type(" ")
             Keys.SHIFT -> { engine.shiftTap(); keys.shift = engine.shift }
-            Keys.BACKSPACE -> if (mode == Mode.PROMPT) { if (prompt.isNotEmpty()) prompt.setLength(prompt.length - Character.charCount(prompt.codePointBefore(prompt.length))); showPrompt() } else engine.backspace()
+            Keys.BACKSPACE -> if (mode == Mode.PROMPT) { if (prompt.isNotEmpty()) prompt.setLength(prompt.length - Character.charCount(prompt.codePointBefore(prompt.length))); showPrompt() } else { engine.backspace(); scheduleIdeas() }
             Keys.ENTER -> if (mode == Mode.PROMPT) sendPrompt() else engine.enter()
             Keys.SYMBOLS -> { page = "symbols"; showPage() }
             Keys.MORE -> { page = "more"; showPage() }
@@ -311,8 +341,11 @@ class KeysPanel(private val context: Context, private val host: Host) {
             showPrompt()
             return
         }
+        // A space or punctuation ends a word: it is learned (where learning is allowed).
+        if (learning && typedWord.length > 1 && text.length == 1 && !text[0].isLetter() && text[0] != '\'') words.learn(typedWord, typedPrevious)
         engine.type(text)
         if (mode == Mode.KEYS && ideas.text.isNotEmpty() && !KeyboardLive.unseen()) clearNotice()
+        scheduleIdeas()
     }
 
     // ------------------------------------------------------------------ the genie
@@ -330,6 +363,7 @@ class KeysPanel(private val context: Context, private val host: Host) {
     /** The Æ key: the keys become the genie panel, about what is in the field. */
     fun openGenie() {
         if (locked) { notice("Ægentica is off in this field.", null, null); return }
+        if (genieOff) { offNotice(); return }
         if (KeyboardLive.ask != null && (KeyboardLive.state.busy || KeyboardLive.unseen()) && KeyboardLive.sameField(host.editor())) {
             KeyboardLive.seen(); setMode(Mode.GENIE); render(KeyboardLive.state); return
         }
@@ -337,7 +371,7 @@ class KeysPanel(private val context: Context, private val host: Host) {
         KeyboardLive.forget()
         val what = (when { base.field == null -> "Empty ${base.kind} field"; base.field.selected -> "Your selection"; else -> "Your text" }) +
             (if (base.appName.isNotBlank()) " in ${base.appName}" else "") + (if (base.clip != null) " · copied text" else "")
-        genie.idle(what, offers(base))
+        genie.idle(what, offers(base), base.appName)
         status.text = "Ægentica"
         setMode(Mode.GENIE)
     }
@@ -412,6 +446,7 @@ class KeysPanel(private val context: Context, private val host: Host) {
     /** The full genie sheet over the app, with the field's text; its Replace comes back to this field. */
     fun workspace() {
         if (locked) { notice("Ægentica is off in this field.", null, null); return }
+        if (genieOff) { offNotice(); return }
         val info = host.editor() ?: return
         // A conversation already going on the phone agent continues in the sheet, and its answer
         // waits back in the keys; otherwise the sheet starts on the field's text, and its Replace comes back here.
@@ -447,6 +482,7 @@ class KeysPanel(private val context: Context, private val host: Host) {
         barKeys.visibility = if (next == Mode.KEYS) View.VISIBLE else View.GONE
         barGenie.visibility = if (next == Mode.GENIE) View.VISIBLE else View.GONE
         barPrompt.visibility = if (next == Mode.PROMPT) View.VISIBLE else View.GONE
+        float.visibility = if (Hands.overlay != null) View.VISIBLE else View.GONE
         // The keys keep their height under the panel, so the app never jumps.
         keys.visibility = if (next == Mode.GENIE) View.INVISIBLE else View.VISIBLE
         genie.view.visibility = if (next == Mode.GENIE) View.VISIBLE else View.GONE
@@ -498,6 +534,8 @@ class KeysPanel(private val context: Context, private val host: Host) {
     // ------------------------------------------------------------------ the bar
 
     private fun notice(text: String, tag: String?, action: (() -> Unit)?) {
+        if (text.isNotEmpty()) suggestions.visibility = View.GONE
+        ideas.visibility = View.VISIBLE
         ideas.text = text
         ideas.contentDescription = if (action != null) text else null
         ideas.setTextColor(ink(if (action != null) R.color.keys_ink else R.color.keys_ink_dim))
@@ -552,6 +590,91 @@ class KeysPanel(private val context: Context, private val host: Host) {
     private fun stopDictation() {
         ears?.cancel()
         mic.isSelected = false; mic.imageTintList = ColorStateList.valueOf(ink(R.color.keys_ink))
+    }
+
+    // ------------------------------------------------------------------ the ideas line
+
+    private val ideasRun = Runnable { refreshIdeas() }
+
+    /** After the key is handled: the field is read for the word being typed, off the tap's path. */
+    private fun scheduleIdeas() { if (learning) { main.removeCallbacks(ideasRun); main.post(ideasRun) } }
+
+    private fun refreshIdeas() {
+        if (!learning || mode != Mode.KEYS) { showIdeas(emptyList(), ""); return }
+        val before = host.connection()?.getTextBeforeCursor(48, 0)
+        val current = WordSuggest.current(before)
+        typedWord = current
+        typedPrevious = WordSuggest.previous(before?.let { it.subSequence(0, it.length - current.length) })
+        val ideas = if (current.isNotEmpty()) words.complete(current) else typedPrevious?.let { words.next(it) }.orEmpty()
+        showIdeas(ideas, current)
+    }
+
+    /** The first idea shows as ghost text: what is typed, then the rest faded. A tap puts the word in. */
+    private fun showIdeas(list: List<String>, typed: String) {
+        if (list.isEmpty() || (ideas.text.isNotEmpty() && ideas.isClickable)) { suggestions.visibility = View.GONE; ideas.visibility = View.VISIBLE; return }
+        ideas.visibility = View.GONE
+        suggestions.visibility = View.VISIBLE
+        for (i in 0 until suggestions.childCount) {
+            val slot = suggestions.getChildAt(i) as TextView
+            val word = list.getOrNull(i)
+            slot.visibility = if (word == null) View.INVISIBLE else View.VISIBLE
+            if (word == null) continue
+            slot.text = if (i == 0 && typed.isNotEmpty() && word.length > typed.length && word.startsWith(typed, ignoreCase = true))
+                android.text.SpannableString(word).apply { setSpan(android.text.style.ForegroundColorSpan(ink(R.color.keys_ink_dim)), typed.length, word.length, 0) }
+                else word
+            slot.contentDescription = word
+            slot.setOnClickListener { take(word, typed) }
+        }
+    }
+
+    private fun take(word: String, typed: String) {
+        val connection = host.connection() ?: return
+        connection.beginBatchEdit()
+        if (typed.isNotEmpty()) connection.deleteSurroundingText(typed.length, 0)
+        connection.commitText("$word ", 1)
+        connection.endBatchEdit()
+        words.learn(word, typedPrevious)
+        engine.caps(); keys.shift = engine.shift
+        scheduleIdeas()
+    }
+
+    // ------------------------------------------------------------------ voice, the switch, the bubble
+
+    /** Hold space and speak: the words go to the genie as a request, which starts when the finger lifts. */
+    private fun holdToSpeak(): Boolean {
+        if (locked || genieOff || mode == Mode.PROMPT) return false
+        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return false
+        val e = ears ?: Ears(context).also { ears = it }
+        if (!e.available()) return false
+        e.cancel()
+        setMode(Mode.PROMPT)
+        promptText.text = "Listening… let go to send"
+        e.listen(onPartial = { promptText.text = it }, onFinal = { heard ->
+            if (heard.isNotBlank()) { prompt.setLength(0); prompt.append(heard.trim()); sendPrompt() }
+        }, onStop = { problem -> if (mode == Mode.PROMPT && prompt.isEmpty()) { problem?.let { status.text = it.message }; setMode(Mode.KEYS) } })
+        return true
+    }
+
+    private fun setGenieOff(off: Boolean) {
+        val pkg = host.editor()?.packageName ?: return
+        KeyboardPrefs.setOff(context, pkg, off)
+        genieOff = off
+        keys.genieOff = locked || off
+        setMode(Mode.KEYS)
+        if (off) offNotice() else notice("Ægentica is on here again.", null, null)
+    }
+
+    private fun offNotice() {
+        val app = KeyboardText.appName(context, host.editor()?.packageName.orEmpty()).ifBlank { "this app" }
+        notice("Ægentica is off in $app · Turn on", "keys-genie-on") { setGenieOff(false) }
+    }
+
+    /** The genie floats over the app as the rabbit (Ægentica hands' bubble) and the keyboard steps aside. */
+    private fun floatGenie() {
+        val genie = Hands.overlay ?: return
+        setMode(Mode.KEYS, animate = false)
+        genie.summon()
+        host.hide()
     }
 
     /** A vertical drag of at least [distance] pixels upwards. Taps pass through. */
@@ -916,6 +1039,12 @@ object KeyboardSetup {
             !chosen -> dialog.setPositiveButton("Choose keyboard") { _, _ -> activity.getSystemService(InputMethodManager::class.java).showInputMethodPicker() }
             else -> dialog.setPositiveButton("Choose another keyboard") { _, _ -> activity.getSystemService(InputMethodManager::class.java).showInputMethodPicker() }
         }
+        // Words learned for the ideas line, and apps where the genie is off, can be cleared here.
+        val off = KeyboardPrefs.offApps(activity)
+        dialog.setNeutralButton(if (off.isEmpty()) "Forget typed words" else "Forget words, genie on everywhere") { _, _ ->
+            WordSuggest.forget(activity); KeyboardPrefs.clearOff(activity)
+            android.widget.Toast.makeText(activity, "Done.", android.widget.Toast.LENGTH_SHORT).show()
+        }
         dialog.showProtected(activity)
     }
 
@@ -927,4 +1056,17 @@ object KeyboardSetup {
             if (!activity.isFinishing && !chosen(activity)) activity.getSystemService(InputMethodManager::class.java).showInputMethodPicker()
         }, 500)
     }
+}
+
+/** Per-app choices: where the owner turned the genie off. */
+object KeyboardPrefs {
+    private fun prefs(context: Context) = context.getSharedPreferences("keys", 0)
+    fun off(context: Context, pkg: String?) = !pkg.isNullOrBlank() && pkg in prefs(context).getStringSet("off", emptySet()).orEmpty()
+    fun setOff(context: Context, pkg: String, off: Boolean) {
+        val now = prefs(context).getStringSet("off", emptySet()).orEmpty().toMutableSet()
+        if (off) now += pkg else now -= pkg
+        prefs(context).edit().putStringSet("off", now).apply()
+    }
+    fun offApps(context: Context): Set<String> = prefs(context).getStringSet("off", emptySet()).orEmpty()
+    fun clearOff(context: Context) = prefs(context).edit().remove("off").apply()
 }

@@ -83,7 +83,8 @@ class KeyboardTest {
 
     private fun KeysPanel.key(label: String) = keys.layout!!.keys.first { it.label == label }
     private fun KeysPanel.code(code: Int) = keys.layout!!.keys.first { it.code == code }
-    private fun KeysPanel.typeWord(word: String) = word.forEach { c -> pressed(if (c == ' ') code(Keys.SPACE) else key(c.lowercaseChar().toString())) }
+    /** One key at a time, letting the keyboard's posted work run between keys as it does on a phone. */
+    private fun KeysPanel.typeWord(word: String) = word.forEach { c -> pressed(if (c == ' ') code(Keys.SPACE) else key(c.lowercaseChar().toString())); idle() }
 
     @After fun tearDown() { KeyboardAgents.forTest = null; KeyboardLive.forget(); KeyboardInbox.clear() }
 
@@ -250,5 +251,50 @@ class KeyboardTest {
         agent.update!!(GenieState(answer = "Hej!", who = "Ægentica")); idle()
         panel.openGenie()
         assertTrue("its answer is waiting back in the keys", views(panel.view).any { it.tag == "genie-insert" && shown(it) })
+    }
+
+    @Test fun `the ideas line completes words and offers next words from what the owner types, and learns nothing in mail fields`() {
+        context.getSharedPreferences(WordSuggest.PREFS, 0).edit().clear().commit()
+        val field = field()
+        val (panel, _) = panel(field)
+        panel.typeWord("vi ses imorgon "); idle()
+        panel.typeWord("vi "); idle()
+        val first = { (views(panel.view).filter { it.tag == "keys-suggestion" }.first() as TextView) }
+        assertEquals("the word the owner wrote after it last time", "ses", first().text.toString())
+        panel.typeWord("ses imo"); idle()
+        assertEquals("imorgon", first().text.toString())
+        first().performClick(); idle()
+        assertEquals("vi ses imorgon vi ses imorgon ", field.text.toString())
+        panel.finish()
+
+        context.getSharedPreferences(WordSuggest.PREFS, 0).edit().clear().commit()
+        val mail = field(type = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
+        val (address, _) = panel(mail)
+        address.typeWord("anna "); idle()
+        address.finish()
+        assertTrue("nothing typed in an address field is remembered", context.getSharedPreferences(WordSuggest.PREFS, 0).all.isEmpty())
+    }
+
+    @Test fun `the genie can be switched off per app, and links in an answer open only on a tap`() {
+        val agent = FakeAgent(); KeyboardAgents.forTest = agent
+        val (panel, host) = panel(field("hej"))
+        panel.openGenie()
+        byTag(panel.view, "genie-off-here").performClick()
+        assertEquals(KeysPanel.Mode.KEYS, panel.mode)
+        panel.pressed(panel.code(Keys.GENIE)); idle()
+        assertNull("off in this app: the genie is not asked", agent.ask)
+        assertTrue((byTag(panel.view, "keys-ideas") as TextView).text.startsWith("Ægentica is off in"))
+        assertTrue(KeyboardPrefs.off(context, "com.example.chat"))
+        assertFalse("other apps keep the genie", KeyboardPrefs.off(context, "com.example.other"))
+        byTag(panel.view, "keys-ideas").performClick()
+        assertFalse(panel.keys.genieOff)
+
+        panel.openGenie()
+        text(panel.view, "Improve").performClick(); idle()
+        agent.update!!(GenieState(answer = "Boka här: https://bokning.example.se/tid", who = "Ægentica")); idle()
+        assertTrue("nothing opened by itself", host.opened.isEmpty())
+        byTag(panel.view, "genie-action").performClick()
+        assertEquals(Intent.ACTION_VIEW, host.opened.single().action)
+        KeyboardPrefs.clearOff(context)
     }
 }

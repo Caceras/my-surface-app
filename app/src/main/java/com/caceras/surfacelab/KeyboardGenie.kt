@@ -147,6 +147,10 @@ class GeniePanel(private val context: Context, private val host: Host) {
         fun canReplace(): Boolean
         fun decide(approval: Approval, allow: Boolean, always: Boolean)
         fun listen()
+        /** Open what an answer points at (a link, a number to call): the owner's tap, the app's own screen. */
+        fun open(intent: android.content.Intent)
+        /** Turn the genie off in the app being typed in. */
+        fun offHere()
     }
 
     private fun ink(id: Int) = context.getColor(id)
@@ -220,10 +224,13 @@ class GeniePanel(private val context: Context, private val host: Host) {
     }
 
     /** A fresh panel about [what] ("Your text in Messages"), with requests to start from. */
-    fun idle(what: String, offers: List<Pair<String, String>>) {
+    fun idle(what: String, offers: List<Pair<String, String>>, app: String = "") {
         context_.text = what
         starters.removeAllViews(); starters.visibility = View.VISIBLE
         offers.forEach { (label, request) -> starters.addView(chip(label, "genie-starter") { host.ask(label, request) }, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(6) }) }
+        // Last, quiet: the genie can be switched off for this app (the keys keep working).
+        starters.addView(chip("Off in ${app.ifBlank { "this app" }}", "genie-off-here") { host.offHere() }.apply { setTextColor(ink(R.color.keys_ink_dim)) },
+            LinearLayout.LayoutParams(-2, dp(40)))
         steps.removeAllViews(); answer.text = ""; shownAnswer = ""; cards.removeAllViews()
     }
 
@@ -252,6 +259,12 @@ class GeniePanel(private val context: Context, private val host: Host) {
         cards.removeAllViews()
         state.approval?.let { approvalCard(it) }
         ready?.let { textCard(it) }
+        // Links and numbers in a finished answer: one tap opens the app's own screen; nothing runs by itself.
+        if (!state.busy && state.error == null) AssistantActions.detect(state.answer).takeIf { it.isNotEmpty() }?.let { found ->
+            val row = row().apply { tag = "genie-actions" }
+            found.forEach { (label, intent) -> row.addView(chip(label, "genie-action") { host.open(intent) }, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(6) }) }
+            cards.addView(HorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = false; addView(row) })
+        }
         // Follow the work as it streams, then bring the result card fully into view.
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
     }
