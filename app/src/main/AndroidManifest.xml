@@ -87,9 +87,9 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
-        <!-- Glimt, for browsing with an assistant: opened from Ægentica's Phone menu. -->
+        <!-- The Ægentica bar (aegentica.se/bar), for browsing with an assistant: opened from Ægentica's Phone menu. -->
         <activity
-            android:name=".GlimtActivity"
+            android:name=".BarActivity"
             android:theme="@style/Launch"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation"

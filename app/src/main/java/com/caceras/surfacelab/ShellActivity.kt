@@ -41,6 +41,8 @@ class ShellSite(
     val home: String,
     /** https hosts that load inside the app; every other link opens in the browser. */
     val hosts: Set<String>,
+    /** Only this path and the paths under it stay in the app (null: the whole site). */
+    val path: String? = null,
     /** The web view's tag, for tests. */
     val tag: String,
     /** The page may use the microphone (live voice), after Android's own permission. */
@@ -48,7 +50,9 @@ class ShellSite(
     val lightCanvas: String,
     val darkCanvas: String,
 ) {
-    fun keeps(url: Uri): Boolean = url.scheme == "https" && url.host in hosts && url.port == -1
+    fun keeps(url: Uri): Boolean =
+        url.scheme == "https" && url.host in hosts && url.port == -1 &&
+            (path == null || url.path == path || url.path?.startsWith("$path/") == true)
 }
 
 /**

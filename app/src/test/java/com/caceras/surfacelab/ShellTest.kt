@@ -230,13 +230,13 @@ class ShellTest {
         assertTrue(AegenticaActivity.isAegentica(Uri.parse("https://www.aegentica.se/")))
         assertFalse(AegenticaActivity.isAegentica(Uri.parse("http://aegentica.se/")))
         assertFalse(AegenticaActivity.isAegentica(Uri.parse("https://aegentica.se.evil.se/")))
-        assertFalse(AegenticaActivity.isAegentica(Uri.parse("https://glimt-136-148-209-184.sslip.io/")))
+        assertTrue("the bar opens here too", AegenticaActivity.isAegentica(Uri.parse("https://aegentica.se/bar")))
         assertFalse("other sites stay out", AegenticaActivity.isAegentica(Uri.parse("https://example.com/")))
         assertEquals(Intent.ACTION_MAIN, activity.intent.action)
         controller.pause().stop().destroy()
     }
 
-    @Test fun `aegentica-se may use the microphone after Android's prompt, Glimt and other sites never`() {
+    @Test fun `aegentica-se may use the microphone after Android's prompt, the bar and other sites never`() {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val mic = PermissionRequest.RESOURCE_AUDIO_CAPTURE
         val aegentica = Robolectric.buildActivity(AegenticaActivity::class.java).setup()
@@ -262,22 +262,42 @@ class ShellTest {
         assertTrue(stranger.denied)
         aegentica.pause().stop().destroy()
 
-        val glimt = Robolectric.buildActivity(GlimtActivity::class.java).setup()
-        val glimtChrome = shadowOf(glimt.get().window.decorView.findViewWithTag<WebView>("glimt")).webChromeClient
-        val fromGlimt = Asking(Uri.parse("https://glimt-136-148-209-184.sslip.io/"), arrayOf(mic))
-        glimtChrome.onPermissionRequest(fromGlimt)
-        assertTrue("Glimt's dictation is native; its page gets no microphone", fromGlimt.denied)
-        glimt.pause().stop().destroy()
+        val bar = Robolectric.buildActivity(BarActivity::class.java).setup()
+        val barChrome = shadowOf(bar.get().window.decorView.findViewWithTag<WebView>("bar")).webChromeClient
+        val fromBar = Asking(Uri.parse("https://aegentica.se/bar"), arrayOf(mic))
+        barChrome.onPermissionRequest(fromBar)
+        assertTrue("the bar's dictation is native; its page gets no microphone", fromBar.denied)
+        bar.pause().stop().destroy()
     }
 
-    @Test fun `Glimt still opens its own address and keeps only its origin in the app`() {
-        val controller = Robolectric.buildActivity(GlimtActivity::class.java).setup()
-        val web = controller.get().window.decorView.findViewWithTag<WebView>("glimt")
-        assertEquals(GlimtActivity.URL, shadowOf(web).lastLoadedUrl)
-        assertTrue(GlimtActivity.isGlimt(Uri.parse("https://glimt-136-148-209-184.sslip.io/?url=x")))
-        assertFalse(GlimtActivity.isGlimt(Uri.parse("http://glimt-136-148-209-184.sslip.io/")))
-        assertFalse(GlimtActivity.isGlimt(Uri.parse("https://glimt-136-148-209-184.sslip.io.evil.se/")))
-        assertFalse(GlimtActivity.isGlimt(Uri.parse("https://aegentica.se/")))
+    @Test fun `the bar opens aegentica-se-bar and keeps only the bar in its screen`() {
+        val controller = Robolectric.buildActivity(BarActivity::class.java).setup()
+        val web = controller.get().window.decorView.findViewWithTag<WebView>("bar")
+        assertEquals(BarActivity.URL, shadowOf(web).lastLoadedUrl)
+        assertTrue(web.settings.userAgentString.endsWith(ShellActivity.USER_AGENT))
+        assertTrue(BarActivity.isBar(Uri.parse("https://aegentica.se/bar")))
+        assertTrue(BarActivity.isBar(Uri.parse("https://aegentica.se/bar?url=https%3A%2F%2Fexample.com")))
+        assertTrue(BarActivity.isBar(Uri.parse("https://www.aegentica.se/bar/assets/app.js")))
+        assertFalse("another page of the site", BarActivity.isBar(Uri.parse("https://aegentica.se/")))
+        assertFalse("only the bar's own path", BarActivity.isBar(Uri.parse("https://aegentica.se/barn")))
+        assertFalse(BarActivity.isBar(Uri.parse("http://aegentica.se/bar")))
+        assertFalse(BarActivity.isBar(Uri.parse("https://aegentica.se:8443/bar")))
+        assertFalse(BarActivity.isBar(Uri.parse("https://aegentica.se.evil.se/bar")))
+        assertFalse(BarActivity.isBar(Uri.parse("https://glimt-136-148-209-184.sslip.io/")))
+        controller.pause().stop().destroy()
+    }
+
+    @Test fun `from the bar, aegentica-se's other pages open in its own screen and other sites in the browser`() {
+        val controller = Robolectric.buildActivity(BarActivity::class.java).setup()
+        val activity = controller.get()
+        activity.openOutside("https://aegentica.se/chat/abc")
+        val ours = shadowOf(activity).nextStartedActivity
+        assertEquals(AegenticaActivity::class.java.name, ours.component?.className)
+        assertEquals("https://aegentica.se/chat/abc", ours.getStringExtra(ShellActivity.EXTRA_URL))
+        activity.openOutside("https://example.com/")
+        val theirs = shadowOf(activity).nextStartedActivity
+        assertEquals(Intent.ACTION_VIEW, theirs.action)
+        assertEquals("https://example.com/", theirs.dataString)
         controller.pause().stop().destroy()
     }
 
