@@ -17,6 +17,8 @@
     <uses-permission android:name="com.beeper.android.permission.READ_PERMISSION" />
     <uses-permission android:name="com.beeper.android.permission.SEND_PERMISSION" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!-- Android 16 live updates: a running agent shows its progress in the status bar. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <!--
         Package visibility, from Android 11. Without these the speech
@@ -30,6 +32,11 @@
         </intent>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <!-- Ægentica hands opens apps by name (phone_open_app). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
         </intent>
     </queries>
 
@@ -136,6 +143,22 @@
             android:exported="true"
             android:permission="android.permission.BIND_VOICE_INTERACTION" />
         <service android:name=".AssistantRecognitionService" android:exported="false" />
+        <!--
+            Ægentica hands: opt-in in Android's Accessibility settings. Only Android can bind it
+            (BIND_ACCESSIBILITY_SERVICE); it acts only on the phone agent's validated steps.
+        -->
+        <service
+            android:name=".HandsService"
+            android:label="@string/hands_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/hands" />
+        </service>
+        <!-- Stop, Allow and a typed reply from the agent's notification. -->
+        <receiver android:name=".AgentActionReceiver" android:exported="false" />
         <!-- Real-time voice with the owner's LiveKit agent; visible notification with Stop while it runs. -->
         <service android:name=".AgentService" android:exported="false" android:foregroundServiceType="microphone" />
         <activity android:name=".AgentActivity" android:exported="false" android:launchMode="singleTop" />

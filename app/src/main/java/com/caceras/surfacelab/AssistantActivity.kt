@@ -88,6 +88,9 @@ class AssistantActivity : Activity() {
     /** The agent's finished exchange was handled once (actions shown, reply read). */
     private var agentSettled = false
     private var micDownAt = 0L
+    /** The agent started using the hands: the rabbit's bar has the conversation now, so leaving stops nothing. */
+    private var handedOver = false
+    private val stepAside: () -> Unit = { if (agentMode && agent?.running == true && !isFinishing) { handedOver = true; finish() } }
     /** Where "Replace" sends the answer when the sheet was opened from inside the app (the keyboard). */
     private var handback: ((String) -> Unit)? = null
 
@@ -279,6 +282,7 @@ class AssistantActivity : Activity() {
         surface()
         root.post { root.arrive() }
         unlisten = ScreenContexts.listen { showContext() }
+        Hands.onActive = stepAside
         start(intent)
     }
 
@@ -350,6 +354,15 @@ class AssistantActivity : Activity() {
         if (::steps.isInitialized) { steps.removeAllViews(); steps.visibility = View.GONE; approvalCard.visibility = View.GONE; scroll.reset() }
         card.visibility = View.GONE
         showContext()
+        // Opened from the rabbit's "Open the answer": the same conversation, in the sheet.
+        if (intent?.getBooleanExtra(RESUME, false) == true) PhoneAgent.current?.let { session ->
+            agent = session; agentMode = true; agentScreenSent = true; agentSettled = session.running
+            session.listener = { if (!isFinishing && agent === it) renderAgent(it) }
+            question = session.view().question; asked.text = question
+            card.visibility = View.VISIBLE; showSuggestions(); renderAgent(session)
+            if (!session.running && reply.isNotBlank()) showActions()
+            return
+        }
         // Voice first: a fresh assistant invocation starts listening when the microphone is already allowed.
         if (selection == null && intent?.getBooleanExtra(DIRECT, false) != true && prefs().getBoolean("assistant_listen", true) &&
             checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
@@ -547,6 +560,7 @@ class AssistantActivity : Activity() {
         if (!screen.empty) menu.menu.add(0, 2, 0, "Chat about this on aegentica.se")
         if (Live.available() && ConnectedAI.geminiConfigured(this)) menu.menu.add(0, 3, 0, "Talk live about this screen")
         if (PhoneAgent.enabled(this)) menu.menu.add(0, 4, 0, if (PhoneAgent.key(this) == null) "Sign in to OpenRouter" else "Choose the agent's model")
+        menu.menu.add(0, 6, 0, if (Hands.connected) "Ægentica hands · on" else "Let it use your phone (Ægentica hands)")
         menu.menu.add(0, 5, 0, "Assistant settings")
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -555,6 +569,7 @@ class AssistantActivity : Activity() {
                 3 -> { Live.pendingScreen = context().takeIf { !it.empty }; startActivity(LiveActivity.intent(this, start = true)); finish() }
                 4 -> modelTapped()
                 5 -> setup(this)
+                6 -> HandsSetup.show(this)
             }
             true
         }
@@ -575,14 +590,9 @@ class AssistantActivity : Activity() {
         val question = raw.trim().ifEmpty { if (screen.empty) { toast("Type or speak a question."); return } else if (selection != null) "Explain this." else "Explain what is on this screen." }
         stop()
         val session = agent ?: PhoneAgent.session(this, fresh = true).also { agent = it }
-        session.tools = PhoneTools.forAgent(this)
         session.listener = { if (!isFinishing && agent === it) renderAgent(it) }
         agentMode = true; agentSettled = false
         val first = !agentScreenSent && !screen.empty
-        val shot = if (first) screen.screenshot?.let { ScreenContexts.jpeg(ScreenContexts.scaled(it)) } else null
-        val turn = AgentTurn.User(text = question, app = screen.app, appName = appName(screen.app),
-            screen = if (first) screen.text.take(ScreenContexts.MAX_TEXT) else "", selection = selection != null, screenshot = shot, aloud = aloud)
-        if (first) agentScreenSent = true
         this.question = question; reply = ""; answer.text = ""; actions.removeAllViews(); follows.removeAllViews()
         steps.removeAllViews(); steps.visibility = View.GONE; approvalCard.visibility = View.GONE; scroll.reset()
         asked.text = shown ?: question; input.setText("")
@@ -590,9 +600,11 @@ class AssistantActivity : Activity() {
         mouth?.hush()
         if (aloud) (mouth ?: Mouth(this).also { mouth = it }).begin(Ears(this).locale())
         speaking = aloud
+        val turn = PhoneAgent.ask(this, session, question, screen = screen, appName = appName(screen.app), selection = selection != null,
+            aloud = aloud, firstOfInvocation = !agentScreenSent)
+        if (first) agentScreenSent = true
         status.text = (if (screen.empty) "Thinking" else if (selection != null) "Reading the selection" else "Reading the screen") + " · " + PhoneAgent.label(this) +
-            if (shot != null && PhoneAgent.vision(this)) " · sees the screenshot" else ""
-        session.send(turn)
+            if (turn.screenshot != null && PhoneAgent.vision(this)) " · sees the screenshot" else ""
         updateSend()
     }
 
@@ -701,8 +713,10 @@ class AssistantActivity : Activity() {
 
     override fun onResume() { super.onResume(); NativePrivacy.apply(this, window) }
     override fun onPause() {
-        if (brain != null) status.text = "Stopped when you left. Ask again to continue."
-        stop()
+        if (!handedOver) {
+            if (brain != null) status.text = "Stopped when you left. Ask again to continue."
+            stop()
+        }
         super.onPause()
     }
     /** Like the system assistant overlay, the panel closes once the owner leaves it. */
@@ -711,8 +725,10 @@ class AssistantActivity : Activity() {
         if (!isChangingConfigurations) finish()
     }
     override fun onDestroy() {
-        stop(); unlisten?.invoke(); unlisten = null
+        if (!handedOver) stop()
+        unlisten?.invoke(); unlisten = null
         agent?.listener = null
+        if (Hands.onActive === stepAside) Hands.onActive = null
         main.removeCallbacksAndMessages(null)
         mouth?.close(); mouth = null
         ScreenContexts.clear(invocation)
@@ -777,6 +793,10 @@ class AssistantActivity : Activity() {
         fun intent(context: Context, direct: Boolean = false) = Intent(context, AssistantActivity::class.java).putExtra(DIRECT, direct)
 
         const val SOURCE_APP = "com.caceras.surfacelab.extra.SOURCE_APP"
+        private const val RESUME = "com.caceras.surfacelab.extra.RESUME"
+
+        /** The current agent conversation in the sheet, from outside an activity (the rabbit, a notification). */
+        fun resume(context: Context): Intent = intent(context, direct = true).putExtra(RESUME, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         private const val HANDBACK = "com.caceras.surfacelab.extra.HANDBACK"
         private val handbacks = java.util.concurrent.ConcurrentHashMap<String, (String) -> Unit>()
         private fun takeHandback(token: String) = handbacks.remove(token)

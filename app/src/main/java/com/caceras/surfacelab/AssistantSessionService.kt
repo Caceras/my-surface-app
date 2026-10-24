@@ -12,9 +12,10 @@ class AssistantSessionService : VoiceInteractionSessionService() {
 }
 
 /**
- * One invocation. The session draws no window of its own: it opens
- * [AssistantActivity] above the current app and hands it the screen text and
- * screenshot as Android delivers them. Context arrives only when the owner
+ * One invocation. The session draws no window of its own: it opens the floating
+ * genie ([RabbitOverlay], when Ægentica hands is on) or [AssistantActivity] above
+ * the current app, and hands it the screen text and screenshot as Android
+ * delivers them. Context arrives only when the owner
  * invokes the assistant and has left *Use text from screen* / *Use
  * screenshot* on; secure windows arrive empty.
  */
@@ -27,6 +28,10 @@ class AssistantSession(context: Context) : VoiceInteractionSession(context) {
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
         ScreenContexts.begin(this)
+        // With Ægentica hands on, the genie floats over the app and stays while the owner keeps
+        // using the phone; otherwise the sheet opens, which also answers offline with Gemini Nano.
+        val genie = Hands.overlay
+        if (genie != null && HandsTools.floats(context) && PhoneAgent.ready(context) && PhoneAgent.online(context)) { genie.summon(); return }
         startAssistantActivity(AssistantActivity.intent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 

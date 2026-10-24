@@ -177,6 +177,23 @@ On the Pixel:
 - type a long question, send it while the keyboard is up, and watch a long answer stream: the sheet stays above the gesture bar and never shrinks;
 - turn on airplane mode: the sheet says *Offline · Gemini Nano on this phone* and answers.
 
+## Hands and genie acceptance
+
+`HandsTest` covers the snapshot (stable refs across snapshots and `@e` refs, roles, bounds, rows named by their words, hidden elements left out, password values masked and never found), secret fields by flags, input type and Swedish and English words, steps that always ask from a button's words or id, every refusal (missing or long `why`, bad or stale refs, points off screen, swipes off screen, link schemes, typing into a non-field or too much text, Ægentica's own controls), the password hand-over, tiers that the model's words cannot lower (a Send button, *submit*, `tel:` and `sms:`, banking and payment apps), opening apps by name, "always for this app", steps running after the rabbit's flight with the screen change reported, typing, scrolling, Back, Home, opening apps, screenshots (and protected screens), waiting, Stop refusing every step until the next question, the service going away, and touches pausing the hands only when they are not the hands' own.
+
+`RabbitOverlayTest` covers the genie's windows (a stage that never takes a touch, a panel that takes the keyboard only while typing and watches touches elsewhere), the bar, bubble and expanded forms, closing without leftovers, Stop in the bar and in the bubble, take-over and Continue, the password hand-over, where the rabbit lands and its flight there and back, an Allow prompt in the bar and the notification letting the step run, the done notification, and the notification's Stop reaching the agent.
+
+On the Pixel:
+- turn on Ægentica hands, including *Allow restricted settings*;
+- swipe from a corner over Settings: the genie bar opens listening; ask it to turn on Wi-Fi and watch the rabbit fly to the switch before Allow;
+- hold the rabbit, drag it, fold it, unfold it; turn on *Remove animations* and check nothing moves;
+- touch the screen while it works: it pauses; Continue hands it back;
+- ask it to log in somewhere: it stops at the password field and asks you to take over;
+- ask it to send a message: the Send step always asks;
+- keep the microphone open and steer it mid-task; talk over its voice;
+- lock the phone during a task: the notification shows the step, Stop works, Allow asks to unlock;
+- measure battery over an hour with the service on and idle.
+
 ## Ægentica home acceptance
 
 `ShellTest` covers the bridge (context kept until the page says hello, a screen with its JPEG screenshot under protocol version 1, a screenshot that is not a JPEG data URL or is too large left out, speech with pause and resume, dictation, sign-in, the voice picker and menu, malformed requests and non-http links ignored, a new page load must say hello again), the screenshot as a data URL (a Pixel-sized screen becomes a JPEG of at most 1280 px; a busy one is compressed harder and made smaller to fit, or dropped), the assistant's hand-over to aegentica.se (held in memory, never in the intent, taken once, dropped after a minute), the localhost sign-in on a real socket (OpenRouter's redirect, the code, the reply page), the Ægentica shell (aegentica.se loads, the user agent names the shell, file access is off, only `aegentica.se` and `www.aegentica.se` stay in the app, a share is consumed once), the microphone rule (aegentica.se after Android's prompt, never the camera, never another site, never Glimt's page), Glimt's shell, and the file picker returning one file, several or none. `ReaderRepairTest` checks that a Swedish reply is read with a Swedish voice, that the reading state reaches the page, and that a pause keeps the reading open while closing the reader ends it. The site's side is tested in `Caceras/aegentica-app` (`scripts/test-phone-app.mjs` and `scripts/test-phone-app-browser.mjs`); Glimt's in `Caceras/awesomeseo-monorepo` (`apps/chatbar/tests/android.test.ts`).
