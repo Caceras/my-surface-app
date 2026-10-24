@@ -5,7 +5,6 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import org.json.JSONObject
 import java.io.IOException
 import java.io.InputStreamReader
@@ -107,6 +106,11 @@ class AgentSession(private val context: Context, val id: String = UUID.randomUUI
     @Volatile var tools: AgentToolbox = NoTools
     /** Called on the main thread, at most every 60 ms while streaming, at once on each step change. */
     @Volatile var listener: ((AgentSession) -> Unit)? = null
+    /** More watchers of the same updates: the rabbit's bar and the notification. */
+    private val observers = CopyOnWriteArrayList<(AgentSession) -> Unit>()
+    fun addObserver(observer: (AgentSession) -> Unit) { if (observer !in observers) observers += observer }
+    fun removeObserver(observer: (AgentSession) -> Unit) { observers -= observer }
+    private fun publish() { listener?.invoke(this); observers.forEach { it(this) } }
     @Volatile private var run: Run? = null
     /** Where the current exchange starts: the question that started the latest run. */
     @Volatile private var exchangeStart = 0
@@ -144,6 +148,7 @@ class AgentSession(private val context: Context, val id: String = UUID.randomUUI
     /** Stop everything: the model call, a pending Allow and the tools. */
     fun stop() {
         val current = run ?: return
+        if (current.aborted) return
         current.aborted = true
         current.call.get()?.cancel()
         setAside(current, STOPPED)
@@ -329,10 +334,10 @@ class AgentSession(private val context: Context, val id: String = UUID.randomUUI
         val result = AtomicReference<T?>()
         val latch = CountDownLatch(1)
         begin { value -> if (result.compareAndSet(null, value)) latch.countDown() }
-        val until = SystemClock.elapsedRealtime() + timeoutMs
+        val until = System.nanoTime() / 1_000_000 + timeoutMs
         var stoppedAt = 0L
         while (!latch.await(100, TimeUnit.MILLISECONDS)) {
-            val now = SystemClock.elapsedRealtime()
+            val now = System.nanoTime() / 1_000_000
             if (abortable && (run.aborted || run.steered)) return null
             // After Stop a running tool gets three seconds to end, then the run lets go of it.
             if (run.aborted) { if (stoppedAt == 0L) stoppedAt = now else if (now - stoppedAt > 3000) return null }
@@ -344,9 +349,9 @@ class AgentSession(private val context: Context, val id: String = UUID.randomUUI
     private fun online(): Boolean = PhoneAgent.online(context)
 
     private fun emit(now: Boolean = false) {
-        if (now) { main.post { listener?.invoke(this) }; return }
+        if (now) { main.post { publish() }; return }
         synchronized(this) { if (emitQueued) return; emitQueued = true }
-        main.postDelayed({ synchronized(this) { emitQueued = false }; listener?.invoke(this) }, 60)
+        main.postDelayed({ synchronized(this) { emitQueued = false }; publish() }, 60)
     }
 
     /** The latest exchange: the newest question and everything after it. */
@@ -448,6 +453,32 @@ object PhoneAgent {
         }.apply { tag = "agent-listen" })
         android.app.AlertDialog.Builder(activity).setTitle("Phone agent").setView(android.widget.ScrollView(activity).apply { addView(layout) })
             .setPositiveButton("Done") { _, _ -> after() }.showProtected(activity)
+    }
+
+    /**
+     * A question from any surface (the sheet, the rabbit's bar, a notification reply): with the
+     * screen or selection on the first question of an invocation, the hands when they are on, and
+     * the rabbit's Stop, steer and Continue wired to this conversation. Steers when a run is going.
+     */
+    fun ask(context: Context, session: AgentSession, text: String, screen: ScreenContext? = null, appName: String = "",
+            selection: Boolean = false, aloud: Boolean = false, firstOfInvocation: Boolean = false): AgentTurn.User {
+        val withScreen = firstOfInvocation && screen != null && !screen.empty
+        val turn = AgentTurn.User(text = text, app = screen?.app.orEmpty(), appName = appName,
+            screen = if (withScreen) screen!!.text.take(ScreenContexts.MAX_TEXT) else "", selection = selection,
+            screenshot = if (withScreen) screen!!.screenshot?.let { ScreenContexts.jpeg(ScreenContexts.scaled(it)) } else null, aloud = aloud)
+        session.tools = PhoneTools.forAgent(context)
+        Hands.newQuestion(fresh = firstOfInvocation && !session.running)
+        Hands.listener = HandsBridge(session)
+        AgentNotifications.watch(context, session)
+        session.send(turn)
+        return turn
+    }
+
+    /** The rabbit's buttons, for one conversation. */
+    private class HandsBridge(private val session: AgentSession) : Hands.Listener {
+        override fun stop() = session.stop()
+        override fun steer(text: String) { Hands.newQuestion(fresh = false); session.send(AgentTurn.User(text, notes = listOf("Sent while you worked."))) }
+        override fun handedBack() { Hands.newQuestion(fresh = false); session.send(AgentTurn.User("I handed the screen back. Continue where you left off.", notes = listOf("The person handed the screen back."))) }
     }
 
     /** The session the sheet and the overlay share; a new question on a fresh invocation starts a new one. */

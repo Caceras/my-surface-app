@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Ægentica hands. It reads the window in front and acts only while the phone agent works on a
+    request (HandsTools validates every step); it is not an accessibility tool for disabilities,
+    so isAccessibilityTool is false. Screenshots need canTakeScreenshot (Android 11 and later).
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/hands_description"
+    android:accessibilityEventTypes="typeViewClicked|typeViewLongClicked|typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:canPerformGestures="true"
+    android:canTakeScreenshot="true"
+    android:isAccessibilityTool="false"
+    android:notificationTimeout="100" />
