@@ -23,6 +23,11 @@
 -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- The genie, first: it opens over whatever is on screen. -->
+    <shortcut android:shortcutId="genie" android:enabled="true" android:icon="@drawable/ic_surface" android:shortcutShortLabel="@string/shortcut_genie">
+        <intent android:action="com.caceras.surfacelab.action.GENIE" android:targetClass="com.caceras.surfacelab.GenieEntryActivity" android:targetPackage="com.caceras.surface" />
+    </shortcut>
+
     <shortcut
         android:enabled="true"
         android:icon="@drawable/ic_mic"

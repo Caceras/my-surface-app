@@ -415,10 +415,18 @@ class AssistantActivity : Activity() {
         // Opened from the rabbit's "Open the answer": the same conversation, in the sheet.
         if (intent?.getBooleanExtra(RESUME, false) == true || job != null) PhoneAgent.current?.let { session ->
             agent = session; agentMode = true; agentScreenSent = true; agentSettled = session.running
+            // Continued from the keyboard: the answer can go back into the field it came from.
+            if (handback != null) editable = true
             session.listener = { if (!isFinishing && agent === it) renderAgent(it) }
             question = session.view().question; asked.text = question
             card.visibility = View.VISIBLE; showSuggestions(); renderAgent(session)
             if (!session.running && reply.isNotBlank()) showActions()
+            return
+        }
+        // A request the owner already made (the keyboard's genie, a door with words): the genie starts on it at once.
+        intent?.getStringExtra(Genie.EXTRA_REQUEST)?.trim()?.takeIf { it.isNotEmpty() }?.let { request ->
+            intent.removeExtra(Genie.EXTRA_REQUEST)
+            main.post { if (!isFinishing && question.isEmpty()) { input.setText(request); ask(request, false) } }
             return
         }
         // Voice first: a fresh assistant invocation starts listening when the microphone is already allowed.
@@ -543,7 +551,7 @@ class AssistantActivity : Activity() {
             Live.pendingScreen = context().takeIf { !it.empty }
             startActivity(LiveActivity.intent(this, start = true)); finish()
         }
-        if (editable) follows.addView(chipView("Replace selection", "assistant-replace", R.drawable.ic_arrow_up_right) {
+        if (editable) follows.addView(chipView(if (selection != null) "Replace selection" else "Put it in the field", "assistant-replace", R.drawable.ic_arrow_up_right) {
             handBack(Markdown.strip(reply))
         }, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) })
         AssistantActions.detect(reply).forEach { (title, intent) ->
@@ -848,10 +856,9 @@ class AssistantActivity : Activity() {
         /** Kept for older renders; the sheet is opaque either way. */
         internal var blurForTest: Boolean? = null
         private const val REQUEST = 46
-        val SUGGESTIONS = listOf("Explain this", "Summarize", "Fill in what's missing", "Draft a reply", "Translate to English")
+        val SUGGESTIONS = listOf("Explain this", "Summarize", "Fill in what's missing", "Draft a reply")
         /** Chips for selected text: what the owner sees, then what the model is asked. */
         val SELECTION_SUGGESTIONS = listOf(
-            "Translate" to "Translate this text. If it is in Swedish, translate it into English; otherwise translate it into Swedish. Reply with the translation only.",
             "Explain" to "Explain this in plain words.",
             "Summarize" to "Summarize this in a few short lines.",
             "Draft a reply" to "Draft a short, friendly reply to this, ready to send.",
@@ -862,7 +869,8 @@ class AssistantActivity : Activity() {
         private const val RESUME = "com.caceras.surfacelab.extra.RESUME"
 
         /** The current agent conversation in the sheet, from outside an activity (the rabbit, a notification). */
-        fun resume(context: Context): Intent = intent(context, direct = true).putExtra(RESUME, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        fun resume(context: Context, handback: ((String) -> Unit)? = null): Intent = intent(context, direct = true).putExtra(RESUME, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .apply { if (handback != null) UUID().let { token -> handbacks[token] = handback; putExtra(HANDBACK, token) } }
         private const val JOB = "com.caceras.surfacelab.extra.JOB"
 
         /** A job on aegentica.se in the sheet (from its notification), with the conversation that started it. */

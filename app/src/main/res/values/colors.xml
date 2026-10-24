@@ -36,4 +36,16 @@
     <color name="ask_edge">#1A000000</color>
     <color name="ask_keys">#ECEEF2</color>
     <color name="ask_divider">#12000000</color>
+    <!-- Ægentica keys: aegentica.se's monochrome, white keys on a light board, black for the action key. -->
+    <color name="keys_board">#F1F1F2</color>
+    <color name="keys_key">#FFFFFF</color>
+    <color name="keys_modifier">#E0E0E3</color>
+    <color name="keys_pressed">#D4D4D8</color>
+    <color name="keys_ink">#0A0A0A</color>
+    <color name="keys_ink_dim">#6B6B70</color>
+    <color name="keys_action">#0A0A0A</color>
+    <color name="keys_action_pressed">#3A3A3D</color>
+    <color name="keys_on_action">#FAFAFA</color>
+    <color name="keys_preview">#FFFFFF</color>
+    <color name="keys_edge">#E3E3E6</color>
 </resources>

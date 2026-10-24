@@ -465,11 +465,11 @@ object PhoneAgent {
      * the rabbit's Stop, steer and Continue wired to this conversation. Steers when a run is going.
      */
     fun ask(context: Context, session: AgentSession, text: String, screen: ScreenContext? = null, appName: String = "",
-            selection: Boolean = false, aloud: Boolean = false, firstOfInvocation: Boolean = false): AgentTurn.User {
+            selection: Boolean = false, aloud: Boolean = false, firstOfInvocation: Boolean = false, notes: List<String> = emptyList()): AgentTurn.User {
         val withScreen = firstOfInvocation && screen != null && !screen.empty
         val turn = AgentTurn.User(text = text, app = screen?.app.orEmpty(), appName = appName,
             screen = if (withScreen) screen!!.text.take(ScreenContexts.MAX_TEXT) else "", selection = selection,
-            screenshot = if (withScreen) screen!!.screenshot?.let { ScreenContexts.jpeg(ScreenContexts.scaled(it)) } else null, aloud = aloud)
+            screenshot = if (withScreen) screen!!.screenshot?.let { ScreenContexts.jpeg(ScreenContexts.scaled(it)) } else null, aloud = aloud, notes = notes)
         session.tools = PhoneTools.forAgent(context)
         Hands.newQuestion(fresh = firstOfInvocation && !session.running)
         Hands.listener = HandsBridge(session)
@@ -493,6 +493,6 @@ object PhoneAgent {
         if (existing != null && (!fresh || existing.running)) return existing
         // The conversation it replaces is over: it goes to Ægentica's chat history when the phone is connected.
         existing?.let { Backend.saveConversation(context.applicationContext, it) }
-        return AgentSession(context.applicationContext).also { current = it }
+        return AgentSession(context.applicationContext).also { current = it; GenieStatus.changed(context.applicationContext) }
     }
 }

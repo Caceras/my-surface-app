@@ -223,7 +223,7 @@ class AssistantSheetTest {
         val activity = Robolectric.buildActivity(AssistantActivity::class.java, intent).setup()
         val root = activity.get().window.decorView
         assertEquals("Selection", text(root, "assistant-seen"))
-        views(root).first { it is TextView && it.text.toString() == "Translate" }.performClick()
+        views(root).first { it is TextView && it.text.toString() == "Improve" }.performClick()
         waitUntil("the answer") { PhoneAgent.current?.running == false && text(root, "assistant-answer").isNotBlank() }
         val selection = server.sent.poll()!!.getJSONArray("messages").getJSONObject(1).getJSONArray("content").getJSONObject(0).getString("text")
         assertTrue(selection, selection.startsWith("<selection app=") && selection.contains("package=\"com.google.android.apps.messaging\">\nVi ses i morgon\n</selection>"))
@@ -231,5 +231,25 @@ class AssistantSheetTest {
         assertEquals("See you tomorrow", back)
         assertTrue(activity.get().isFinishing)
         activity.pause().stop().destroy()
+    }
+
+    @Test fun `a door with words starts the genie on them at once, and a continued keyboard conversation can put its answer back`() {
+        server.stream("Tre punkter.")
+        val intent = Genie.intent(context, "Mötet flyttas till fredag", editable = true, origin = Genie.Origin.KEYBOARD, request = "Gör det kortare")
+        val activity = Robolectric.buildActivity(AssistantActivity::class.java, intent).setup()
+        val root = activity.get().window.decorView
+        waitUntil("the answer") { PhoneAgent.current?.running == false && text(root, "assistant-answer") == "Tre punkter." }
+        val user = server.sent.poll()!!.getJSONArray("messages").getJSONObject(1).getJSONArray("content")
+        assertTrue(user.getJSONObject(user.length() - 1).getString("text").startsWith("Gör det kortare"))
+        activity.pause().stop().destroy()
+        // The keyboard continues the same conversation in the sheet; the answer can go back to its field.
+        var back: String? = null
+        val resumed = Robolectric.buildActivity(AssistantActivity::class.java, AssistantActivity.resume(context) { back = it }).setup()
+        val again = resumed.get().window.decorView
+        idle()
+        assertEquals("Put it in the field", text(again, "assistant-replace"))
+        byTag(again, "assistant-replace").performClick(); idle()
+        assertEquals("Tre punkter.", back)
+        resumed.pause().stop().destroy()
     }
 }

@@ -202,4 +202,21 @@ class RabbitOverlayTest {
         assertEquals("Only small breeds", calls.first { it.first == "job_message" }.second.getString("message"))
         assertEquals("the bar asks the agent again after that", "Ask Ægentica", (find("rabbit-input") as android.widget.EditText).hint.toString())
     }
+
+    @Test fun `a door with words starts the floating genie on them, without listening first`() {
+        PhoneAgent.keyForTest = "sk-or-test"; PhoneAgent.onlineForTest = true
+        val sent = LinkedBlockingQueue<JSONObject>()
+        ConnectedAI.httpForTest = ConnectedAI.Http { _, _, body, onCall ->
+            onCall(ConnectedAI.Call {}); sent += JSONObject(body.toString(Charsets.UTF_8))
+            ConnectedAI.Response(200, "text/event-stream", ByteArrayInputStream("data: {\"choices\":[{\"delta\":{\"content\":\"God morgon.\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n".toByteArray())) {}
+        }
+        context.getSharedPreferences(HandsTools.PREFS, 0).edit().putBoolean("float", true).commit()
+        Genie.ask(context, "Planera min morgon", Genie.Origin.TAG)
+        idle()
+        assertEquals(RabbitOverlay.Form.EXPANDED, overlay.form)
+        assertFalse("it does not open the microphone", overlay.conversation)
+        waitUntil("the answer") { PhoneAgent.current?.running == false && (find("rabbit-answer") as TextView).text.toString() == "God morgon." }
+        val messages = sent.poll()!!.getJSONArray("messages").getJSONObject(1).getJSONArray("content")
+        assertTrue(messages.toString().contains("NFC tag"))
+    }
 }

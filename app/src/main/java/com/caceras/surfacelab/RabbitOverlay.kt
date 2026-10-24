@@ -403,7 +403,24 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
      * The genie summoned with the assistant gesture: the bar opens over the app with the screen
      * Android shared, listening when the microphone is allowed.
      */
-    override fun summon() {
+    override fun summon() = summon(listen = true)
+
+    /**
+     * The genie starts on a request the owner already made (an NFC tag, a door with words): it opens
+     * over the app with the work showing at once, without listening first.
+     */
+    fun start(request: String, notes: List<String> = emptyList()) {
+        summon(listen = false)
+        screenPending = false; showScreenChip()
+        val session = PhoneAgent.session(context, fresh = true)
+        if (session !== this.session) { this.session?.removeObserver(observer); this.session = session; session.addObserver(observer) }
+        settledFor = null
+        PhoneAgent.ask(context, session, request, notes = notes)
+        status.text = request.oneLine().take(120)
+        expand(content = true)
+    }
+
+    private fun summon(listen: Boolean) {
         ensure()
         summoned = ScreenContexts.invocation
         screenPending = true; screenOn = true
@@ -412,7 +429,7 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         showScreenChip()
         expand(content = session?.running == true || ServerJobs.active != null)
         if (!Hands.active && ServerJobs.active == null) status.text = "What should we do?"
-        if (context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+        if (listen && context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
             context.getSharedPreferences("surfacelab", 0).getBoolean("assistant_listen", true)) main.postDelayed({ if (showing && !listening) listen(once = true) }, 250)
     }
 

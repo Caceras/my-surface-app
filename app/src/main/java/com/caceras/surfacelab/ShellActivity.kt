@@ -77,6 +77,8 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
     private var signedIn: ((String?, String?) -> Unit)? = null
     private var choosing: ValueCallback<Array<Uri>>? = null
     private var micRequest: PermissionRequest? = null
+    /** Selecting text on the page puts Ægentica first in the toolbar and opens the genie sheet in place. */
+    private val selectionGenie = SelectionGenie(this)
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(state: Bundle?) {
@@ -106,7 +108,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
             addView(label("Check your connection, then try again.", 15f, true).apply { gravity = Gravity.CENTER; padDp(0, 8, 0, 20) })
             addView(pill("Try again", primary = true) { visibility = View.GONE; web.reload() })
         }
-        val root = FrameLayout(this).apply {
+        val root = selectionGenie.root().apply {
             setBackgroundColor(canvas)
             addView(web, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             addView(offline, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -157,6 +159,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
     override fun onResume() {
         super.onResume()
         web.onResume()
+        KeyboardSetup.resumed(this)
     }
 
     override fun onPause() {
@@ -203,6 +206,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
     @Deprecated("Framework callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
+        if (selectionGenie.result(requestCode, resultCode, data)) return
         if (requestCode != PICK_FILES) return
         choosing?.onReceiveValue(chosenFiles(resultCode, data))
         choosing = null
@@ -391,6 +395,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
         "Record and transcribe" to { startActivity(TranscribeActivity.intent(this)) },
         "Talk hands-free" to { startActivity(Intent(this, VoiceActivity::class.java)) },
         "Reading voice" to { chooseVoice() },
+        "Ægentica keyboard" to { KeyboardSetup.show(this) },
         "Phone assistant, keyboard and settings" to {
             startActivity(Intent(this, MainActivity::class.java).putExtra("settings", true))
         },
