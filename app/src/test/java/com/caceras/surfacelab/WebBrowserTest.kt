@@ -63,7 +63,7 @@ class WebBrowserTest {
             .forEach { assertEquals(it, "Pages on this phone's own network are not opened.", WebGuard.refuse(it)) }
         assertEquals("Ægentica's own sites open in the app, not in the agent's browser.", WebGuard.refuse("https://aegentica.se/settings/security"))
         assertEquals("Ægentica's own sites open in the app, not in the agent's browser.", WebGuard.refuse("https://www.aegentica.se/"))
-        GlimtActivity.SITE.hosts.forEach { assertNotNull(WebGuard.refuse("https://$it/")) }
+        BarActivity.SITE.hosts.forEach { assertNotNull(WebGuard.refuse("https://$it/")) }
         // A name that points at the phone's network is refused once looked up.
         assertEquals("Pages on this phone's own network are not opened.", WebGuard.refuseResolved("https://router.example/"))
         assertNull(WebGuard.refuseResolved("https://shop.example/"))

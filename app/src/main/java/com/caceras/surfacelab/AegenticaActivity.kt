@@ -15,7 +15,7 @@ class AegenticaActivity : ShellActivity() {
     override val site get() = SITE
 
     override fun menuItems() =
-        listOf<Pair<String, () -> Unit>>("Browse the web with Glimt" to { startActivity(GlimtActivity.intent(this)) }) + phoneTools()
+        listOf<Pair<String, () -> Unit>>("Browse the web with the bar" to { startActivity(BarActivity.intent(this)) }) + phoneTools()
 
     companion object {
         const val URL = "https://aegentica.se/"

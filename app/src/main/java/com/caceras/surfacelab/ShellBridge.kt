@@ -4,7 +4,7 @@ import org.json.JSONObject
 
 /**
  * What a page in the app may ask of the phone, and what the phone tells it, over the message
- * channel [ShellActivity] hands to the page (Ægentica's own site, or Glimt). Messages are JSON
+ * channel [ShellActivity] hands to the page (Ægentica's own site, or its bar). Messages are JSON
  * strings; anything unknown or malformed is ignored. The pages are the owner's own code from
  * their server, but every request is still checked: links leave only as http(s), text is
  * bounded, and no answer is ever run as a command.

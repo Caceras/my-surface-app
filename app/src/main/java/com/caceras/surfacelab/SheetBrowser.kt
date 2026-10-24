@@ -33,7 +33,7 @@ object WebGuard {
     /** Test-only: name lookups without the network. */
     @Volatile var resolverForTest: ((String) -> List<InetAddress>)? = null
 
-    private val OWN = AegenticaActivity.SITE.hosts + GlimtActivity.SITE.hosts
+    private val OWN = AegenticaActivity.SITE.hosts + BarActivity.SITE.hosts
 
     /** Why [raw] may not open, or null when it may. Never looks a name up. */
     fun refuse(raw: String): String? {

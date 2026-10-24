@@ -125,9 +125,9 @@ class BackendTest {
         assertTrue(Backend.connected(context))
         Backend.disconnect(context)
         assertNull(Backend.token(context))
-        // Glimt never keeps one, and a page outside aegentica.se does not open in the shell.
-        val glimt = Robolectric.buildActivity(GlimtActivity::class.java).setup()
-        glimt.get().bridge.receive("""{"t":"access-token","token":"$token","name":"Pixel"}""")
+        // The bar never keeps one, and a page outside aegentica.se does not open in the shell.
+        val bar = Robolectric.buildActivity(BarActivity::class.java).setup()
+        bar.get().bridge.receive("""{"t":"access-token","token":"$token","name":"Pixel"}""")
         assertNull(Backend.token(context))
         val elsewhere = Robolectric.buildActivity(AegenticaActivity::class.java, AegenticaActivity.open(context, "https://evil.example/settings")).setup()
         assertEquals(AegenticaActivity.URL, shadowOf(elsewhere.get().window.decorView.findViewWithTag<WebView>("aegentica")).lastLoadedUrl)

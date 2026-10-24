@@ -41,7 +41,7 @@ A phone conversation is copied into Ægentica's chat history when it is over (a 
 
 ## Safety
 
-- The token is kept with Keystore encryption and sent only to aegentica.se, as a bearer header. Only Ægentica's own site in the app can hand one over; Glimt and other pages cannot.
+- The token is kept with Keystore encryption and sent only to aegentica.se, as a bearer header. Only Ægentica's own site in the app can hand one over; the bar and other pages cannot.
 - Everything the back office returns (memory, messages, job results) reaches the model fenced as data, never as instructions. When a job is handed over, the screen you asked about goes with it as `clientContext`, which the server agent also gets fenced as untrusted.
 - Job events are checked field by field; only `https` links open, aegentica.se's inside the app, and only aegentica.se's own event and media addresses get the token.
 - A notification button sends only an option the job offered, for a request still open.
