@@ -111,6 +111,12 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
     private var unlistenScreen: (() -> Unit)? = null
     /** The invocation the genie was summoned for, whose screen it drops when it closes. */
     private var summoned = -1
+    /** A job handed to the server agent on aegentica.se, in the expanded card. */
+    private lateinit var jobs: JobCard
+    /** The bar's next words go to this job (or answer its question). */
+    private var telling: Pair<ServerJobs.Job, ServerJobs.Input?>? = null
+    private var shownInput: String? = null
+    private val jobWatcher: (ServerJobs.Job) -> Unit = { job -> if (showing) jobChanged(job) }
 
     val showing get() = panel != null
     private val motion get() = ValueAnimator.areAnimatorsEnabled()
@@ -240,9 +246,15 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         answer = text("", 15f).apply { tag = "rabbit-answer"; setTextIsSelectable(true) }
         extra = LinearLayout(context).apply { tag = "rabbit-extra"; orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         actions = LinearLayout(context).apply { tag = "rabbit-actions"; gravity = Gravity.CENTER_VERTICAL }
+        jobs = JobCard(context, object : JobCard.Host {
+            override fun tell(job: ServerJobs.Job, input: ServerJobs.Input?) = tellJob(job, input)
+            override fun opened() = collapse()
+        })
         val cardBody = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(10), dp(10), dp(8))
-            addView(question); addView(steps); addView(answer); addView(extra); addView(actions)
+            addView(question); addView(steps); addView(answer); addView(extra)
+            addView(jobs.view, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
+            addView(actions)
         }
         card = LinearLayout(context).apply {
             tag = "rabbit-card"; orientation = LinearLayout.VERTICAL; visibility = View.GONE
@@ -341,8 +353,50 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
 
     private fun ensure() {
         leaving?.let { main.removeCallbacks(it) }; leaving = null
-        if (!showing) addWindows()
+        if (!showing) { addWindows(); ServerJobs.addObserver(jobWatcher); ServerJobs.active?.let { jobs.show(it) } }
         attach()
+    }
+
+    // ---------------------------------------------------------------- jobs on aegentica.se
+
+    /** A job changed: the genie shows the one its conversation handed over, opens up when it asks, and reads a price aloud in a conversation. */
+    private fun jobChanged(job: ServerJobs.Job) {
+        if (jobs.job == null || (jobs.job?.finished == true && !job.finished)) jobs.show(job)
+        if (jobs.job !== job) return
+        if (telling?.first === job && telling?.second != null && job.inputs.none { it.requestId == telling?.second?.requestId }) endTelling()
+        val input = job.inputs.firstOrNull()
+        if (input != null && input.requestId != shownInput) {
+            shownInput = input.requestId
+            if (form != Form.EXPANDED) expand(content = true)
+            pose(Pose.WAVING)
+            status.text = "Ægentica asks · " + input.prompt.oneLine().take(80)
+            if (input.priced && input.requestId !in job.readBack && (conversation || session?.view()?.aloud == true)) {
+                ears?.cancel(); listening = false; showMic()
+                PriceVoice.ask(context, job, input, mouth ?: Mouth(context).also { mouth = it }, ears ?: Ears(context).also { ears = it }) { line -> if (showing) status.text = line }
+            }
+        } else if (input == null && session?.running != true && !Hands.active) {
+            status.text = when {
+                job.finished -> if (job.state == "completed") "The job on aegentica.se is done." else (job.error ?: "The job stopped.").take(120)
+                else -> "On aegentica.se · " + (job.steps.lastOrNull { it.status == "running" }?.label ?: "Working")
+            }
+        }
+    }
+
+    /** The bar talks to the job now: its next words steer it, or answer its question. */
+    private fun tellJob(job: ServerJobs.Job, question: ServerJobs.Input?) {
+        telling = job to question
+        input.hint = question?.let { "Answer: " + it.prompt.oneLine().take(50) } ?: "Tell the job…"
+        focusable(true)
+    }
+
+    private fun endTelling() { telling = null; if (showing && !listening) input.hint = "Ask Ægentica" }
+
+    /** Words for the job: an answer to its open question, else its newest instruction. */
+    private fun sendToJob(words: String) {
+        val (job, question) = telling ?: return
+        endTelling()
+        status.text = "Sending to the job…"
+        ServerJobs.tell(context, job, words, question) { error -> if (showing) status.text = error ?: "Sent to the job." }
     }
 
     /**
@@ -356,8 +410,8 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         unlistenScreen?.invoke()
         unlistenScreen = ScreenContexts.listen { if (showing) showScreenChip() }
         showScreenChip()
-        expand(content = session?.running == true)
-        if (!Hands.active) status.text = "What should we do?"
+        expand(content = session?.running == true || ServerJobs.active != null)
+        if (!Hands.active && ServerJobs.active == null) status.text = "What should we do?"
         if (context.checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED &&
             context.getSharedPreferences("surfacelab", 0).getBoolean("assistant_listen", true)) main.postDelayed({ if (showing && !listening) listen(once = true) }, 250)
     }
@@ -421,6 +475,7 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         if (words.isEmpty()) return
         input.setText("")
         focusable(false)
+        if (telling != null) { sendToJob(words); return }
         if (!PhoneAgent.ready(context)) { status.text = "Sign in to OpenRouter in Settings → Phone agent to use the agent."; return }
         val current = PhoneAgent.current?.takeIf { it.running }
         if (current != null) { status.text = "Got it: $words".take(120); Hands.steer(words); return }
@@ -786,7 +841,11 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
     }
 
     override fun close() {
+        PriceVoice.cancel(ears)
         conversation = false; ears?.cancel(); listening = false; mouth?.close(); mouth = null
+        ServerJobs.removeObserver(jobWatcher); if (::jobs.isInitialized) jobs.detach(); telling = null; shownInput = null
+        // The conversation goes to Ægentica's chat history once it is over (when the phone is connected).
+        session?.takeIf { !it.running && !Hands.active }?.let { Backend.saveConversation(context, it) }
         unlistenScreen?.invoke(); unlistenScreen = null
         if (summoned >= 0) { ScreenContexts.clear(summoned); summoned = -1 }
         session?.removeObserver(observer); session = null

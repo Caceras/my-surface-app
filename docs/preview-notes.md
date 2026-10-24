@@ -1,6 +1,10 @@
 # Current preview changes
 
 **New in this build:**
+- **Ægentica on aegentica.se, from the phone.** Connect once in Settings → *Connect to Ægentica* (tap *Make token* on the page that opens). The phone agent then checks your memory, reads your Inbox and drafts replies you send yourself, proposes tasks, and hands long jobs to Ægentica's server agent, which keeps going while the phone sleeps.
+- **Watch a job.** The genie, the sheet and a live notification show its steps, tables as they fill in, pictures, files and the cost so far. Tap the live picture to watch Ægentica's browser full screen and take over. *Tell the job* steers it.
+- **Paying, out loud.** A step that costs money shows its price on the Approve button ("Approve · $0.96 for 24 images"). In a voice conversation the genie reads the amount aloud first; then a clear yes approves.
+- **Your phone chats on the computer.** A finished phone conversation appears in Ægentica's chat history (questions and answers only; screens stay on the phone).
 - **Ægentica hands: it uses your phone.** Turn it on in Settings → *Ægentica hands* (Android may first need *Allow restricted settings* in App info). The assistant gesture then opens the genie, a light floating bar with the rabbit, over any app, listening. Ask it to do something: it reads the screen, and the rabbit flies to each button just before it taps, types or scrolls. It asks before acting (*Always in this app* remembers), always asks before sending, calling, paying or deleting, and never types passwords: it asks you to take over. **Stop** is always on screen, and touching the screen pauses it until you tap Continue.
 - **The genie bar.** Fold it into the rabbit, drag it anywhere, hold the rabbit to hear what it is doing. Keep the microphone open to steer it while it works.
 - **A live notification.** While it uses your apps, the notification shows the current step with Stop, Allow and a reply field; on Android 16 it can show as a live update in the status bar.

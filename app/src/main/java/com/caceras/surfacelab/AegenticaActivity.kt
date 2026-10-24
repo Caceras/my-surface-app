@@ -33,5 +33,11 @@ class AegenticaActivity : ShellActivity() {
 
         fun intent(context: Context) =
             Intent(context, AegenticaActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+
+        /** One page of aegentica.se: a chat, a file, or Settings → Security to connect this phone. */
+        fun open(context: Context, url: String) = intent(context).putExtra(ShellActivity.EXTRA_URL, url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        /** Connect this phone to Ægentica's back office: aegentica.se makes an access token and hands it over. */
+        fun connect(context: Context) = open(context, Backend.CONNECT)
     }
 }

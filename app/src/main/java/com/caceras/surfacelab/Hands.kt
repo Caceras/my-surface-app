@@ -386,7 +386,7 @@ class HandsTools(private val context: Context, private val playbook: Playbook = 
 
     override fun offered(): List<ToolSpec> = if (Hands.connected && enabled(context)) playbook.tools.filter { it.target == "phone" } else emptyList()
 
-    override fun handsFree() = prefs.getBoolean("hands_free", false)
+    override fun handsFree(call: Prepared.Ready) = prefs.getBoolean("hands_free", false)
     override fun remembered(call: Prepared.Ready) = call.risk == Risk.ACT && call.app in always(context)
     override fun remember(call: Prepared.Ready) { if (call.risk == Risk.ACT && call.app.isNotBlank()) prefs.edit().putStringSet("always", always(context) + call.app).apply() }
     override fun stop() = Hands.stop()

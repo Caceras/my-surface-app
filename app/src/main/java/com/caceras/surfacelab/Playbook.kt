@@ -72,6 +72,8 @@ class Playbook(json: JSONObject) {
     val shared: List<String> = instructions.optJSONArray("shared").strings()
     val hands: List<String> = instructions.optJSONArray("hands").strings()
     val noHands: List<String> = instructions.optJSONArray("noHands").strings()
+    /** When the phone is connected to Ægentica's back office (the aegentica_* tools). */
+    val backend: List<String> = instructions.optJSONArray("backend").strings()
 
     private val sensitive = json.getJSONObject("sensitive")
     /** Words on a button or field that make a step always ask, by kind (send, call, pay, delete, account). */
@@ -92,6 +94,7 @@ class Playbook(json: JSONObject) {
         tools.forEach { t ->
             t.required.forEach { require(it in t.properties) { "${t.name} requires undeclared $it" } }
             require(t.risk == Risk.READ || t.needsWhy) { "${t.name} acts, so it must require why" }
+            require(t.target == "phone" || t.target == "backend") { "${t.name} has an unknown target ${t.target}" }
         }
     }
 

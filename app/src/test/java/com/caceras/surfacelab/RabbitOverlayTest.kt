@@ -55,7 +55,7 @@ class RabbitOverlayTest {
         Hands.attach(HandsTest.FakeScreen(null), overlay)
         Hands.listener = listener
     }
-    @After fun tearDown() { overlay.close(); Hands.resetForTest(); ConnectedAI.httpForTest = null; PhoneAgent.keyForTest = null; PhoneAgent.onlineForTest = null; PhoneAgent.current = null; idle() }
+    @After fun tearDown() { overlay.close(); Hands.resetForTest(); ConnectedAI.httpForTest = null; PhoneAgent.keyForTest = null; PhoneAgent.onlineForTest = null; PhoneAgent.current = null; Backend.resetForTest(); ServerJobs.resetForTest(); idle() }
 
     @Test fun `the genie opens as a bar over the app, folds into the rabbit and closes without leaving windows`() {
         assertTrue(windows().isEmpty())
@@ -177,5 +177,29 @@ class RabbitOverlayTest {
         waitUntil("the stop") { !session.running }
         assertTrue(session.view().stopped)
         assertTrue("Stop also stops the hands", Hands.stopped)
+    }
+
+    @Test fun `a job on aegentica-se shows in the genie, opens it when it asks, and the bar can talk to the job`() {
+        val calls = java.util.concurrent.CopyOnWriteArrayList<Pair<String, JSONObject>>()
+        Backend.apiForTest = Backend.Api { tool, args -> calls += tool to args; JSONObject() }
+        overlay.summon(); idle()
+        overlay.collapse(); idle()
+        val job = ServerJobs.jobs.getOrPut("j") { ServerJobs.Job("j", "https://aegentica.se/chat/j", null) }
+        ServerJobs.apply(job, "status", JSONObject().put("state", "working").put("title", "Dog breeds"))
+        ServerJobs.apply(job, "input", JSONObject("""{"requestId":"r1","kind":"tool-approval","prompt":"Generate 40 pictures","options":[{"id":"approve","label":"Approve"},{"id":"cancel","label":"Cancel"}],"cost":{"usd":1.2,"count":40,"unit":"image"}}"""))
+        // What the job sends reaches the genie the way the follower publishes it.
+        ServerJobs.watch(context, "j", "https://aegentica.se/chat/j", null); idle()
+        assertEquals("the genie opens when the job asks", RabbitOverlay.Form.EXPANDED, overlay.form)
+        assertEquals("Approve · $1.20 for 40 images", (find("job-approve") as TextView).text.toString())
+        assertTrue((find("rabbit-status") as TextView).text.startsWith("Ægentica asks"))
+        assertNull("an approval is answered before the job hears more", find("job-tell"))
+        find("job-approve")!!.performClick()
+        waitUntil("the approval") { calls.any { it.first == "job_respond" } && find("job-tell") != null }
+        find("job-tell")!!.performClick(); idle()
+        assertEquals("Tell the job…", (find("rabbit-input") as android.widget.EditText).hint.toString())
+        overlay.submit("Only small breeds", aloud = false)
+        waitUntil("the message to the job") { calls.any { it.first == "job_message" } }
+        assertEquals("Only small breeds", calls.first { it.first == "job_message" }.second.getString("message"))
+        assertEquals("the bar asks the agent again after that", "Ask Ægentica", (find("rabbit-input") as android.widget.EditText).hint.toString())
     }
 }

@@ -67,7 +67,9 @@ Every example the owner gives (the dog-breed spreadsheet, the Gboard screenshots
 
 - **Summon:** the assistant gesture and Quick Tap open the floating genie over any app when [Ægentica hands](hands.md) is on, otherwise the sheet; the sheet also opens from text selection and from inside the app (`AssistantActivity.withText`).
 - **Show:** the rabbit flies to each step, the bar shows what it does, Allow prompts and steps appear and fade, the microphone can stay open to steer, and touching the screen takes over. The notification is a live surface with Stop, Allow and a reply.
-- **Return:** the answer lands in the bar, the sheet and the notification, read aloud when the question was spoken.
-- **Next:** server jobs through Ægentica's back office (`https://aegentica.se/api/backend/mcp`) with a live view of the server's browser, insight cards and priced approvals; memory, Inbox, tasks and chat history from the same backend.
+- **Keep going:** with the phone [connected to Ægentica](backend.md), long jobs go to the server agent and keep running while the phone sleeps. The genie, the sheet and a live notification show their steps, tables, pictures, files and cost, and Ægentica's browser live with take-over; a step that costs money shows its price and is approved by a tap, or by voice after the amount is read back.
+- **Remember:** the phone agent uses the same memory, Inbox and tasks as aegentica.se, and phone chats continue in Ægentica's chat history.
+- **Return:** the answer lands in the bar, the sheet and the notification, read aloud when the question was spoken; a finished job's notification opens its answer, its chat and its files.
+- **Next:** a web view inside the sheet the agent can browse in; widgets and a Quick Settings tile with running jobs; the watch and earbuds.
 
 The same outcome for every platform is in aegentica-app's [docs/NORTH_STAR.md](https://github.com/Caceras/aegentica-app/blob/main/docs/NORTH_STAR.md).

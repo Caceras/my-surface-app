@@ -39,7 +39,7 @@ sealed class Prepared {
     class Refused(val outcome: ToolOutcome) : Prepared()
 }
 
-/** What runs the agent's tools: the hands, later Ægentica's server tools. */
+/** What runs the agent's tools: the hands on this phone, and Ægentica's back office on aegentica.se. */
 interface AgentToolbox {
     /** Tools the model may call right now. */
     fun offered(): List<ToolSpec>
@@ -49,8 +49,8 @@ interface AgentToolbox {
     /** The person allowed this kind of step always for its app. */
     fun remembered(call: Prepared.Ready): Boolean = false
     fun remember(call: Prepared.Ready) {}
-    /** Acting steps run without asking (hands-free); steps that always ask still ask. */
-    fun handsFree(): Boolean = false
+    /** This acting step runs without asking (hands-free on the phone); steps that always ask still ask. */
+    fun handsFree(call: Prepared.Ready): Boolean = false
     fun stop() {}
 }
 
@@ -233,7 +233,8 @@ class AgentSession(private val context: Context, val id: String = UUID.randomUUI
         if (key == null) { reply.status = "error"; reply.error = PhoneAgent.NO_KEY; lastError = reply.error; return }
         val history = thread.toList().dropLast(1)
         val hands = offered.any { it.target == "phone" }
-        val body = AgentRequest.body(history, playbook, reply.model, id, offered, PhoneAgent.vision(context), hands, final)
+        val backend = offered.any { it.target == "backend" }
+        val body = AgentRequest.body(history, playbook, reply.model, id, offered, PhoneAgent.vision(context), hands, final, backend = backend)
         val payload = body.toString().toByteArray()
         try {
             require(payload.size <= 12_000_000) { "The request is too large to send. Start a new question." }
@@ -294,8 +295,11 @@ class AgentSession(private val context: Context, val id: String = UUID.randomUUI
         val spec = offered.firstOrNull { it.name == call.name }
         if (spec == null) {
             call.status = "error"
-            call.result = if (playbook.tool(call.name)?.target == "phone") "${call.name} is not available now: Ægentica hands is off or not connected."
-                else "There is no tool called ${call.name}."
+            call.result = when (playbook.tool(call.name)?.target) {
+                "phone" -> "${call.name} is not available now: Ægentica hands is off or not connected."
+                "backend" -> "${call.name} is not available now: this phone is not connected to Ægentica."
+                else -> "There is no tool called ${call.name}."
+            }
             return
         }
         val args = AgentStream.parseArgs(call.args)
@@ -305,7 +309,7 @@ class AgentSession(private val context: Context, val id: String = UUID.randomUUI
             is Prepared.Ready -> p
         }
         call.label = prepared.label
-        val asks = prepared.risk == Risk.ALWAYS || (prepared.risk == Risk.ACT && !tools.handsFree() && !tools.remembered(prepared))
+        val asks = prepared.risk == Risk.ALWAYS || (prepared.risk == Risk.ACT && !tools.handsFree(prepared) && !tools.remembered(prepared))
         if (asks) {
             call.status = "awaiting-approval"
             val approval = Approval(call, prepared)
@@ -487,6 +491,8 @@ object PhoneAgent {
     fun session(context: Context, fresh: Boolean): AgentSession {
         val existing = current
         if (existing != null && (!fresh || existing.running)) return existing
+        // The conversation it replaces is over: it goes to Ægentica's chat history when the phone is connected.
+        existing?.let { Backend.saveConversation(context.applicationContext, it) }
         return AgentSession(context.applicationContext).also { current = it }
     }
 }

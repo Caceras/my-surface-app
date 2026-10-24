@@ -102,10 +102,15 @@ class PhoneAgentTest {
             t.required.forEach { assertTrue("${t.name} requires undeclared $it", it in t.properties) }
             if (t.risk != Risk.READ) assertTrue("${t.name} acts without a why", t.needsWhy)
         }
-        assertEquals(listOf("phone_find", "phone_highlight", "phone_screenshot", "phone_scroll", "phone_snapshot", "phone_wait_for"),
-            playbook.tools.filter { it.risk == Risk.READ }.map { it.name }.sorted())
-        assertEquals(listOf("phone_back", "phone_home", "phone_long_press", "phone_open_app", "phone_open_url", "phone_recents", "phone_swipe", "phone_tap", "phone_type"),
-            playbook.tools.filter { it.risk == Risk.ACT }.map { it.name }.sorted())
+        fun names(target: String, risk: Risk) = playbook.tools.filter { it.target == target && it.risk == risk }.map { it.name }.sorted()
+        assertEquals(listOf("phone_find", "phone_highlight", "phone_screenshot", "phone_scroll", "phone_snapshot", "phone_wait_for"), names("phone", Risk.READ))
+        assertEquals(listOf("phone_back", "phone_home", "phone_long_press", "phone_open_app", "phone_open_url", "phone_recents", "phone_swipe", "phone_tap", "phone_type"), names("phone", Risk.ACT))
+        // Ægentica's back office: reading runs on its own; anything that keeps, drafts, proposes or starts work asks.
+        assertEquals(listOf("aegentica_inbox_list", "aegentica_inbox_read", "aegentica_inbox_search", "aegentica_job_status", "aegentica_memory_read", "aegentica_memory_search", "aegentica_tasks_list"),
+            names("backend", Risk.READ))
+        assertEquals(listOf("aegentica_handoff", "aegentica_inbox_draft_reply", "aegentica_job_message", "aegentica_memory_save", "aegentica_tasks_create"), names("backend", Risk.ACT))
+        assertTrue("no tool answers a job's approvals for the person", playbook.tools.none { it.name.contains("respond") || it.name.contains("approve") })
+        assertTrue(playbook.backend.any { it.contains("Never answer a job's approvals or questions for the person") })
         // The same words as Glimt and the live browser.
         assertTrue(playbook.shared.any { it.contains("untrusted data") && it.contains("only the person gives instructions") })
         assertTrue(playbook.hands.any { it.contains("Take over to type your password") })

@@ -48,12 +48,14 @@ class AgentReply(val model: String) {
  */
 class SseParser {
     sealed class Event {
-        data class Data(val data: String, val event: String?) : Event()
+        /** [id] is the event's own `id:` field, for resuming a stream with Last-Event-ID. */
+        data class Data(val data: String, val event: String?, val id: String? = null) : Event()
         data class Comment(val text: String) : Event()
     }
     private val buf = StringBuilder()
     private val data = mutableListOf<String>()
     private var event: String? = null
+    private var id: String? = null
 
     fun push(text: String): List<Event> {
         buf.append(text)
@@ -88,12 +90,12 @@ class SseParser {
         val field = if (colon < 0) line else line.substring(0, colon)
         var value = if (colon < 0) "" else line.substring(colon + 1)
         if (value.startsWith(" ")) value = value.substring(1)
-        if (field == "data") data += value else if (field == "event") event = value
+        when (field) { "data" -> data += value; "event" -> event = value; "id" -> if ('\u0000' !in value) id = value }
     }
 
     private fun dispatch(out: MutableList<Event>) {
-        if (data.isNotEmpty()) out += Event.Data(data.joinToString("\n"), event)
-        data.clear(); event = null
+        if (data.isNotEmpty()) out += Event.Data(data.joinToString("\n"), event, id)
+        data.clear(); event = null; id = null
     }
 }
 

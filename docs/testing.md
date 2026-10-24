@@ -194,6 +194,21 @@ On the Pixel:
 - lock the phone during a task: the notification shows the step, Stop works, Allow asks to unlock;
 - measure battery over an hour with the service on and idle.
 
+## Back office acceptance
+
+`BackendTest` covers pairing (the `access-token` message, only a real `aeg_pat_` token, kept only by Ægentica's own site in the app, stored sealed, never in the clear, disconnecting, Connect opening Settings → Security, and other sites not opening in the shell), the MCP client (one JSON-RPC call with the bearer token, structured results, an SSE answer, refusals, `401`), the back-office tools (offered only when connected, `why` and length limits, asking even with hands-free on, results fenced as data, drafts never sent), the agent handing a job over after Allow with the back office's instructions in its prompt, job events field by field (steps, the reply, tables appended from `start` with pictures in cells, pictures, files, cost, the browser, approvals with their price, the end with its links) and `job_get` snapshots, spoken approval only after the price was read back and only for a clear yes, following a job's stream and resuming it with `Last-Event-ID`, the live notification with a priced Approve that sends only an offered option, replies refused while an approval waits and otherwise steering the job, the job card (steps, price on the button, tables, pictures, files, the live browser, Tell the job only after an approval is answered), the live browser's events and taking over with taps as fractions, saving chats once (again only when grown, never with screens, never when turned off), and the sheet opening on a job and telling it. `RabbitOverlayTest` covers the genie opening when a job asks and its bar talking to the job.
+
+On the Pixel:
+- connect in Settings → Connect to Ægentica, tap *Make token* on aegentica.se, and check the toast;
+- ask the genie "remember that I like oat milk", then on the computer check Memory;
+- ask it to reply to a message in the Inbox: it drafts, and the draft waits in Ægentica's Inbox;
+- ask for a long job ("find twelve dog breeds for small flats with pictures, as a spreadsheet"): it asks to hand over, then the card fills in; lock the phone and watch the notification;
+- when it asks to pay for pictures, check the price on the button; answer by voice in a conversation: it reads the amount, then a yes approves;
+- tap the live picture, take over, tap and scroll, hand back;
+- tell the job something mid-way; check it changes course;
+- when it is done, open the chat and the spreadsheet from the notification;
+- close the sheet and find the phone conversation in Ægentica's chat history on the computer.
+
 ## Ægentica home acceptance
 
 `ShellTest` covers the bridge (context kept until the page says hello, a screen with its JPEG screenshot under protocol version 1, a screenshot that is not a JPEG data URL or is too large left out, speech with pause and resume, dictation, sign-in, the voice picker and menu, malformed requests and non-http links ignored, a new page load must say hello again), the screenshot as a data URL (a Pixel-sized screen becomes a JPEG of at most 1280 px; a busy one is compressed harder and made smaller to fit, or dropped), the assistant's hand-over to aegentica.se (held in memory, never in the intent, taken once, dropped after a minute), the localhost sign-in on a real socket (OpenRouter's redirect, the code, the reply page), the Ægentica shell (aegentica.se loads, the user agent names the shell, file access is off, only `aegentica.se` and `www.aegentica.se` stay in the app, a share is consumed once), the microphone rule (aegentica.se after Android's prompt, never the camera, never another site, never Glimt's page), Glimt's shell, and the file picker returning one file, several or none. `ReaderRepairTest` checks that a Swedish reply is read with a Swedish voice, that the reading state reaches the page, and that a pause keeps the reading open while closing the reader ends it. The site's side is tested in `Caceras/aegentica-app` (`scripts/test-phone-app.mjs` and `scripts/test-phone-app-browser.mjs`); Glimt's in `Caceras/awesomeseo-monorepo` (`apps/chatbar/tests/android.test.ts`).

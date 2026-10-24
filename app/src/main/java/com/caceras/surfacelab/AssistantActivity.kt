@@ -93,6 +93,13 @@ class AssistantActivity : Activity() {
     private val stepAside: () -> Unit = { if (agentMode && agent?.running == true && !isFinishing) { handedOver = true; finish() } }
     /** Where "Replace" sends the answer when the sheet was opened from inside the app (the keyboard). */
     private var handback: ((String) -> Unit)? = null
+    /** A job handed to the server agent on aegentica.se, shown below the answer. */
+    private lateinit var jobs: JobCard
+    /** The composer's next words go to this job (or answer its question) instead of a new question. */
+    private var telling: Pair<ServerJobs.Job, ServerJobs.Input?>? = null
+    /** The last question was spoken, so a priced step is read back and may be approved by voice. */
+    private var voiceFirst = false
+    private val jobWatcher: (ServerJobs.Job) -> Unit = { job -> if (!isFinishing) jobChanged(job) }
 
     /** The answer goes back to whoever opened the sheet with text: the selection menu's caller, or [withText]'s handback. */
     private fun handBack(text: String) {
@@ -168,6 +175,11 @@ class AssistantActivity : Activity() {
             addView(steps, LinearLayout.LayoutParams(-1, -2))
             addView(answer, LinearLayout.LayoutParams(-1, -2))
             addView(approvalCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); marginEnd = dp(10) })
+            jobs = JobCard(this@AssistantActivity, object : JobCard.Host {
+                override fun tell(job: ServerJobs.Job, input: ServerJobs.Input?) = tellJob(job, input)
+                override fun opened() { finish() }
+            })
+            addView(jobs.view, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); marginEnd = dp(10) })
             addView(HorizontalScrollView(this@AssistantActivity).apply { isHorizontalScrollBarEnabled = false; addView(follows) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
         }
         val foot = LinearLayout(this).apply {
@@ -283,7 +295,47 @@ class AssistantActivity : Activity() {
         root.post { root.arrive() }
         unlisten = ScreenContexts.listen { showContext() }
         Hands.onActive = stepAside
+        ServerJobs.addObserver(jobWatcher)
         start(intent)
+    }
+
+    // ---------------------------------------------------------------- jobs on aegentica.se
+
+    /** A job changed: the sheet adopts one its own conversation just handed over, and reads a price aloud when the owner talks. */
+    private fun jobChanged(job: ServerJobs.Job) {
+        if (jobs.job == null && !job.finished && agentMode && agent != null) { jobs.show(job); card.visibility = View.VISIBLE }
+        if (jobs.job !== job) return
+        if (telling?.first === job && telling?.second != null && job.inputs.none { it.requestId == telling?.second?.requestId }) endTelling()
+        val priced = job.inputs.firstOrNull { it.priced && it.requestId !in job.readBack }
+        if (priced != null && voiceFirst && agent?.running != true) readPrice(job, priced)
+    }
+
+    /** The composer talks to the job now: its next words steer it, or answer its question. */
+    private fun tellJob(job: ServerJobs.Job, question: ServerJobs.Input?) {
+        telling = job to question
+        input.hint = question?.let { "Answer: " + it.prompt.oneLine().take(60) } ?: "Tell the job…"
+        input.requestFocus()
+        getSystemService(InputMethodManager::class.java)?.showSoftInput(input, 0)
+    }
+
+    private fun endTelling() { telling = null; if (input.hint != "Listening…") input.hint = hint() }
+
+    /** Words for the job: an answer to its open question, else its newest instruction. */
+    private fun sendToJob(raw: String): Boolean {
+        val (job, question) = telling ?: return false
+        val text = raw.trim()
+        if (text.isEmpty()) return true
+        input.setText(""); hideKeyboard(); endTelling()
+        status.text = "Sending to the job…"
+        ServerJobs.tell(this, job, text, question) { error -> if (!isFinishing) status.text = error ?: "Sent to the job." }
+        return true
+    }
+
+    /** A step that costs money, read back aloud; only then may a spoken yes approve it. */
+    private fun readPrice(job: ServerJobs.Job, priced: ServerJobs.Input) {
+        val voice = mouth ?: Mouth(this).also { mouth = it }
+        val e = ears ?: Ears(this).also { ears = it }
+        PriceVoice.ask(this, job, priced, voice, e) { line -> if (!isFinishing) status.text = line }
     }
 
     private fun busy() = brain != null || agent?.running == true
@@ -322,6 +374,8 @@ class AssistantActivity : Activity() {
     /** The cross ends the current question and returns to the suggestions. */
     private fun clearThread() {
         stop()
+        agent?.let { Backend.saveConversation(applicationContext, it) }
+        jobs.show(null); endTelling()
         // A new conversation next time: the agent forgets this one.
         agent?.listener = null; agent = null; agentScreenSent = false; agentMode = false
         question = ""; reply = ""; answer.text = ""; asked.text = ""; status.text = ""; actions.removeAllViews(); follows.removeAllViews()
@@ -353,9 +407,13 @@ class AssistantActivity : Activity() {
         agent?.listener = null; agent = null; agentScreenSent = false; agentMode = false
         if (::steps.isInitialized) { steps.removeAllViews(); steps.visibility = View.GONE; approvalCard.visibility = View.GONE; scroll.reset() }
         card.visibility = View.GONE
+        endTelling()
+        val job = intent?.getStringExtra(JOB)?.let { ServerJobs.jobs[it] }
+        jobs.show(job)
         showContext()
+        if (job != null) { card.visibility = View.VISIBLE; if (PhoneAgent.current == null) { asked.text = job.title.ifBlank { "A job on aegentica.se" }; showSuggestions(); return } }
         // Opened from the rabbit's "Open the answer": the same conversation, in the sheet.
-        if (intent?.getBooleanExtra(RESUME, false) == true) PhoneAgent.current?.let { session ->
+        if (intent?.getBooleanExtra(RESUME, false) == true || job != null) PhoneAgent.current?.let { session ->
             agent = session; agentMode = true; agentScreenSent = true; agentSettled = session.running
             session.listener = { if (!isFinishing && agent === it) renderAgent(it) }
             question = session.view().question; asked.text = question
@@ -418,6 +476,8 @@ class AssistantActivity : Activity() {
      * steer it. Otherwise Nano (or the connected model after its opt-in) answers, labelled.
      */
     private fun ask(raw: String, aloud: Boolean, shown: String? = null) {
+        if (telling != null && sendToJob(raw)) return
+        voiceFirst = aloud
         if (agent?.running == true) { steer(raw, aloud); return }
         if (PhoneAgent.ready(this) && PhoneAgent.online(this)) { askAgent(raw, aloud, shown); return }
         askBrain(raw, aloud, shown)
@@ -561,6 +621,7 @@ class AssistantActivity : Activity() {
         if (Live.available() && ConnectedAI.geminiConfigured(this)) menu.menu.add(0, 3, 0, "Talk live about this screen")
         if (PhoneAgent.enabled(this)) menu.menu.add(0, 4, 0, if (PhoneAgent.key(this) == null) "Sign in to OpenRouter" else "Choose the agent's model")
         menu.menu.add(0, 6, 0, if (Hands.connected) "Ægentica hands · on" else "Let it use your phone (Ægentica hands)")
+        menu.menu.add(0, 7, 0, if (Backend.token(this) != null) "Ægentica on aegentica.se · connected" else "Connect to Ægentica (memory, Inbox, server jobs)")
         menu.menu.add(0, 5, 0, "Assistant settings")
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -570,6 +631,7 @@ class AssistantActivity : Activity() {
                 4 -> modelTapped()
                 5 -> setup(this)
                 6 -> HandsSetup.show(this)
+                7 -> BackendSetup.show(this)
             }
             true
         }
@@ -726,6 +788,10 @@ class AssistantActivity : Activity() {
     }
     override fun onDestroy() {
         if (!handedOver) stop()
+        // The conversation goes to Ægentica's chat history once it is over (when the phone is connected).
+        if (!handedOver) agent?.let { Backend.saveConversation(applicationContext, it) }
+        ServerJobs.removeObserver(jobWatcher); jobs.detach()
+        PriceVoice.cancel(ears)
         unlisten?.invoke(); unlisten = null
         agent?.listener = null
         if (Hands.onActive === stepAside) Hands.onActive = null
@@ -797,6 +863,10 @@ class AssistantActivity : Activity() {
 
         /** The current agent conversation in the sheet, from outside an activity (the rabbit, a notification). */
         fun resume(context: Context): Intent = intent(context, direct = true).putExtra(RESUME, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        private const val JOB = "com.caceras.surfacelab.extra.JOB"
+
+        /** A job on aegentica.se in the sheet (from its notification), with the conversation that started it. */
+        fun showJob(context: Context, jobId: String): Intent = resume(context).putExtra(JOB, jobId)
         private const val HANDBACK = "com.caceras.surfacelab.extra.HANDBACK"
         private val handbacks = java.util.concurrent.ConcurrentHashMap<String, (String) -> Unit>()
         private fun takeHandback(token: String) = handbacks.remove(token)

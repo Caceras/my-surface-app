@@ -28,6 +28,8 @@ A connected routine requires separate consent to its prompt, provider and fixed 
 
 The app implements no analytics, advertising SDK, remote content synchronization or account backend. System services still manage initial model/speech downloads. [ML Kit service constraints](https://developers.google.com/ml-kit/genai).
 
+**Ægentica on aegentica.se (optional):** only after the owner connects the phone (Settings → *Connect to Ægentica*, then *Make token* on aegentica.se). The access token is kept encrypted with Keystore and sent only to aegentica.se. The phone agent then reads the owner's memory, Inbox and tasks there and can save a fact, draft a reply (never sent by the phone), propose a task (saved turned off) and start a job, each after the owner allows it. Starting a job sends the agent's brief and, when the question was about a screen, that screen's text, to the owner's server, where the server agent gets it fenced as untrusted. Finished phone conversations are copied into Ægentica's chat history as questions and answers only (screens and screenshots stay on the phone); Settings → *Connect to Ægentica* turns this off. Job events, pictures and the live browser's pictures are shown and never stored by the app; the live browser streams only while its view is on screen. Disconnecting deletes the token on the phone; aegentica.se's Settings → Security ends it everywhere. [Back office on the phone](backend.md).
+
 ## Local storage
 
 | Data | Storage | Removal and limits |

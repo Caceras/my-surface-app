@@ -23,6 +23,11 @@ class ShellBridge(private val send: (String) -> Unit, private val phone: Phone) 
         fun openOutside(url: String)
         fun chooseVoice()
         fun menu()
+        /**
+         * An access token aegentica.se made for this phone (Settings → Security → Connect), for
+         * Ægentica's back office. Only Ægentica's own site keeps it; other sites are ignored.
+         */
+        fun accessToken(token: String, name: String) {}
     }
 
     private var connected = false
@@ -103,6 +108,10 @@ class ShellBridge(private val send: (String) -> Unit, private val phone: Phone) 
             }
             "voices" -> phone.chooseVoice()
             "menu" -> phone.menu()
+            "access-token" -> {
+                val token = m.optString("token")
+                if (Backend.validToken(token)) phone.accessToken(token, m.optString("name").oneLine().take(60))
+            }
         }
     }
 

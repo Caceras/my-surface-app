@@ -119,7 +119,8 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
             window.statusBarColor = canvas
             window.navigationBarColor = canvas
         }
-        if (state == null || web.restoreState(state) == null) web.loadUrl(site.home)
+        if (state == null || web.restoreState(state) == null) web.loadUrl(target(intent) ?: site.home)
+        intent?.removeExtra(EXTRA_URL)
         accept(intent)
     }
 
@@ -134,6 +135,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
      * ([handOver]). A return link carries nothing.
      */
     private fun accept(intent: Intent?) {
+        target(intent)?.let { web.loadUrl(it); intent?.removeExtra(EXTRA_URL) }
         if (intent?.action == ACTION_CONTEXT) {
             take()?.let { bridge.context(it.kind, text = it.text, title = it.title, app = it.app, screenshot = it.screenshot) }
             intent.action = Intent.ACTION_MAIN
@@ -366,6 +368,16 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
 
     override fun chooseVoice() = SpeechVoices.showPicker(this) { ReadingService.refreshVoice() }
 
+    /** A page of this site to open ([EXTRA_URL]); other addresses are ignored. */
+    private fun target(intent: Intent?): String? = intent?.getStringExtra(EXTRA_URL)?.takeIf { it.length <= 2048 && site.keeps(Uri.parse(it)) }
+
+    /** Ægentica's own site, on its own address, hands this phone an access token for the back office. */
+    override fun accessToken(token: String, name: String) {
+        if (site !== AegenticaActivity.SITE || web.url?.let { site.keeps(Uri.parse(it)) } != true) return
+        val ok = Backend.pair(this, token, name)
+        android.widget.Toast.makeText(this, if (ok) "Connected to Ægentica. The phone agent can use your memory, Inbox and server jobs." else "This phone could not keep Ægentica's access. Try again.", android.widget.Toast.LENGTH_LONG).show()
+    }
+
     override fun menu() {
         val items = menuItems()
         AlertDialog.Builder(this).setTitle(ShellBridge.APP)
@@ -393,6 +405,8 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
         const val HANDSHAKE = "aegentica-shell"
         /** Opens the shell with what [handOver] left; the intent itself carries nothing. */
         const val ACTION_CONTEXT = "com.caceras.surfacelab.action.SHELL_CONTEXT"
+        /** A page of the site to open instead of its home; only the site's own addresses. */
+        const val EXTRA_URL = "com.caceras.surfacelab.extra.URL"
         private const val PICK_FILES = 31
         private const val MIC = 32
         /** A hand-over the shell never picked up (the start failed) is dropped after this long. */

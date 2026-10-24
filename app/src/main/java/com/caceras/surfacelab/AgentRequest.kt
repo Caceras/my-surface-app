@@ -41,7 +41,7 @@ object AgentRequest {
     /** Attribute values in our fences: a title must not be able to close the tag it sits in. */
     private fun esc(text: String) = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
 
-    fun systemPrompt(playbook: Playbook, hands: Boolean, now: Date = Date(), zone: TimeZone = TimeZone.getDefault(), locale: Locale = Locale.getDefault()): String {
+    fun systemPrompt(playbook: Playbook, hands: Boolean, now: Date = Date(), zone: TimeZone = TimeZone.getDefault(), locale: Locale = Locale.getDefault(), backend: Boolean = false): String {
         val day = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).apply { timeZone = zone }.format(now)
         val lines = mutableListOf(
             "You are Ægentica, the person's assistant on their Android phone, opened on top of the app they are using. You see the screen they invoked you on (<screen>): its text, and a screenshot when it is shared.",
@@ -52,6 +52,7 @@ object AgentRequest {
         )
         lines += playbook.shared
         lines += if (hands) playbook.hands else playbook.noHands
+        if (backend) lines += playbook.backend
         return lines.joinToString("\n")
     }
 
@@ -94,8 +95,8 @@ object AgentRequest {
     }
 
     /** History as Chat Completions messages, with tool results after the turn that asked for them. */
-    fun messages(thread: List<AgentTurn>, playbook: Playbook, vision: Boolean, hands: Boolean, now: Date = Date()): JSONArray {
-        val out = JSONArray().put(JSONObject().put("role", "system").put("content", systemPrompt(playbook, hands, now)))
+    fun messages(thread: List<AgentTurn>, playbook: Playbook, vision: Boolean, hands: Boolean, now: Date = Date(), backend: Boolean = false): JSONArray {
+        val out = JSONArray().put(JSONObject().put("role", "system").put("content", systemPrompt(playbook, hands, now, backend = backend)))
         for (turn in thread) when (turn) {
             is AgentTurn.User -> out.put(JSONObject().put("role", "user").put("content", userContent(turn, vision)))
             is AgentTurn.Assistant -> {
@@ -134,8 +135,9 @@ object AgentRequest {
         hands: Boolean,
         final: Boolean = false,
         maxTokens: Int = 4096,
+        backend: Boolean = false,
     ): JSONObject {
-        val body = JSONObject().put("model", model).put("messages", messages(thread, playbook, vision, hands)).put("stream", true)
+        val body = JSONObject().put("model", model).put("messages", messages(thread, playbook, vision, hands, backend = backend)).put("stream", true)
             .put("session_id", sessionId).put("max_tokens", maxTokens)
             // Cost and tokens come back with the last chunk.
             .put("usage", JSONObject().put("include", true))
