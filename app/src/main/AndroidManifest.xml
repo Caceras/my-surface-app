@@ -217,12 +217,6 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
-        <!--
-            The worker behind every text-selection action. It is not exported
-            and carries no intent-filter of its own: each flavour supplies its
-            own <activity-alias> entries, which is what puts one menu item per
-            task into the selection popup.
-        -->
         <!-- Ægentica keys: an AI panel beside the owner's keyboard; it writes only when they tap Replace or Insert. -->
         <service
             android:name=".AegenticaKeyboard"
@@ -234,19 +228,24 @@
             </intent-filter>
             <meta-data android:name="android.view.im" android:resource="@xml/keyboard" />
         </service>
-        <!-- "Listen" in the selection menu reads the selection with the gap-free reader. -->
+        <!--
+            "Ægentica" in any app's text-selection menu: the genie sheet opens over that app with the
+            selection as context, and Replace puts an answer back in an editable field. It is the one
+            selection entry; the earlier per-task entries (Summarise, Proofread, Listen…) live inside it.
+        -->
         <activity-alias
-            android:name=".Listen"
-            android:targetActivity=".ReadingActivity"
+            android:name=".Ask"
+            android:targetActivity=".AssistantActivity"
             android:exported="true"
             android:icon="@drawable/ic_surface"
-            android:label="@string/task_listen">
+            android:label="@string/task_ask">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity-alias>
+        <!-- The core build's demo selection entry (Uppercase) runs here; it is not exported. -->
         <activity
             android:name=".ProcessTextActivity"
             android:exported="false"

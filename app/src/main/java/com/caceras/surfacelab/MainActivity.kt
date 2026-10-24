@@ -337,7 +337,7 @@ class MainActivity : Activity() {
             })
         }
 
-        line("Share sheet & Text selection", "Choose Ægentica AI when sharing text, or select text in a supporting app for " + brain.tasks.joinToString(", ") { it.alias } + ".")
+        line("Share sheet & Text selection", "Choose Ægentica AI when sharing text, or select text in any app and choose Ægentica: the genie opens over the app with the selection.")
 
         panel.addView(flatButton("Workspace · notes, connections & backups") {
             startActivity(WorkspaceActivity.intent(this, "library"))

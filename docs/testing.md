@@ -152,7 +152,8 @@ On the Pixel:
 - with a third-party offline voice app (for example HayaiTTS), confirm the reading-voice picker lists its voices and that a long text reads without pauses between sentences;
 - with the phone language set to English (Sweden), tap the microphone in chat and in the assistant sheet: it should switch to an installed English pack and listen, without a "not ready yet" message;
 - with Google as Android's default and HayaiTTS installed, confirm Read aloud uses a HayaiTTS voice, the picker lists HayaiTTS first with voice names, and Google's voice is never used unless picked;
-- select text in Chrome: *Ægentica* opens the sheet; on editable text, *Replace selection* replaces it; *Listen* reads it;
+- select text in Chrome and Messages: *Ægentica* (in the ⋮ menu) opens the genie sheet over the app; on editable text, *Replace selection* replaces it; no Listen, Summarise or Proofread entries remain;
+- select a word on aegentica.se inside Ægentica: *Ægentica* is the first toolbar item (with the rabbit), Google's Translate is second and still opens; select text in the site's message box, ask the genie to rewrite it and tap *Replace selection*: the box shows the new text and the site reacts to it as typing;
 - turn on *Ægentica keys*, switch to it in Messages and Gmail: Fix and Translate with Nano and with the connected model (Nano may refuse when Ægentica is not the foreground app), Replace and Insert, *Reply to copied*, dictation, the keyboard icon back to Gboard, and a password field showing the panel as off;
 - Nano answering about a screenshot in Swedish;
 - OpenRouter with a real key: streaming, the model picker, and a spent credit limit;
@@ -201,3 +202,7 @@ On the Pixel: a 60-minute locked-screen recording (two parts, playback across th
 `LiveAndInsightsTest` drives `LiveSession` and `LiveActivity` through a fake transport and fake audio: setup content and tool declarations, no microphone before `setupComplete`, PCM chunk encoding, read-only tool answers that exclude unrelated notes and reject unknown functions, playback and barge-in flush, transcript fragments merged into lines, a saved verbatim note, resumption with the latest handle after `goAway`, stale-socket fencing, a rejected-key message, and ending plus saving when the screen pauses. Insights covers JSON parsing around prose/code fences, review labels (existing vs new), transactional apply with provenance and exact undo. `ShotTest` renders `live-conversation`, `insights-review` and `verbatim-changes`.
 
 On the Pixel: Live with a real key (connect, Swedish question about a known transcript, citation of the note title, interrupting by voice, loudspeaker echo vs headphones, a 12+ minute session crossing a connection reset, airplane-mode failure message), Insights quality with Nano and with Gemini on a Swedish transcript, and the Transcribe tile from the lock screen.
+
+## Selection and keyboard acceptance
+
+`SelectionTest` covers the toolbar on Ægentica's own pages: Ægentica in the first (assist) slot, Android's own smart action moved after it and still running with its original item, our own selection entry not listed twice, other apps' entries kept and a lone Paste toolbar left alone; a selection in one of our fields or on the page handed to the genie sheet, replaced only after the sheet answers with Replace (and typed into the page as quoted data), and password fields never handed over; and the manifest's single *Ægentica* entry pointing at the genie sheet.

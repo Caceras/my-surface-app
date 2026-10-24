@@ -19,7 +19,8 @@ class LogicTest {
     @Test
     fun `alias name selects the task`() {
         assertEquals(Task.ASK, Task.fromComponent("com.caceras.surfacelab.Ask"))
-        assertEquals(Task.SUMMARIZE, Task.fromComponent("com.caceras.surfacelab.Summarize"))
+        // The presets no longer have selection entries of their own; an old alias name finds no task.
+        assertEquals(Task.UPPERCASE, Task.fromComponent("com.caceras.surfacelab.Summarize"))
         assertEquals(Task.UPPERCASE, Task.fromComponent("com.caceras.surfacelab.Uppercase"))
     }
 

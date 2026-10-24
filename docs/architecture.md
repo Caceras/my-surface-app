@@ -11,7 +11,8 @@
 | `MainActivity.kt` | Typed chat, editable dictation, reply actions, Settings, share intake |
 | `ConversationSheet.kt` | Searchable local archives, previews, resume and deletion |
 | `VoiceActivity.kt` | Foreground listening/thinking/speaking flow, speech setup, continuous-session controls |
-| `ProcessTextActivity.kt` | Text-selection prompt/result flow and editable-selection return values |
+| `ProcessTextActivity.kt` | The core build's Uppercase demo selection entry and its editable-selection return value |
+| `Genie.kt`, `SelectionToolbar.kt` | One way to open the genie sheet with text (selection on our pages, the keyboard); Ægentica first in our pages' selection toolbar, with the page's selection read and replaced through the page |
 | `SurfaceBrain.kt` | Variant-independent task, status, streaming, result and cancellation contract |
 | `nano/…/Brain.kt` | ML Kit Prompt client, readiness, system-instruction fallback, generation fencing |
 | `core/…/Brain.kt` | Deterministic uppercase implementation for tests and scaffolding |

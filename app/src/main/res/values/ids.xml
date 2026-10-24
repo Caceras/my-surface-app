@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The system's own smart action (Translate, Call…), moved just after Ægentica in our selection toolbar. -->
+    <item type="id" name="selection_assist_moved" />
+</resources>

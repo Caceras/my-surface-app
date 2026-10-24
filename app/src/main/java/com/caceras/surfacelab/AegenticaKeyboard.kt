@@ -258,8 +258,9 @@ object KeyboardText {
     /** [field] is false for text that did not come from the field, such as the clipboard. */
     data class Source(val text: String, val selected: Boolean, val field: Boolean = true, val before: Int = 0, val after: Int = 0)
 
-    fun secret(info: EditorInfo?): Boolean {
-        val type = info?.inputType ?: return false
+    fun secret(info: EditorInfo?): Boolean = info != null && secret(info.inputType)
+
+    fun secret(type: Int): Boolean {
         val variation = type and InputType.TYPE_MASK_VARIATION
         return when (type and InputType.TYPE_MASK_CLASS) {
             InputType.TYPE_CLASS_TEXT -> variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||

@@ -93,17 +93,18 @@ enum class Task(val alias: String) {
     ASK("Ask"),
 
     // Presets. These are ordinary prompts with a fixed system instruction --
-    // there is nothing special about them, and adding your own is one entry
-    // here plus one manifest alias.
-    SUMMARIZE("Summarize"),
-    PROOFREAD("Proofread"),
-    REWRITE("Rewrite"),
+    // there is nothing special about them. They no longer have selection-menu
+    // entries of their own: the one "Ægentica" entry opens the genie sheet,
+    // which offers them (and anything else) about the selection.
+    SUMMARIZE(""),
+    PROOFREAD(""),
+    REWRITE(""),
 
     /** Readable text from dictation or a transcript; the caller keeps the verbatim original. */
-    POLISH("Polish"),
+    POLISH(""),
 
-    /** Reads the selection aloud with the reader; no model involved. */
-    LISTEN("Listen"),
+    /** Reads text aloud with the reader; no model involved. The genie sheet's Listen does this for a selection. */
+    LISTEN(""),
 
     /** Ægentica keys: an edit of the text the owner is typing in another app. No selection-menu entry. */
     KEYBOARD(""),
