@@ -682,44 +682,57 @@ class ShotTest {
         } finally { Brains.useForTest(null); ScreenContexts.begin(); AssistantActivity.blurForTest=null }
     }
 
-    @Test fun `keyboard panel with an answer`() = keyboardShot("")
-    @Test @Config(qualifiers = "w411dp-h914dp-night-xxhdpi") fun `keyboard panel with an answer in dark mode`() = keyboardShot("-night")
+    @Test fun `keyboard keys and genie panel`() = keyboardShot("")
+    @Test @Config(qualifiers = "w411dp-h914dp-night-xxhdpi") fun `keyboard keys and genie panel in dark mode`() = keyboardShot("-night")
 
-    /** Ægentica keys where Android puts a keyboard: at the bottom, under a messaging field. */
+    /** Ægentica keys where Android puts a keyboard: the keys, then the genie panel with a reply ready to insert. */
     private fun keyboardShot(suffix: String) {
         val app = RuntimeEnvironment.getApplication()
-        var finish: ((BrainResult) -> Unit)? = null
-        Brains.useForTest(object : SurfaceBrain {
-            override val tasks = listOf(Task.KEYBOARD)
-            override fun status(context: android.content.Context, onStatus: (BrainStatus) -> Unit) = onStatus(BrainStatus("Test", true))
-            override fun prepare(context: android.content.Context, onStatus: (BrainStatus) -> Unit) = status(context, onStatus)
-            override fun run(context: android.content.Context, task: Task, input: String, instruction: String, onPartial: (String) -> Unit, onResult: (BrainResult) -> Unit) { finish = onResult }
-        })
+        KeyboardAgents.forTest = object : GenieAgent {
+            override fun start(context: android.content.Context, ask: GenieAsk, update: (GenieState) -> Unit): GenieWork {
+                updateHolder = update
+                return object : GenieWork { override fun steer(text: String) = Unit; override fun stop() = Unit; override fun decide(approval: Approval, allow: Boolean, always: Boolean) = Unit }
+            }
+        }
         try {
-            val field = android.widget.EditText(app).apply { setText("hej jag kan inte komma imorgon pga jobbet men kanske på fredag istället") }
-            val connection = field.onCreateInputConnection(android.view.inputmethod.EditorInfo())
-            val panel = KeyboardPanel(app, object : KeyboardPanel.Host {
+            val field = android.widget.EditText(app).apply { setText("hej jag kan inte komma imorgon pga jobbet men kanske på fredag istället"); setSelection(text.length) }
+            val info = android.view.inputmethod.EditorInfo()
+            val connection = field.onCreateInputConnection(info)
+            info.packageName = "com.google.android.apps.messaging"
+            val panel = KeysPanel(app, object : KeysPanel.Host {
                 override fun connection() = connection
-                override fun editor() = android.view.inputmethod.EditorInfo().apply { inputType = android.text.InputType.TYPE_CLASS_TEXT }
-                override fun backToKeyboard() = Unit
+                override fun editor() = info
+                override fun switchKeyboard() = Unit
+                override fun pickKeyboard() = Unit
+                override fun open(intent: android.content.Intent) = Unit
+                override fun language() = "sv"
             })
-            panel.view.findViewWithTag<View>("keys-actions").let { (it as android.view.ViewGroup).getChildAt(1) }.performClick()
-            finish!!(BrainResult("Hej! Jag kan tyvärr inte komma i morgon på grund av jobbet, men kanske på fredag i stället?", true))
+            fun draw(name: String) {
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+                val view = panel.view
+                view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST))
+                view.layout(0, 0, view.measuredWidth, view.measuredHeight)
+                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                canvas.drawColor(if (suffix.isEmpty()) Color.rgb(255, 255, 255) else Color.rgb(10, 10, 10))
+                val bubble = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = if (suffix.isEmpty()) Color.rgb(240, 240, 241) else Color.rgb(38, 38, 40) }
+                canvas.drawRoundRect(android.graphics.RectF(width * 0.3f, 300f, width - 40f, 520f), 60f, 60f, bubble)
+                canvas.save(); canvas.translate(0f, (height - view.measuredHeight).toFloat()); view.draw(canvas); canvas.restore()
+                val dir = File("build/screenshots").apply { mkdirs() }
+                File(dir, "$name$suffix.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                assertTrue(view.measuredHeight > view.context.dp(250))
+            }
+            draw("keyboard-keys")
+            panel.openGenie()
+            panel.genie.view.findViewWithTag<View>("genie-starters").let { (it as android.view.ViewGroup).getChildAt(0) }.performClick()
             org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-            val view = panel.view
-            view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST))
-            view.layout(0, 0, view.measuredWidth, view.measuredHeight)
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            canvas.drawColor(if (suffix.isEmpty()) Color.rgb(246, 248, 251) else Color.rgb(15, 17, 21))
-            val bubble = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(11, 87, 208) }
-            canvas.drawRoundRect(android.graphics.RectF(width * 0.3f, 300f, width - 40f, 520f), 60f, 60f, bubble)
-            canvas.save(); canvas.translate(0f, (height - view.measuredHeight).toFloat()); view.draw(canvas); canvas.restore()
-            val dir = File("build/screenshots").apply { mkdirs() }
-            File(dir, "keyboard-panel$suffix.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-            assertTrue(view.measuredHeight > view.context.dp(200))
-        } finally { Brains.useForTest(null) }
+            updateHolder!!(GenieState(steps = listOf(AgentStep("s1", "Reading your message", "done")),
+                answer = "```field\nHej! Jag kan tyvärr inte komma i morgon på grund av jobbet, men kanske på fredag i stället?\n```", who = "Ægentica · claude-sonnet-5.5"))
+            draw("keyboard-genie")
+        } finally { KeyboardAgents.forTest = null; KeyboardLive.forget(); updateHolder = null }
     }
+
+    private var updateHolder: ((GenieState) -> Unit)? = null
 
     @Test fun `agent voice with a proposal`() {
         val app=RuntimeEnvironment.getApplication()

@@ -217,7 +217,10 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
-        <!-- Ægentica keys: an AI panel beside the owner's keyboard; it writes only when they tap Replace or Insert. -->
+        <!--
+            Ægentica keys: a full keyboard with the genie inside. Model text reaches a field only when
+            the owner taps Insert or Replace; password, card, code, number and incognito fields get plain keys.
+        -->
         <service
             android:name=".AegenticaKeyboard"
             android:label="@string/keyboard_name"
@@ -228,6 +231,14 @@
             </intent-filter>
             <meta-data android:name="android.view.im" android:resource="@xml/keyboard" />
         </service>
+        <!-- Opens the genie sheet for the keyboard in a task of its own, over the app being typed in. -->
+        <activity
+            android:name=".GenieKeyboardBridge"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:noHistory="false"
+            android:theme="@style/GenieBridge" />
         <!--
             "Ægentica" in any app's text-selection menu: the genie sheet opens over that app with the
             selection as context, and Replace puts an answer back in an editable field. It is the one

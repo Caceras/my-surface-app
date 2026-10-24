@@ -27,7 +27,27 @@ Clock uses the normal SET_ALARM permission. Calendar, Maps and Dialer do not req
 | Quick Settings | Opens foreground Voice after required unlock; add requests report success/decline/error |
 | Widget | Type/Talk controls; full-size preview only with opt-in; compact layout never exposes answer text |
 
-## Keyboard
+## Ægentica keys (the on-screen keyboard)
+
+Ægentica keys is a full keyboard that can be the phone's everyday keyboard. Turn it on in Settings → *Ægentica keys* (or aegentica.se's Phone menu → *Ægentica keyboard*): **Turn on** opens Android's keyboard list (Android requires the owner to switch a keyboard on once and shows its warning), and coming back offers the keyboard picker at once; **Choose keyboard** opens the picker directly.
+
+| Key or gesture | What it does |
+|---|---|
+| Letters | Svenska layout with å ä ö, or English (US) from Settings → Languages; sentence capitals where the field asks for them; two spaces after a word type a full stop |
+| Shift | Once for one capital, twice quickly for caps lock, again to turn it off |
+| Long press | Accents and the top row's digits (hint in the corner); `.` offers punctuation and, in email and web fields, `.se` and `.com` |
+| Delete | Deletes a whole character (an emoji with a skin tone too); held, it repeats |
+| Space | Slide left or right to move the cursor; hold for the keyboard picker |
+| Enter | The field's own action (Search, Send, Go, Next, Done) or a new line |
+| ?123, =\<, 😊 | Numbers and symbols, more symbols, emoji |
+| Æ | The genie panel, about what you are writing; hold it for the full genie sheet |
+| Bar | The rabbit (the genie), clipboard (paste with one tap), on-device dictation, the globe back to your previous keyboard |
+
+The genie panel shows what the agent is doing and its results as cards. **Insert** puts the text at the cursor; **Replace** swaps it for the text the genie read, only while the field still holds exactly that text, with **Undo** on the bar. An action the agent wants to take arrives as an **Allow** card (the playbook decides what asks). Type (the keys type into the request line) or tap the microphone to steer it. Close the panel with the keyboard icon; the work continues and the rabbit waves when the answer is ready. Drag the panel up, tap the expand icon or hold Æ for the full genie sheet over the app; its *Replace selection* comes back to the same field. Number, phone, date, password, card, code and incognito fields get plain keys only.
+
+Gboard's swipe typing, autocorrect and next-word prediction are not matched: Ægentica keys types exactly what you tap.
+
+## Hardware keyboard
 
 | Shortcut | Behavior |
 |---|---|

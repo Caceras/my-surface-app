@@ -345,7 +345,7 @@ class MainActivity : Activity() {
         panel.addView(flatButton("Connected AI · OpenRouter, Gemini or local") { ConnectedAI.settings(this) { updateSend(); status.text=if(ConnectedAI.enabled(this)) "Connected AI · " + ConnectedAI.host(this) else "Gemini Nano · On device" } })
         panel.addView(flatButton("Phone assistant · see and ask about any screen") { AssistantActivity.setup(this) })
         panel.addView(flatButton("Phone agent · OpenRouter sign-in and model") { PhoneAgent.settings(this) })
-        panel.addView(flatButton("Ægentica keys · AI beside your keyboard") { KeyboardPanel.setup(this) })
+        panel.addView(flatButton("Ægentica keys · a keyboard with the genie inside") { KeyboardSetup.show(this) })
         panel.addView(flatButton("AI sources") { KnowledgeContext.choose(this) { composeState.text=KnowledgeContext.label(this) } })
         panel.addView(preferenceSwitch("Recall matching notes when I ask", KnowledgeContext.recallEnabled(this)) { KnowledgeContext.setRecall(this, it) }.apply { tag = "recall-switch" })
         panel.addView(label("Searches your own notes and transcripts for words in your question and cites them. Stays on this phone with Nano; connected AI needs its own opt-in.", 13f, true))
@@ -1147,6 +1147,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        KeyboardSetup.resumed(this)
         NativePrivacy.apply(this, window)
         Reminders.reschedule(this)
         if (::messages.isInitialized && !busy && Chat.load(this) != history) {

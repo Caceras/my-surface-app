@@ -157,6 +157,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
     override fun onResume() {
         super.onResume()
         web.onResume()
+        KeyboardSetup.resumed(this)
     }
 
     override fun onPause() {
@@ -382,6 +383,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
         "Record and transcribe" to { startActivity(TranscribeActivity.intent(this)) },
         "Talk hands-free" to { startActivity(Intent(this, VoiceActivity::class.java)) },
         "Reading voice" to { chooseVoice() },
+        "Ægentica keyboard" to { KeyboardSetup.show(this) },
         "Phone assistant, keyboard and settings" to {
             startActivity(Intent(this, MainActivity::class.java).putExtra("settings", true))
         },

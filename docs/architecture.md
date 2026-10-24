@@ -12,6 +12,7 @@
 | `ConversationSheet.kt` | Searchable local archives, previews, resume and deletion |
 | `VoiceActivity.kt` | Foreground listening/thinking/speaking flow, speech setup, continuous-session controls |
 | `ProcessTextActivity.kt` | The core build's Uppercase demo selection entry and its editable-selection return value |
+| `AegenticaKeyboard.kt`, `KeysView.kt`, `KeyLayout.kt`, `KeyboardGenie.kt`, `GenieKeyboardBridge.kt` | The keyboard service, its panel and typing engine (`KeysPanel`, `KeysEngine`), field reading and lockout (`KeyboardText`), the genie panel and its agent seam (`GenieAgent`: the phone agent, or Nano/the connected model), the work that outlives the keyboard's views (`KeyboardLive`), the sheet's Replace waiting for its field (`KeyboardInbox`), setup (`KeyboardSetup`) and the sheet opened in its own task |
 | `Genie.kt`, `SelectionToolbar.kt` | One way to open the genie sheet with text (selection on our pages, the keyboard); Ægentica first in our pages' selection toolbar, with the page's selection read and replaced through the page |
 | `SurfaceBrain.kt` | Variant-independent task, status, streaming, result and cancellation contract |
 | `nano/…/Brain.kt` | ML Kit Prompt client, readiness, system-instruction fallback, generation fencing |
