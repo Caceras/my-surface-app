@@ -337,7 +337,7 @@ class MainActivity : Activity() {
             })
         }
 
-        line("Share sheet & Text selection", "Choose Ægentica AI when sharing text, or select text in any app and choose Ægentica: the genie opens over the app with the selection.")
+        line("Share sheet & Text selection", "Choose Ægentica AI when sharing text, or select text in any app and choose Ægentica: it opens over the app with the selection.")
 
         panel.addView(flatButton("Workspace · notes, connections & backups") {
             startActivity(WorkspaceActivity.intent(this, "library"))
@@ -347,8 +347,8 @@ class MainActivity : Activity() {
         panel.addView(flatButton("Phone agent · OpenRouter sign-in and model") { PhoneAgent.settings(this) })
         panel.addView(flatButton("Ægentica hands · let the assistant use your phone") { HandsSetup.show(this) })
         panel.addView(flatButton("Connect to Ægentica · memory, Inbox and server jobs") { BackendSetup.show(this) }.apply { tag = "backend-entry" })
-        panel.addView(flatButton("Ægentica keys · a keyboard with the genie inside") { KeyboardSetup.show(this) })
-        panel.addView(flatButton("NFC tag · start the genie with a tap") { GenieTags.write(this) })
+        panel.addView(flatButton("Ægentica keys · a keyboard with Ægentica inside") { KeyboardSetup.show(this) })
+        panel.addView(flatButton("NFC tag · start Ægentica with a tap") { GenieTags.write(this) })
         panel.addView(flatButton("AI sources") { KnowledgeContext.choose(this) { composeState.text=KnowledgeContext.label(this) } })
         panel.addView(preferenceSwitch("Recall matching notes when I ask", KnowledgeContext.recallEnabled(this)) { KnowledgeContext.setRecall(this, it) }.apply { tag = "recall-switch" })
         panel.addView(label("Searches your own notes and transcripts for words in your question and cites them. Stays on this phone with Nano; connected AI needs its own opt-in.", 13f, true))

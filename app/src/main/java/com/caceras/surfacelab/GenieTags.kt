@@ -71,13 +71,13 @@ object GenieTags {
         if (adapter == null) { Toast.makeText(activity, "This phone has no NFC.", Toast.LENGTH_LONG).show(); return }
         if (!adapter.isEnabled) { Toast.makeText(activity, "Turn on NFC in Android's settings first.", Toast.LENGTH_LONG).show(); return }
         val input = EditText(activity).apply {
-            hint = "What should the genie do? (e.g. Plan my morning)"
+            hint = "What should Ægentica do? (e.g. Plan my morning)"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             styleField()
         }
         val box = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; padDp(20, 8, 20, 0); addView(input) }
-        AlertDialog.Builder(activity).setTitle("NFC tag for the genie")
-            .setMessage("Tap the tag later and the genie starts on these words, on this phone only. Anything it wants to do still asks you first.")
+        AlertDialog.Builder(activity).setTitle("NFC tag for Ægentica")
+            .setMessage("Tap the tag later and Ægentica starts on these words, on this phone only. Anything it wants to do still asks you first.")
             .setView(box).setNegativeButton("Cancel", null)
             .setPositiveButton("Write a tag") { _, _ ->
                 val request = input.text.toString().trim()

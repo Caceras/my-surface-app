@@ -29,12 +29,14 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.caceras.surfacelab.RabbitMotion.Pose
 import kotlin.math.abs
 
 /**
- * The genie over every app: the rabbit (aegentica.se's own drawings, public/brand/mascot-*) and a
- * floating bar in aegentica.se's monochrome composer shape, drawn by Ægentica hands' accessibility
- * service so it stays while the owner keeps using the phone.
+ * Ægentica over every app: the rabbit (Glimt's 13 sprites from Riki's own drawings, with its
+ * motion rules in [RabbitMotion]) and a floating bar in aegentica.se's monochrome composer shape,
+ * drawn by Ægentica hands' accessibility service so it stays while the owner keeps using the
+ * phone. The rabbit has no name.
  *
  * Three forms, moved between with short scale-and-fade transitions: the **bubble** (just the
  * rabbit, with Stop while it works), the **bar** (what it is doing, the message box, + / screen /
@@ -44,17 +46,14 @@ import kotlin.math.abs
  * run, and talking over its voice stops the voice.
  *
  * While the hands act, a full-screen stage that never takes a touch shows the moves: the rabbit
- * flies to the target about 250 ms before each step, rings it, ripples a tap, wiggles while
- * typing, bobs with a scroll and poofs when a new screen opens. A touch anywhere else while the
+ * hops (or leaps, further away) to land beside the target before each step, acts it out (a
+ * pounce for a tap or typing, a look for reading, a walk for a scroll, a leap to another screen),
+ * rings it, ripples a tap and poofs when a new screen opens. Between steps it takes the pose that
+ * fits what Ægentica is doing, and while it waits it fidgets now and then. A touch anywhere else while the
  * hands work pauses them. Only transform and alpha animate, and nothing moves when Android's
  * animations are off.
  */
 class RabbitOverlay(private val context: Context) : HandsOverlay {
-    enum class Pose(val drawable: Int) {
-        SEATED(R.drawable.rabbit_seated), CURIOUS(R.drawable.rabbit_curious), SITTING(R.drawable.rabbit_sitting),
-        RUNNING(R.drawable.rabbit_running), STANDING(R.drawable.rabbit_standing), WAVING(R.drawable.rabbit_waving),
-        LEAPING(R.drawable.rabbit_leaping), RESTING(R.drawable.rabbit_resting)
-    }
 
     enum class Form { HIDDEN, BUBBLE, BAR, EXPANDED }
 
@@ -62,7 +61,11 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
     private val main = Handler(Looper.getMainLooper())
     private val density = context.resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).toInt()
+    /** The bubble's size. */
     private val size get() = dp(56)
+    /** A sprite's size on screen, in pixels. */
+    private fun spriteW(p: Pose) = (p.w * RabbitMotion.SCALE * density).toInt()
+    private fun spriteH(p: Pose) = (p.h * RabbitMotion.SCALE * density).toInt()
     private fun ink(id: Int) = context.getColor(id)
 
     var form = Form.HIDDEN; private set
@@ -155,8 +158,8 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
 
     private fun addWindows() {
         val stageView = FrameLayout(context).apply { tag = "rabbit-stage"; clipChildren = false; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS }
-        flyer = ImageView(context).apply { tag = "rabbit-flyer"; setImageResource(Pose.RUNNING.drawable); scaleType = ImageView.ScaleType.FIT_CENTER; visibility = View.INVISIBLE }
-        stageView.addView(flyer, FrameLayout.LayoutParams(size, size))
+        flyer = ImageView(context).apply { tag = "rabbit-flyer"; setImageResource(Pose.HOP.drawable); scaleType = ImageView.ScaleType.FIT_CENTER; visibility = View.INVISIBLE }
+        stageView.addView(flyer, FrameLayout.LayoutParams(spriteW(Pose.HOP), spriteH(Pose.HOP)))
         wm.addView(stageView, overlayParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS).apply {
@@ -165,7 +168,7 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         stage = stageView
 
         // The bubble: the rabbit alone, and Stop while it works.
-        bubbleRabbit = ImageView(context).apply { setImageResource(Pose.SEATED.drawable); scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(dp(6), dp(6), dp(6), dp(6)) }
+        bubbleRabbit = ImageView(context).apply { setImageResource(Pose.SIT.drawable); scaleType = ImageView.ScaleType.FIT_CENTER; setPadding(dp(6), dp(6), dp(6), dp(6)) }
         bubbleStop = stopPill("rabbit-bubble-stop")
         bubble = FrameLayout(context).apply {
             tag = "rabbit-bubble"; visibility = View.GONE
@@ -184,7 +187,7 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
 
         // The bar: aegentica.se's composer shape.
         barRabbit = ImageView(context).apply {
-            tag = "rabbit-home"; setImageResource(Pose.SEATED.drawable); scaleType = ImageView.ScaleType.FIT_CENTER
+            tag = "rabbit-home"; setImageResource(Pose.SIT.drawable); scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "Ægentica. Tap to fold into the rabbit, hold to hear what it is doing, drag to move."
         }
         draggable(barRabbit) { collapse() }
@@ -353,7 +356,12 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
 
     private fun ensure() {
         leaving?.let { main.removeCallbacks(it) }; leaving = null
-        if (!showing) { addWindows(); ServerJobs.addObserver(jobWatcher); ServerJobs.active?.let { jobs.show(it) } }
+        if (!showing) {
+            addWindows(); ServerJobs.addObserver(jobWatcher); ServerJobs.active?.let { jobs.show(it) }
+            lastActive = android.os.SystemClock.uptimeMillis()
+            // Left alone, the rabbit loafs after a minute and sleeps after three.
+            main.postDelayed(object : Runnable { override fun run() { if (!showing) return; if (!away) rest(); main.postDelayed(this, 30_000) } }, 30_000)
+        }
         attach()
     }
 
@@ -368,7 +376,7 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         if (input != null && input.requestId != shownInput) {
             shownInput = input.requestId
             if (form != Form.EXPANDED) expand(content = true)
-            pose(Pose.WAVING)
+            rest()
             status.text = "Ægentica asks · " + input.prompt.oneLine().take(80)
             if (input.priced && input.requestId !in job.readBack && (conversation || session?.view()?.aloud == true)) {
                 ears?.cancel(); listening = false; showMic()
@@ -454,6 +462,7 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         place(form)
         if (from == Form.BUBBLE || from == Form.HIDDEN) hero(bar, grow = true)
         session?.let { render(it) }
+        lastActive = android.os.SystemClock.uptimeMillis(); rest()
     }
 
     fun collapse() {
@@ -463,6 +472,7 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         card.visibility = View.GONE; bar.visibility = View.GONE; bubble.visibility = View.VISIBLE
         place(form)
         hero(bubble, grow = true)
+        rest()
     }
 
     /** The bar grows out of the rabbit, or the rabbit out of the bar: scale and fade, about 200 ms. */
@@ -492,6 +502,7 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         if (words.isEmpty()) return
         input.setText("")
         focusable(false)
+        lastActive = android.os.SystemClock.uptimeMillis()
         if (telling != null) { sendToJob(words); return }
         if (!PhoneAgent.ready(context)) { status.text = "Sign in to OpenRouter in Settings → Phone agent to use the agent."; return }
         val current = PhoneAgent.current?.takeIf { it.running }
@@ -579,6 +590,7 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
             else -> status.text
         }
         if (approval != null && form == Form.BUBBLE) expand(content = true)
+        if (!away) rest()
         if (!view.busy && settledFor !== session && session.thread.isNotEmpty()) {
             settledFor = session
             showActions(view)
@@ -630,11 +642,11 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
     private fun showApproval(approval: Approval) {
         if (mode == "approval" && approvalShown == approval.call.id) return
         setMode("approval"); approvalShown = approval.call.id
-        pose(Pose.WAVING)
+        rest()
         extra.addView(text(approval.label, 15f).apply { typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL); setPadding(0, dp(8), 0, 0) })
         val detail = listOfNotNull(approval.reason, approval.appName.takeIf { it.isNotBlank() }?.let { "In $it" }).joinToString(" · ")
         if (detail.isNotBlank()) extra.addView(text(detail, 13f, R.color.ask_ink_3))
-        val decide = { d: Decision -> setMode("status"); pose(Pose.SEATED); session?.decide(approval.call.id, d) }
+        val decide = { d: Decision -> setMode("status"); session?.decide(approval.call.id, d); rest() }
         val list = mutableListOf(button(if (approval.risk == Risk.ALWAYS) "Allow once" else "Allow", "rabbit-allow", true) { decide(Decision(true)) })
         if (approval.rememberable) list += button("Always in ${approval.appName}", "rabbit-always", false) { decide(Decision(true, always = true)) }
         list += button("Don't", "rabbit-deny", false) { decide(Decision(false)) }
@@ -653,13 +665,62 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         ensure()
         if (form == Form.HIDDEN) expand(content = true)
         setMode("status")
-        pose(Pose.SEATED)
+        lastActive = android.os.SystemClock.uptimeMillis(); rest()
         stop.visibility = View.VISIBLE; bubbleStop.visibility = View.VISIBLE
     }
 
     private fun pose(p: Pose) {
         if (!showing) return
         barRabbit.setImageResource(p.drawable); bubbleRabbit.setImageResource(p.drawable)
+        homePose = p
+    }
+
+    /** The pose at home, for tests and for holding the rabbit. */
+    internal var homePose = Pose.SIT; private set
+    private var lastDone = 0L
+    private var lastActive = android.os.SystemClock.uptimeMillis()
+    private var fidgeting: Runnable? = null
+    private val random = java.util.Random()
+
+    /**
+     * The pose that fits what Ægentica is doing (Glimt's rules): begging while it waits for you,
+     * looking while it works (turning while it thinks), a wave when it is done, standing while the
+     * bar is open, and sitting, loafing and at last sleeping when left alone. Then a fidget now and then.
+     */
+    private fun rest() {
+        if (!showing) return
+        val view = session?.view()
+        val now = android.os.SystemClock.uptimeMillis()
+        val busy = view?.busy == true || Hands.active
+        if (busy) lastActive = now
+        val waiting = view?.approval != null || jobs.job?.inputs?.isNotEmpty() == true || mode == "handover"
+        val p = if (mode == "paused") Pose.REST else RabbitMotion.restPose(
+            waiting = waiting, thinking = busy && view?.steps?.none { it.status == "running" } != false, busy = busy,
+            open = form == Form.BAR || form == Form.EXPANDED, typing = input.hasFocus() && input.text.isNotEmpty(),
+            doneMs = if (lastDone == 0L) Long.MAX_VALUE else now - lastDone, idleMs = now - lastActive)
+        pose(p)
+        fidget(!busy && !waiting && mode == "status")
+    }
+
+    /** While it waits, the rabbit does a small thing on its own every 6 to 14 seconds; never with animations off. */
+    private fun fidget(allowed: Boolean) {
+        if (!allowed || !motion || away) { fidgeting?.let { main.removeCallbacks(it) }; fidgeting = null; return }
+        if (fidgeting != null) return
+        val go = object : Runnable {
+            override fun run() {
+                fidgeting = null
+                if (!showing || away || !motion || mode != "status" || session?.running == true || Hands.active) return
+                val f = RabbitMotion.fidget(random.nextDouble())
+                val home = homeView()
+                pose(f.pose)
+                val shift = f.dx * RabbitMotion.SCALE * density * 0.5f
+                home.animate().translationX(shift).setDuration(300).withEndAction {
+                    home.animate().translationX(0f).setStartDelay(f.ms - 300).setDuration(300).withEndAction { if (showing) rest() }.start()
+                }.start()
+            }
+        }
+        fidgeting = go
+        main.postDelayed(go, RabbitMotion.fidgetDelay(random.nextDouble()))
     }
 
     /** The rabbit's home on screen: the bar's rabbit, or the bubble. */
@@ -667,52 +728,71 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
 
     private fun stageXY(x: Int, y: Int): Pair<Float, Float> { val o = IntArray(2); stage?.getLocationOnScreen(o); return (x - o[0]).toFloat() to (y - o[1]).toFloat() }
 
-    private fun homeSpot(): Pair<Float, Float> {
+    /** Where the flying rabbit starts and ends: over its home, its feet on the home's bottom. */
+    private fun homeSpot(p: Pose): Pair<Float, Float> {
         val home = homeView()
         val at = IntArray(2); home.getLocationOnScreen(at)
         val (x, y) = stageXY(at[0], at[1])
-        return (x - (size - home.width) / 2f) to (y - (size - home.height) / 2f)
+        return (x + (home.width - spriteW(p)) / 2f) to (y + home.height - spriteH(p).toFloat())
     }
 
-    /** Beside the target, above it when there is room, never covering the point it touches. */
-    internal fun landing(target: Rect, screenW: Int, screenH: Int, top: Int = dp(24)): Pair<Float, Float> {
-        val x = (target.centerX() - size * 0.9f).coerceIn(0f, (screenW - size).toFloat())
-        val above = target.top - size * 0.85f
-        val y = (if (above >= top) above else target.bottom + dp(4).toFloat()).coerceIn(0f, (screenH - size).toFloat())
-        return x to y
+    /**
+     * Where the rabbit lands for [tool] on [target] (Glimt's rule: beside it on the left, feet on
+     * its bottom edge, or on its right without room; always on screen): the sprite's top-left, and
+     * whether it is mirrored to face the target.
+     */
+    internal fun landing(target: Rect, screenW: Int, screenH: Int, tool: String = ""): Triple<Float, Float, Boolean> {
+        val p = RabbitMotion.poseFor(tool)
+        val spot = RabbitMotion.landing(target, spriteW(p), spriteH(p), screenW, screenH, p, gap = dp(6), margin = dp(8))
+        return Triple(spot.x.toFloat(), (spot.y - spriteH(p)).toFloat(), spot.flip)
     }
 
-    override fun flyTo(bounds: Rect, label: String, then: () -> Unit) {
+    private fun show(view: ImageView, p: Pose, flip: Boolean) {
+        view.setImageResource(p.drawable)
+        view.layoutParams = view.layoutParams.apply { width = spriteW(p); height = spriteH(p) }
+        view.scaleX = if (flip) -1f else 1f
+    }
+
+    /** A trip from where the flyer is to ([tx], [ty]): hops for a short way, a leap across the screen. */
+    private fun travel(tx: Float, ty: Float, then: () -> Unit) {
+        val sx = flyer.translationX; val sy = flyer.translationY
+        val distance = Math.hypot((tx - sx).toDouble(), (ty - sy).toDouble()).toFloat() / density
+        val ms = RabbitMotion.travelMs(distance, reduced = !motion)
+        if (ms == 0L) { flyer.translationX = tx; flyer.translationY = ty; then(); return }
+        val p = RabbitMotion.travelPose(distance)
+        show(flyer, p, RabbitMotion.flipFor(p, faceRight = tx >= sx))
+        val hops = RabbitMotion.hops(distance)
+        val height = dp(if (p == Pose.LEAP) 48 else 22).toFloat()
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = ms; interpolator = android.view.animation.LinearInterpolator()
+            addUpdateListener {
+                val t = it.animatedValue as Float
+                flyer.translationX = sx + (tx - sx) * t
+                flyer.translationY = sy + (ty - sy) * t - height * abs(Math.sin(Math.PI * hops * t)).toFloat()
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() { override fun onAnimationEnd(animation: android.animation.Animator) { then() } })
+            start()
+        }
+    }
+
+    override fun flyTo(bounds: Rect, tool: String, then: () -> Unit) {
         if (!showing || !motion) { if (showing) highlight(bounds); then(); return }
         returning?.let { main.removeCallbacks(it) }
+        fidget(false)
         val origin = IntArray(2); stage?.getLocationOnScreen(origin)
         val local = Rect(bounds).apply { offset(-origin[0], -origin[1]) }
         val metrics = context.resources.displayMetrics
-        val (tx, ty) = landing(local, metrics.widthPixels, metrics.heightPixels)
+        val (tx, ty, flip) = landing(local, metrics.widthPixels, metrics.heightPixels, tool)
         if (!away) {
-            val (hx, hy) = homeSpot()
+            val (hx, hy) = homeSpot(Pose.HOP)
             flyer.translationX = hx; flyer.translationY = hy
             flyer.visibility = View.VISIBLE; homeView().alpha = 0f
             away = true
         }
-        flyer.setImageResource(Pose.RUNNING.drawable)
-        flyer.scaleX = if (tx < flyer.translationX) -1f else 1f
-        val sx = flyer.translationX; val sy = flyer.translationY
-        val hop = dp(40).toFloat()
-        ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = FLIGHT_MS; interpolator = DecelerateInterpolator()
-            addUpdateListener {
-                val t = it.animatedValue as Float
-                flyer.translationX = sx + (tx - sx) * t
-                // A small arc, like a hop.
-                flyer.translationY = sy + (ty - sy) * t - hop * 4 * t * (1 - t)
-            }
-            addListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator) {
-                    flyer.scaleX = 1f; flyer.setImageResource(Pose.CURIOUS.drawable); then(); scheduleReturn()
-                }
-            })
-            start()
+        travel(tx, ty) {
+            // Landed: it acts out the step, facing the target.
+            show(flyer, RabbitMotion.poseFor(tool), flip)
+            then(); scheduleReturn()
         }
     }
 
@@ -721,11 +801,8 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         returning?.let { main.removeCallbacks(it) }
         val back = Runnable {
             if (!showing || !away) return@Runnable
-            val (hx, hy) = homeSpot()
-            flyer.setImageResource(Pose.RUNNING.drawable)
-            flyer.animate().translationX(hx).translationY(hy).setDuration(FLIGHT_MS + 50).withEndAction {
-                flyer.visibility = View.INVISIBLE; homeView().alpha = 1f; away = false
-            }.start()
+            val (hx, hy) = homeSpot(Pose.HOP)
+            travel(hx, hy) { flyer.visibility = View.INVISIBLE; homeView().alpha = 1f; away = false; rest() }
         }
         returning = back
         main.postDelayed(back, LINGER_MS)
@@ -761,7 +838,7 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
 
     override fun typing(bounds: Rect) {
         if (!showing || !motion || !away) return
-        flyer.setImageResource(Pose.STANDING.drawable)
+        show(flyer, Pose.POUNCE, flyer.scaleX < 0)
         ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 600
             addUpdateListener { flyer.rotation = (Math.sin((it.animatedValue as Float) * Math.PI * 6) * 6).toFloat() }
@@ -804,24 +881,24 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
         show()
         expand(content = true)
         setMode("handover")
-        pose(Pose.WAVING)
+        rest()
         status.text = "$text, then tap Continue."
-        extra.addView(buttons(button("Continue", "rabbit-continue", true) { setMode("status"); pose(Pose.SEATED); Hands.handBack() }))
+        extra.addView(buttons(button("Continue", "rabbit-continue", true) { setMode("status"); rest(); Hands.handBack() }))
     }
 
     override fun paused() {
         if (!showing) return
         expand(content = true)
         setMode("paused")
-        pose(Pose.RESTING)
+        rest()
         status.text = "You have the screen. Tap Continue when you are done."
-        extra.addView(buttons(button("Continue", "rabbit-continue", true) { setMode("status"); pose(Pose.SEATED); Hands.handBack() }))
+        extra.addView(buttons(button("Continue", "rabbit-continue", true) { setMode("status"); rest(); Hands.handBack() }))
     }
 
     override fun stopped() {
         if (!showing) return
         setMode("status")
-        pose(Pose.SITTING)
+        rest()
         status.text = "Stopped."
         stop.visibility = View.GONE; bubbleStop.visibility = View.GONE
         conversation = false; ears?.cancel(); listening = false; showMic()
@@ -830,14 +907,14 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
     override fun done(answer: String?) {
         if (!showing) return
         setMode("status")
-        pose(Pose.LEAPING)
+        lastDone = android.os.SystemClock.uptimeMillis(); rest()
         stop.visibility = View.GONE; bubbleStop.visibility = View.GONE
         status.text = Markdown.strip(answer.orEmpty()).replace(Regex("\\s+"), " ").trim().ifBlank { "Done." }.take(120)
         if (form == Form.BUBBLE) expand(content = true)
         // A spoken question gets its answer read aloud, as in the sheet.
         val view = session?.view()
         if (view?.aloud == true && !answer.isNullOrBlank()) speak(answer)
-        main.postDelayed({ if (showing) pose(Pose.SEATED) }, 1200)
+        main.postDelayed({ if (showing) rest() }, 2300)
     }
 
     /** Fade away; the gesture or the bubble brings it back. */
@@ -870,8 +947,8 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
     }
 
     companion object {
-        /** The rabbit reaches its target this long before the step. */
-        const val FLIGHT_MS = 250L
+        /** The longest trip to a target (Glimt's rule: 240 to 620 ms by distance). */
+        const val FLIGHT_MS = 620L
         /** How long it stays at the target after a step before hopping home. */
         const val LINGER_MS = 1600L
         /** Bar, bubble and card change into each other in this time. */

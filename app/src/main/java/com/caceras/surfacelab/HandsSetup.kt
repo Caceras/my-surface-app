@@ -47,7 +47,7 @@ object HandsSetup {
             prefs.edit().putBoolean("hands_free", it).apply()
         }.apply { tag = "hands-free" })
         layout.addView(activity.label("Sending, calling, paying, buying, deleting and account changes still ask every time.", 12f, true))
-        layout.addView(activity.preferenceSwitch("The assistant gesture opens the floating genie", prefs.getBoolean("float", true)) {
+        layout.addView(activity.preferenceSwitch("The assistant gesture opens the floating bar", prefs.getBoolean("float", true)) {
             prefs.edit().putBoolean("float", it).apply()
         }.apply { tag = "hands-float" })
         val always = HandsTools.always(activity)

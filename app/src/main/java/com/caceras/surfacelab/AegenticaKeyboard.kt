@@ -185,7 +185,7 @@ class KeysPanel(private val context: Context, private val host: Host) {
             }
         })
         rabbit = ImageView(context).apply {
-            tag = "keys-rabbit"; setImageResource(R.drawable.mascot_sitting); scaleType = ImageView.ScaleType.FIT_CENTER
+            tag = "keys-rabbit"; setImageResource(R.drawable.rabbit_sit); scaleType = ImageView.ScaleType.FIT_CENTER
             contentDescription = "Ægentica"; padDp(8, 6, 4, 6); isClickable = true; isFocusable = true
             background = RippleDrawable(press, null, null)
             setOnClickListener { performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); if (mode == Mode.KEYS) openGenie() else setMode(Mode.KEYS) }
@@ -219,8 +219,8 @@ class KeysPanel(private val context: Context, private val host: Host) {
         barGenie = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL; visibility = View.GONE
             addView(status, LinearLayout.LayoutParams(0, -1, 1f))
-            addView(iconButton(R.drawable.ic_float, "Float the genie over the app", "keys-float") { floatGenie() }.also { float = it }, LinearLayout.LayoutParams(dp(44), dp(44)))
-            addView(iconButton(R.drawable.ic_expand, "Open the full genie", "keys-expand") { workspace() }, LinearLayout.LayoutParams(dp(44), dp(44)))
+            addView(iconButton(R.drawable.ic_float, "Float Ægentica over the app", "keys-float") { floatGenie() }.also { float = it }, LinearLayout.LayoutParams(dp(44), dp(44)))
+            addView(iconButton(R.drawable.ic_expand, "Open Ægentica in full", "keys-expand") { workspace() }, LinearLayout.LayoutParams(dp(44), dp(44)))
             addView(iconButton(R.drawable.ic_keys, "Back to the keys", "keys-close") { setMode(Mode.KEYS) }, LinearLayout.LayoutParams(dp(44), dp(44)))
         }
         promptText = context.label("", 15f).apply {
@@ -510,7 +510,7 @@ class KeysPanel(private val context: Context, private val host: Host) {
         override fun run() {
             if (!KeyboardLive.state.busy) { rabbitPose(); return }
             busyFrame++
-            rabbit.setImageResource(if (busyFrame % 2 == 0) R.drawable.mascot_running else R.drawable.mascot_leaping)
+            rabbit.setImageResource(if (busyFrame % 2 == 0) R.drawable.rabbit_hop else R.drawable.rabbit_leap)
             main.postDelayed(this, 300)
         }
     }
@@ -520,10 +520,10 @@ class KeysPanel(private val context: Context, private val host: Host) {
         main.removeCallbacks(flip)
         when {
             busy && ValueAnimator.areAnimatorsEnabled() -> main.post(flip)
-            busy -> rabbit.setImageResource(R.drawable.mascot_running)
-            mode != Mode.KEYS -> rabbit.setImageResource(R.drawable.mascot_curious)
-            KeyboardLive.unseen() -> rabbit.setImageResource(R.drawable.mascot_waving)
-            else -> rabbit.setImageResource(R.drawable.mascot_sitting)
+            busy -> rabbit.setImageResource(R.drawable.rabbit_hop)
+            mode != Mode.KEYS -> rabbit.setImageResource(R.drawable.rabbit_look)
+            KeyboardLive.unseen() -> rabbit.setImageResource(R.drawable.rabbit_wave)
+            else -> rabbit.setImageResource(R.drawable.rabbit_sit)
         }
         rabbit.alpha = if (locked) 0.35f else 1f
         rabbit.contentDescription = if (locked) "Ægentica is off in this field" else if (busy) "Ægentica is working" else "Ægentica"
@@ -1032,11 +1032,11 @@ object KeyboardSetup {
         val on = enabled(activity)
         val chosen = chosen(activity)
         val text = when {
-            chosen -> "Ægentica keys is your keyboard. Tap Æ (or the rabbit) in any app and the genie works on what you are writing; drag it up for the full genie."
+            chosen -> "Ægentica keys is your keyboard. Tap Æ (or the rabbit) in any app and Ægentica works on what you are writing; drag it up to open it in full."
             on -> "Ægentica keys is turned on. Choose it as your keyboard, and it opens in every app."
-            else -> "A full keyboard with Ægentica inside: type as usual, tap Æ for the genie with what you are writing, drag up for the full genie.\n\n" +
+            else -> "A full keyboard with Ægentica inside: type as usual, tap Æ and Ægentica works on what you are writing, drag up to open it in full.\n\n" +
                 "1. Turn on Ægentica keys (Android asks once and warns that a keyboard can read what you type).\n2. Choose it as your keyboard."
-        } + "\n\nThe field's text leaves the phone only when you tap Æ and ask, and the genie's text goes in only when you tap Insert or Replace. Passwords, cards, codes, numbers and incognito fields get plain keys only."
+        } + "\n\nThe field's text leaves the phone only when you tap Æ and ask, and Ægentica's text goes in only when you tap Insert or Replace. Passwords, cards, codes, numbers and incognito fields get plain keys only."
         val dialog = android.app.AlertDialog.Builder(activity).setTitle("Ægentica keys").setMessage(text).setNegativeButton("Not now", null)
         when {
             !on -> dialog.setPositiveButton("Turn on") { _, _ ->
@@ -1048,7 +1048,7 @@ object KeyboardSetup {
         }
         // Words learned for the ideas line, and apps where the genie is off, can be cleared here.
         val off = KeyboardPrefs.offApps(activity)
-        dialog.setNeutralButton(if (off.isEmpty()) "Forget typed words" else "Forget words, genie on everywhere") { _, _ ->
+        dialog.setNeutralButton(if (off.isEmpty()) "Forget typed words" else "Forget words, Ægentica on everywhere") { _, _ ->
             WordSuggest.forget(activity); KeyboardPrefs.clearOff(activity)
             android.widget.Toast.makeText(activity, "Done.", android.widget.Toast.LENGTH_SHORT).show()
         }

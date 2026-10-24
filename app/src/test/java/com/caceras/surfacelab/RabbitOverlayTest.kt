@@ -110,25 +110,39 @@ class RabbitOverlayTest {
         assertEquals("Take over to type your password, then tap Continue.", (find("rabbit-status") as TextView).text.toString())
     }
 
-    @Test fun `the rabbit lands beside its target, above when there is room, never off screen`() {
+    @Test fun `the rabbit lands beside its target, feet on its bottom edge, never off screen, and acts the step out`() {
         overlay.show(); idle()
         val density = context.resources.displayMetrics.density
-        val size = 56 * density
-        val (x, y) = overlay.landing(Rect(400, 600, 600, 700), 1080, 2400)
-        assertEquals(500 - size * 0.9f, x, 0.5f); assertEquals(600 - size * 0.85f, y, 0.5f)
-        val (_, below) = overlay.landing(Rect(0, 10, 200, 60), 1080, 2400)
-        assertEquals("near the top it lands below", 60 + 4 * density, below, 0.5f)
-        val (cx, cy) = overlay.landing(Rect(1070, 2390, 1080, 2400), 1080, 2400)
-        assertTrue(cx <= 1080 - size && cy <= 2400 - size)
-        // It flies there in about 250 ms, then the step runs; then it hops home.
+        val pounce = RabbitMotion.Pose.POUNCE
+        val w = (pounce.w * RabbitMotion.SCALE * density).toInt(); val h = (pounce.h * RabbitMotion.SCALE * density).toInt()
+        val (x, y, flip) = overlay.landing(Rect(400, 600, 600, 700), 1080, 2400, "phone_tap")
+        assertEquals(400f - w - (6 * density).toInt(), x, 0.5f); assertEquals(700f - h, y, 0.5f); assertFalse(flip)
+        val (rx, _, rflip) = overlay.landing(Rect(0, 600, 200, 700), 1080, 2400, "phone_tap")
+        assertEquals("no room on the left: on the right, facing back", 200f + (6 * density).toInt(), rx, 0.5f); assertTrue(rflip)
+        val (cx, cy, _) = overlay.landing(Rect(1070, 2390, 1080, 2400), 1080, 2400, "phone_tap")
+        assertTrue(cx + w <= 1080 && cy >= 0 && cy + h <= 2400)
+        // It hops there (at most 620 ms), then the step runs while it pounces; then it hops home.
         var ran = false
-        overlay.flyTo(Rect(10, 10, 50, 50), "") { ran = true }
+        overlay.flyTo(Rect(500, 1500, 700, 1600), "phone_tap") { ran = true }
         assertFalse(ran)
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(RabbitOverlay.FLIGHT_MS + 50))
         assertTrue(ran)
-        assertEquals(View.VISIBLE, find("rabbit-flyer")!!.visibility)
+        val flyer = find("rabbit-flyer") as android.widget.ImageView
+        assertEquals(View.VISIBLE, flyer.visibility)
+        assertEquals(w, flyer.layoutParams.width)
         shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(RabbitOverlay.LINGER_MS + RabbitOverlay.FLIGHT_MS + 200))
-        assertEquals(View.INVISIBLE, find("rabbit-flyer")!!.visibility)
+        assertEquals(View.INVISIBLE, flyer.visibility)
+    }
+
+    @Test fun `at home the rabbit takes the pose that fits, and begs while a step waits for you`() {
+        overlay.summon(); idle()
+        assertEquals("open and idle, it stands", RabbitMotion.Pose.STAND, overlay.homePose)
+        overlay.collapse(); idle()
+        assertEquals(RabbitMotion.Pose.SIT, overlay.homePose)
+        overlay.handOver(HandsTools.TAKE_OVER); idle()
+        assertEquals(RabbitMotion.Pose.BEG, overlay.homePose)
+        overlay.done("Klart."); idle()
+        assertEquals(RabbitMotion.Pose.WAVE, overlay.homePose)
     }
 
     @Test fun `an Allow prompt shows in the bar and the live notification, and Allow lets the step run`() {

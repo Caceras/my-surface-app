@@ -21,11 +21,11 @@ class GenieWidgetProvider : AppWidgetProvider() {
         fun views(context: Context, status: GenieStatus.Status) = RemoteViews(context.packageName, R.layout.genie_widget).apply {
             setTextViewText(R.id.genie_widget_status, status.words)
             setImageViewResource(R.id.genie_widget_rabbit, when {
-                status.working -> R.drawable.mascot_running
-                status.ready -> R.drawable.mascot_waving
-                else -> R.drawable.mascot_sitting
+                status.working -> R.drawable.rabbit_hop
+                status.ready -> R.drawable.rabbit_wave
+                else -> R.drawable.rabbit_sit
             })
-            setContentDescription(R.id.genie_widget_root, "Ægentica: ${status.words}. Tap to open the genie.")
+            setContentDescription(R.id.genie_widget_root, "Ægentica: ${status.words}. Tap to open Ægentica.")
             setOnClickPendingIntent(R.id.genie_widget_root, PendingIntent.getActivity(context, 7, GenieStatus.open(context, Genie.Origin.WIDGET),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
         }

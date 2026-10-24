@@ -1,6 +1,6 @@
-# Ægentica hands and the genie
+# Ægentica hands and the floating bar
 
-**Ægentica hands** is an opt-in Android accessibility service that lets the phone agent see the screen and tap, type, scroll and open apps for you, only while it works on something you asked. The **genie** is the rabbit and a floating bar over every app: summon it with the assistant gesture, watch it work, steer it by voice or text, take over at any moment, and get the result where you are.
+**Ægentica hands** is an opt-in Android accessibility service that lets the phone agent see the screen and tap, type, scroll and open apps for you, only while it works on something you asked. The **floating bar** with the rabbit sits over every app: summon it with the assistant gesture, watch it work, steer it by voice or text, take over at any moment, and get the result where you are.
 
 ## Turn it on
 
@@ -12,11 +12,11 @@ Turn it off the same way, at any time. **Stop** ends a task at once.
 
 ## What the owner sees
 
-- **The genie bar.** With the hands on, the assistant gesture (corner swipe, holding the power button, or Quick Tap set to the digital assistant) opens a light, floating bar over the app instead of the sheet. It has aegentica.se's composer shape: what the genie is doing, the message box, and **+**, the screen chip, the model's logo, the microphone and send. It stays while you keep using the phone.
+- **The floating bar.** With the hands on, the assistant gesture (corner swipe, holding the power button, or Quick Tap set to the digital assistant) opens a light, floating bar over the app instead of the sheet. It has aegentica.se's composer shape: what Ægentica is doing, the message box, and **+**, the screen chip, the model's logo, the microphone and send. It stays while you keep using the phone.
 - **Three forms.** The rabbit alone (a bubble), the bar, and the bar with the conversation above it (the question, the steps, the answer and Allow prompts). Tap the rabbit to fold or unfold; drag it anywhere; hold it to hear what it is doing. Changes between forms are short scale-and-fade transitions.
-- **Voice.** The bar opens listening. Tap the microphone to keep it open while the genie works: what you say steers the run, and talking over its voice stops the voice. Hold it to say one thing.
-- **The rabbit at work.** About 250 ms before each step the rabbit flies to its target, so you see what will happen and can still stop it. Then a tap ripples and sparkles, typing wiggles, a scroll bobs, and a new screen poofs. Read-only steps ring the element they point at. With Android's *Remove animations* on, nothing moves.
-- **Stop** is on screen whenever the hands work, also when the genie is folded into the rabbit.
+- **Voice.** The bar opens listening. Tap the microphone to keep it open while it works: what you say steers the run, and talking over its voice stops the voice. Hold it to say one thing.
+- **The rabbit at work.** Before each step the rabbit hops to land beside its target (a leap when it is far), in a quarter to two thirds of a second, so you see what will happen and can still stop it. Then it acts the step out: a pounce for a tap or typing, a look for reading, a walk for a scroll, a leap to another screen. A tap ripples and sparkles, and a new screen poofs. Read-only steps ring the element they point at. Between steps it begs while a step waits for you, looks while Ægentica works (turning while it thinks), waves when it is done, stands while the bar is open, and sits, loafs and at last sleeps when left alone; now and then it fidgets. These are Glimt's own sprites and rules, so it looks and moves the same everywhere. With Android's *Remove animations* on, nothing moves.
+- **Stop** is on screen whenever the hands work, also when the bar is folded into the rabbit.
 - **Take over.** Touch the screen while it works and the hands pause: "You have the screen. Tap Continue when you are done." Continue hands it back and the agent carries on.
 - **The notification.** While the agent uses your apps, a notification shows what it is doing now, with Stop, Allow and Don't when a step waits, and a reply field that steers it. On Android 16 it asks to show as a live update in the status bar. Allowing and replying need the phone unlocked. When the run ends, it says so and opens the answer.
 
@@ -32,7 +32,7 @@ Glimt's tiers, from the [shared playbook](playbook.md):
 
 - Every acting call carries a one-line `why` (3 to 160 characters), shown in the prompt and spoken when you hold the rabbit.
 - **Hands-free** (off by default) lets ordinary acting steps run without asking; steps that always ask still ask.
-- Passwords, card numbers and one-time codes: their values show as `••••` in what the model reads, and the hands **refuse to type** into those fields. The genie asks you to "Take over to type your password, then tap Continue".
+- Passwords, card numbers and one-time codes: their values show as `••••` in what the model reads, and the hands **refuse to type** into those fields. The bar asks you to "Take over to type your password, then tap Continue".
 - The hands never tap Ægentica's own windows (the bar, its Allow buttons, the sheet), by element or by point.
 - Every step is validated on the phone before anything happens: the tool must be in the playbook and offered now, refs must come from the newest snapshot and still exist, points must be on screen, text is at most 2,000 characters, only `https`, `tel:`, `sms:` and `mailto:` links open. Model text is never run as a command.
 - Stop, a touch on the screen, or turning the service off stops the hands at once; after Stop every step is refused until the next question.
@@ -49,7 +49,7 @@ e5 button “Wi-Fi · Off” [tap] @[0,440,880,560]
 e6 switch “Wi-Fi” [off, tap] @[900,460,1040,540]
 ```
 
-Refs stay the same for the same element through a conversation; `@e6` is accepted too. A tappable row is named by the words inside it. `phone_screenshot` hides the genie and sends a JPEG of at most 1568 px.
+Refs stay the same for the same element through a conversation; `@e6` is accepted too. A tappable row is named by the words inside it. `phone_screenshot` hides the bar and the rabbit and sends a JPEG of at most 1568 px.
 
 ## Android's limits
 
@@ -69,7 +69,8 @@ The service does nothing on its own: it reacts to clicks only to notice that you
 |---|---|
 | `HandsService.kt` | The accessibility service, and the adapters from Android's nodes, gestures, global actions and screenshots |
 | `Hands.kt` | The hands' state (working, paused, stopped), the policy (secrets, steps that always ask, names), refs, the snapshot format and `HandsTools`, the agent's toolbox |
-| `RabbitOverlay.kt` | The genie: the stage for the rabbit's moves and the bubble, bar and expanded card |
+| `RabbitOverlay.kt` | The floating bar: the stage for the rabbit's moves and the bubble, bar and expanded card |
 | `AgentNotifications.kt`, `AgentActionReceiver.kt` | The live notification and its Stop, Allow, Don't and reply |
-| `HandsSetup.kt` | Turning it on, hands-free, the floating genie switch and remembered apps |
-| `res/drawable-nodpi/rabbit_*.webp`, `res/drawable-night-nodpi/rabbit_*.webp` | aegentica.se's rabbit drawings (its `public/brand/mascot-*.webp`), day and night |
+| `HandsSetup.kt` | Turning it on, hands-free, the floating bar switch and remembered apps |
+| `RabbitMotion.kt` | The rabbit's poses and motion rules, ported from Glimt (`apps/chatbar/src/lib/alo.ts` in Caceras/awesomeseo-monorepo): where it lands, trips, the pose between steps and fidgets |
+| `res/drawable-nodpi/rabbit_*.webp` | Glimt's 13 rabbit sprites, cut from Riki's own drawings (`apps/chatbar/public/alo`) |

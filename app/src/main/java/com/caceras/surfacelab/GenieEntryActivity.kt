@@ -71,7 +71,7 @@ class GenieEntryActivity : Activity() {
         if (request == null) { Toast.makeText(this, "This tag has no Ægentica request.", Toast.LENGTH_SHORT).show(); finish(); return }
         if (request.signed) { done { Genie.ask(this, request.text, Genie.Origin.TAG) }; return }
         android.app.AlertDialog.Builder(this).setTitle("A tag asks Ægentica")
-            .setMessage("“${request.text}”\n\nThis tag was not written on this phone. Start the genie on these words?")
+            .setMessage("“${request.text}”\n\nThis tag was not written on this phone. Start Ægentica on these words?")
             .setNegativeButton("Cancel") { _, _ -> finish() }
             .setPositiveButton("Start") { _, _ -> done { Genie.ask(this, request.text, Genie.Origin.TAG) } }
             .setOnCancelListener { finish() }

@@ -256,12 +256,12 @@ object HandsSnapshot {
  * the main thread. Animations are short; with Android's animations off they are skipped.
  */
 interface HandsOverlay {
-    /** The assistant gesture: the genie's bar opens over the app with the screen Android shared. */
+    /** The assistant gesture: the floating bar opens over the app with the screen Android shared. */
     fun summon()
     /** The hands start working: the rabbit appears with the Stop button. */
     fun show()
-    /** Fly to an element before acting on it; [then] runs when the rabbit is there (about 250 ms). */
-    fun flyTo(bounds: Rect, label: String, then: () -> Unit)
+    /** Hop to an element before acting on it ([tool] picks the pose it acts out); [then] runs when the rabbit is there. */
+    fun flyTo(bounds: Rect, tool: String, then: () -> Unit)
     fun tapped(x: Int, y: Int)
     fun typing(bounds: Rect)
     fun scrolled(bounds: Rect, direction: String)
@@ -523,6 +523,7 @@ class HandsTools(private val context: Context, private val playbook: Playbook = 
         val target = call.payload as? HandsTarget
         val args = call.args
         val overlay = Hands.overlay
+        acting = call.spec.name
         fun onMain(block: () -> Unit) = main.post { if (!Hands.stopped) block() }
         try {
             when (call.spec.name) {
@@ -592,15 +593,19 @@ class HandsTools(private val context: Context, private val playbook: Playbook = 
     }
 
     /**
-     * An acting step: the rabbit flies to the target first (about 250 ms, so the person sees what
-     * will happen and can still stop it), then the step runs, then the screen settles and the
+     * An acting step: the rabbit hops to the target first (a quarter to two thirds of a second, so
+     * the person sees what will happen and can still stop it), then the step runs, then the screen settles and the
      * result says where the agent landed.
      */
+    /** The step being run, so the rabbit acts it out. */
+    @Volatile private var acting = ""
+
     private fun act(target: HandsTarget, done: (ToolOutcome) -> Unit, show: () -> Unit, step: (finished: (Boolean, String) -> Unit) -> Unit) {
         val latch = java.util.concurrent.CountDownLatch(1)
+        val tool = acting
         main.post {
             val overlay = Hands.overlay
-            if (overlay == null) latch.countDown() else overlay.flyTo(target.bounds, "") { latch.countDown() }
+            if (overlay == null) latch.countDown() else overlay.flyTo(target.bounds, tool) { latch.countDown() }
         }
         latch.await(1500, java.util.concurrent.TimeUnit.MILLISECONDS)
         if (Hands.stopped) return done(ToolOutcome(false, AgentSession.STOPPED))

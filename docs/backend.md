@@ -27,17 +27,17 @@ Hands-free applies only to Ægentica hands on the phone; the back office always 
 
 ## Jobs on the phone
 
-A job handed over shows as a card in the genie and in the sheet, and as a notification.
+A job handed over shows as a card in the floating bar and in the sheet, and as a notification.
 
 - **The card:** what it is doing, its steps, a question or an approval, tables as they fill in, the newest pictures, files, the cost so far, and when it ends, its answer. **Open chat** opens it on aegentica.se in the app; a file opens there too.
-- **Paying:** a step that costs money shows its price ("About $0.96 for 24 images") and the approve button carries the amount. When you asked by voice, the genie reads the amount aloud and listens: a short, clear yes approves, a no skips. Before the amount was read in full, or for anything else it heard, nothing is approved and the buttons stay.
+- **Paying:** a step that costs money shows its price ("About $0.96 for 24 images") and the approve button carries the amount. When you asked by voice, Ægentica reads the amount aloud and listens: a short, clear yes approves, a no skips. Before the amount was read in full, or for anything else it heard, nothing is approved and the buttons stay.
 - **Steering:** **Tell the job** puts the bar or the sheet's message box on the job; your next words steer it, or answer its question. While an approval waits, it is answered first, because words would cancel it.
 - **The live view:** while the job uses Ægentica's browser, the card shows it live, with a ring where the agent is about to act. Tap it for the full screen: **Take over** to tap, scroll and type yourself (a password the agent must never type), **Hand back** when done.
 - **The notification:** a live update while it works (Android 16 asks to show it as a status-bar chip): its newest step, **Stop**, **Approve · $0.96 for 24 images** and **Don't** when a step waits, or a reply field. Approving and replying need the phone unlocked. When it ends: "Ægentica is done" with the answer, **Open chat** and the first file.
 
 ## Chat history
 
-A phone conversation is copied into Ægentica's chat history when it is over (a new question, closing the sheet or the genie), so it continues on the computer. Questions and answers only, as text; screens and screenshots stay on the phone. It is saved again only when it grew. Turn it off in Settings → Connect to Ægentica.
+A phone conversation is copied into Ægentica's chat history when it is over (a new question, closing the sheet or the floating bar), so it continues on the computer. Questions and answers only, as text; screens and screenshots stay on the phone. It is saved again only when it grew. Turn it off in Settings → Connect to Ægentica.
 
 ## Safety
 
@@ -68,7 +68,7 @@ The contract is aegentica-app's `docs/BACKEND_API.md`.
 | `Backend.kt` | Pairing, the Keystore-sealed token, the MCP client, saving chats |
 | `BackendSetup.kt` | Settings → Connect to Ægentica |
 | `ServerJobs.kt` | Jobs: events, snapshots, answering, steering, priced approvals; `BackendTools`, the agent's back-office tools; `Toolboxes`, the hands and the back office as one |
-| `JobCard.kt` | The job card for the sheet and the genie, the live picture, and `PriceVoice`, approving a price by voice |
+| `JobCard.kt` | The job card for the sheet and the floating bar, the live picture, and `PriceVoice`, approving a price by voice |
 | `LiveBrowser.kt`, `LiveViewActivity.kt` | The server's browser live, and the full-screen view with taking over |
 | `AgentNotifications.kt`, `AgentActionReceiver.kt` | The job's live notification and its Stop, Approve, Don't and reply |
 | `ShellBridge.kt`, `ShellActivity.kt` | The `access-token` message from aegentica.se, kept only by Ægentica's own site |

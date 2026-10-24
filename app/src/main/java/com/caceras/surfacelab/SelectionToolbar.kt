@@ -96,7 +96,7 @@ class SelectionToolbar(
         (mine ?: menu.add(Menu.NONE, ASSIST, 0, NAME).also { ours = it }).apply {
             isVisible = true
             title = NAME
-            icon = context.getDrawable(R.drawable.mascot_curious)
+            icon = context.getDrawable(R.drawable.rabbit_look)
             contentDescription = "Ask Ægentica about the selection"
             setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
         }
