@@ -334,9 +334,9 @@ class HandsTest {
 
     @Test fun `the agent gets the hands only when the service is on and the owner allows it`() {
         assertEquals(playbook.tools.filter { it.target == "phone" }.map { it.name }, tools.offered().map { it.name })
-        assertEquals(tools.offered().map { it.name }, PhoneTools.forAgent(context).offered().map { it.name })
+        assertEquals(tools.offered().map { it.name }, PhoneTools.forAgent(context).offered().filter { it.target == "phone" }.map { it.name })
         context.getSharedPreferences(HandsTools.PREFS, 0).edit().putBoolean("enabled", false).commit()
-        assertTrue(tools.offered().isEmpty()); assertTrue(PhoneTools.forAgent(context).offered().isEmpty())
+        assertTrue(tools.offered().isEmpty()); assertTrue(PhoneTools.forAgent(context).offered().none { it.target == "phone" })
         context.getSharedPreferences(HandsTools.PREFS, 0).edit().putBoolean("enabled", true).putBoolean("hands_free", true).commit()
         assertTrue(tools.handsFree(prepare("phone_back", """{"why":"Close the menu"}""") as Prepared.Ready))
         assertTrue(HandsTools.floats(context))

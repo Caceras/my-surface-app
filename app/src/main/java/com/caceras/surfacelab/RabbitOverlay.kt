@@ -94,6 +94,8 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
     private lateinit var answer: TextView
     private lateinit var extra: LinearLayout
     private lateinit var actions: LinearLayout
+    /** The pages the agent opened in the sheet's browser: one tap shows them in the sheet. */
+    private lateinit var webChip: TextView
 
     private var session: AgentSession? = null
     private val observer: (AgentSession) -> Unit = { render(it) }
@@ -253,9 +255,12 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
             override fun tell(job: ServerJobs.Job, input: ServerJobs.Input?) = tellJob(job, input)
             override fun opened() = collapse()
         })
+        webChip = button("See the page", "rabbit-web", false) { context.startActivity(AssistantActivity.resume(context)); collapse() }.apply { visibility = View.GONE }
         val cardBody = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(10), dp(10), dp(8))
-            addView(question); addView(steps); addView(answer); addView(extra)
+            addView(question); addView(steps)
+            addView(webChip, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40)).apply { topMargin = dp(4); bottomMargin = dp(4) })
+            addView(answer); addView(extra)
             addView(jobs.view, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) })
             addView(actions)
         }
@@ -572,6 +577,8 @@ class RabbitOverlay(private val context: Context) : HandsOverlay {
             val mark = when (step.status) { "done" -> "✓"; "error" -> "!"; "denied" -> "✕"; "awaiting-approval" -> "?"; else -> "•" }
             steps.addView(text("$mark  ${step.label}", 13f, if (step.status == "running") R.color.ask_ink_2 else R.color.ask_ink_3).apply { maxLines = 2; tag = "rabbit-step"; setPadding(0, dp(2), 0, dp(2)) })
         }
+        SheetBrowser.active?.let { page -> webChip.text = "See the page · " + page.title.ifBlank { page.host }.take(30) }
+        webChip.visibility = if (SheetBrowser.pages.isEmpty()) View.GONE else View.VISIBLE
         if (view.answer.isNotBlank()) answer.text = Markdown.render(Prompts.reply(view.answer), dp(18), view.busy)
         answer.visibility = if (view.answer.isBlank()) View.GONE else View.VISIBLE
         val approval = view.approval

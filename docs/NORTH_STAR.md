@@ -70,6 +70,7 @@ Every example the owner gives (the dog-breed spreadsheet, the Gboard screenshots
 - **Keep going:** with the phone [connected to Ægentica](backend.md), long jobs go to the server agent and keep running while the phone sleeps. Ægentica, the sheet and a live notification show their steps, tables, pictures, files and cost, and Ægentica's browser live with take-over; a step that costs money shows its price and is approved by a tap, or by voice after the amount is read back.
 - **Remember:** the phone agent uses the same memory, Inbox and tasks as aegentica.se, and phone chats continue in Ægentica's chat history.
 - **Return:** the answer lands in the bar, the sheet and the notification, read aloud when the question was spoken; a finished job's notification opens its answer, its chat and its files.
-- **Next:** a web view inside the sheet the agent can browse in; widgets and a Quick Settings tile with running jobs; the watch and earbuds.
+- **See:** a browser inside the sheet where the agent opens public pages, reads them and acts in them while you watch, with the same tiers as Glimt.
+- **Next:** widgets and a Quick Settings tile with running jobs; the watch and earbuds.
 
 The same outcome for every platform is in aegentica-app's [docs/NORTH_STAR.md](https://github.com/Caceras/aegentica-app/blob/main/docs/NORTH_STAR.md).

@@ -1,6 +1,7 @@
 # Current preview changes
 
 **New in this build:**
+- **A browser in the sheet.** Ask Ægentica to look something up on a website: it opens the page right in the sheet, where you see it and can use it too, reads it and clicks or types for you after you allow it. Buying, sending and submitting always ask; it never types passwords (type them in the page yourself). Up to four pages, one chip each; *See the page* in the floating bar opens them.
 - **The rabbit from Glimt.** The rabbit over your apps now uses the same 13 drawings and moves as in Glimt: it hops or leaps to land beside what it works on, pounces on a tap, looks while it reads, begs while it waits for you, waves when done, and loafs and sleeps when left alone. It has no name, and the app no longer calls it a genie.
 - **Ægentica starts on what you asked.** From the keyboard or a door with words (an NFC tag), Ægentica starts working right away, in the floating bar when it is on. When the sheet continues a keyboard conversation, **Put it in the field** sends the answer back to the field you were typing in. The sheet no longer offers translation chips.
 - **Ægentica on aegentica.se, from the phone.** Connect once in Settings → *Connect to Ægentica* (tap *Make token* on the page that opens). The phone agent then checks your memory, reads your Inbox and drafts replies you send yourself, proposes tasks, and hands long jobs to Ægentica's server agent, which keeps going while the phone sleeps.

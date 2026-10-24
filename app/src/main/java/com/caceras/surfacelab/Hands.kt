@@ -120,6 +120,22 @@ class HandsPolicy(private val playbook: Playbook) {
         return REASONS.getValue(kind)
     }
 
+    /** The same rule for a web page's element, from its name and id: why a step on it always asks, or null. */
+    fun sensitiveText(label: String, id: String? = null): String? {
+        val all = words(label) + idWords(id)
+        val kind = playbook.sensitiveWords.entries.firstOrNull { (_, list) -> list.any { contains(all, it) } }?.key ?: return null
+        return REASONS.getValue(kind)
+    }
+
+    /** Whether a web page's field is a password, card or code field by its label and id (the page's own checks come first). */
+    fun secretText(label: String, id: String? = null): Boolean {
+        val all = words(label) + idWords(id)
+        return playbook.secretFields.any { field ->
+            val parts = words(field)
+            if (parts.size == 1) all.any { it.startsWith(parts[0]) } else contains(all, field)
+        }
+    }
+
     fun role(node: UiNode): String {
         val c = node.className.substringAfterLast('.')
         return when {

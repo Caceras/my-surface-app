@@ -18,7 +18,7 @@ class ToolSpec(
     val name: String,
     val description: String,
     val risk: Risk,
-    /** "phone" for the hands; "backend" for Ægentica's server tools. */
+    /** "phone" for the hands, "backend" for Ægentica's server tools, "web" for the browser inside the sheet. */
     val target: String,
     val label: String,
     val parameters: JSONObject,
@@ -74,6 +74,8 @@ class Playbook(json: JSONObject) {
     val noHands: List<String> = instructions.optJSONArray("noHands").strings()
     /** When the phone is connected to Ægentica's back office (the aegentica_* tools). */
     val backend: List<String> = instructions.optJSONArray("backend").strings()
+    /** When the agent has the browser inside the sheet (the web_* tools). */
+    val web: List<String> = instructions.optJSONArray("web").strings()
 
     private val sensitive = json.getJSONObject("sensitive")
     /** Words on a button or field that make a step always ask, by kind (send, call, pay, delete, account). */
@@ -94,7 +96,7 @@ class Playbook(json: JSONObject) {
         tools.forEach { t ->
             t.required.forEach { require(it in t.properties) { "${t.name} requires undeclared $it" } }
             require(t.risk == Risk.READ || t.needsWhy) { "${t.name} acts, so it must require why" }
-            require(t.target == "phone" || t.target == "backend") { "${t.name} has an unknown target ${t.target}" }
+            require(t.target in setOf("phone", "backend", "web")) { "${t.name} has an unknown target ${t.target}" }
         }
     }
 

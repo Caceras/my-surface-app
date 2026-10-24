@@ -164,7 +164,7 @@ class BackendTest {
     @Test fun `the agent gets the back office only when connected, acting tools ask even hands-free, and results come fenced as data`() {
         val tools = BackendTools(context)
         assertTrue(tools.offered().isEmpty())
-        assertSame(NoTools, PhoneTools.forAgent(context))
+        assertTrue(PhoneTools.forAgent(context).offered().none { it.target == "backend" })
         Backend.apiForTest = api
         assertEquals(Playbook.get(context).tools.filter { it.target == "backend" }.map { it.name }, tools.offered().map { it.name })
         val playbook = Playbook.get(context)

@@ -100,6 +100,11 @@ class AssistantActivity : Activity() {
     /** The last question was spoken, so a priced step is read back and may be approved by voice. */
     private var voiceFirst = false
     private val jobWatcher: (ServerJobs.Job) -> Unit = { job -> if (!isFinishing) jobChanged(job) }
+    /** The browser inside the sheet, where the agent (and the owner) browse: its pages and the one on screen. */
+    private lateinit var browserBox: LinearLayout
+    private lateinit var browserFrame: android.widget.FrameLayout
+    private lateinit var browserTabs: LinearLayout
+    private val browserWatcher: () -> Unit = { if (!isFinishing) renderBrowser() }
 
     /** The answer goes back to whoever opened the sheet with text: the selection menu's caller, or [withText]'s handback. */
     private fun handBack(text: String) {
@@ -267,8 +272,22 @@ class AssistantActivity : Activity() {
                 addView(send, LinearLayout.LayoutParams(dp(44), dp(44)))
             }, LinearLayout.LayoutParams(-1, -2))
         }
+        // The browser: page chips, open outside, close; the page itself below.
+        browserTabs = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        browserFrame = android.widget.FrameLayout(this).apply { tag = "assistant-browser-page"; background = pill(R.color.ask_fill, 16); clipToOutline = true }
+        browserBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; tag = "assistant-browser"; visibility = View.GONE; padDp(10, 2, 4, 6)
+            addView(LinearLayout(this@AssistantActivity).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(HorizontalScrollView(this@AssistantActivity).apply { isHorizontalScrollBarEnabled = false; addView(browserTabs) }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(icon(R.drawable.ic_arrow_up_right, "Open this page in your browser", "assistant-browser-outside", 16) { openPageOutside() }, LinearLayout.LayoutParams(dp(40), dp(40)))
+                addView(icon(R.drawable.ic_close, "Close the pages", "assistant-browser-close", 16) { SheetBrowser.closeAll() }, LinearLayout.LayoutParams(dp(40), dp(40)))
+            }, LinearLayout.LayoutParams(-1, -2))
+            addView(browserFrame, LinearLayout.LayoutParams(-1, minOf((metrics.heightPixels * 0.4f).toInt(), dp(420))).apply { marginEnd = dp(6) })
+        }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; tag = "assistant-sheet"; padDp(4, 6, 4, 4)
+            addView(browserBox, LinearLayout.LayoutParams(-1, -2))
             addView(card, LinearLayout.LayoutParams(-1, -2))
             addView(suggestions, LinearLayout.LayoutParams(-1, -2))
             addView(bar, LinearLayout.LayoutParams(-1, -2))
@@ -296,7 +315,33 @@ class AssistantActivity : Activity() {
         unlisten = ScreenContexts.listen { showContext() }
         Hands.onActive = stepAside
         ServerJobs.addObserver(jobWatcher)
+        SheetBrowser.listener = browserWatcher
         start(intent)
+        renderBrowser()
+    }
+
+    // ---------------------------------------------------------------- the browser inside the sheet
+
+    /** The pages the agent opened: a chip each (the one on screen in ink), and the page on screen below. */
+    private fun renderBrowser() {
+        val pages = SheetBrowser.pages.toList()
+        browserBox.visibility = if (pages.isEmpty()) View.GONE else View.VISIBLE
+        browserTabs.removeAllViews()
+        pages.forEach { page ->
+            val on = page === SheetBrowser.active
+            browserTabs.addView(chipView((page.title.ifBlank { page.host.ifBlank { "Page" } }).take(28) + if (page.loading) " …" else "", "assistant-browser-tab") { SheetBrowser.show(page) }.apply {
+                setTextColor(ink(if (on) R.color.ask_ink else R.color.ask_ink_3)); contentDescription = "Page ${page.id}: ${page.title.ifBlank { page.url }}"
+            }, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(6) })
+        }
+        SheetBrowser.attach(browserFrame, this)
+        SheetBrowser.active?.blocked?.let { status.text = it }
+        scroll.taken = if (pages.isEmpty()) 0 else (browserFrame.layoutParams.height + dp(46))
+        scroll.requestLayout()
+    }
+
+    private fun openPageOutside() {
+        val url = SheetBrowser.active?.url?.takeIf { it.startsWith("http") } ?: return
+        open(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE))
     }
 
     // ---------------------------------------------------------------- jobs on aegentica.se
@@ -375,7 +420,7 @@ class AssistantActivity : Activity() {
     private fun clearThread() {
         stop()
         agent?.let { Backend.saveConversation(applicationContext, it) }
-        jobs.show(null); endTelling()
+        jobs.show(null); endTelling(); SheetBrowser.closeAll()
         // A new conversation next time: the agent forgets this one.
         agent?.listener = null; agent = null; agentScreenSent = false; agentMode = false
         question = ""; reply = ""; answer.text = ""; asked.text = ""; status.text = ""; actions.removeAllViews(); follows.removeAllViews()
@@ -799,6 +844,7 @@ class AssistantActivity : Activity() {
         // The conversation goes to Ægentica's chat history once it is over (when the phone is connected).
         if (!handedOver) agent?.let { Backend.saveConversation(applicationContext, it) }
         ServerJobs.removeObserver(jobWatcher); jobs.detach()
+        SheetBrowser.detach(browserFrame); if (SheetBrowser.listener === browserWatcher) SheetBrowser.listener = null
         PriceVoice.cancel(ears)
         unlisten?.invoke(); unlisten = null
         agent?.listener = null
@@ -819,6 +865,8 @@ class AssistantActivity : Activity() {
         private var tallest = 0
         /** Room left on screen for the answer, in pixels; null measures the window. */
         internal var roomForTest: Int? = null
+        /** Pixels the browser above the answer takes. */
+        var taken = 0
 
         fun reset() { tallest = 0; requestLayout() }
 
@@ -833,7 +881,7 @@ class AssistantActivity : Activity() {
                 insets.top + insets.bottom
             }.getOrDefault(0) else 0
             // The bar (52dp), the header row (40dp) and the sheet's margins and padding.
-            return screen - taken - (132 * density).toInt()
+            return screen - taken - this.taken - (132 * density).toInt()
         }
 
         override fun onMeasure(widthSpec: Int, heightSpec: Int) {

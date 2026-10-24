@@ -234,7 +234,8 @@ class AgentSession(private val context: Context, val id: String = UUID.randomUUI
         val history = thread.toList().dropLast(1)
         val hands = offered.any { it.target == "phone" }
         val backend = offered.any { it.target == "backend" }
-        val body = AgentRequest.body(history, playbook, reply.model, id, offered, PhoneAgent.vision(context), hands, final, backend = backend)
+        val web = offered.any { it.target == "web" }
+        val body = AgentRequest.body(history, playbook, reply.model, id, offered, PhoneAgent.vision(context), hands, final, backend = backend, web = web)
         val payload = body.toString().toByteArray()
         try {
             require(payload.size <= 12_000_000) { "The request is too large to send. Start a new question." }
@@ -298,6 +299,7 @@ class AgentSession(private val context: Context, val id: String = UUID.randomUUI
             call.result = when (playbook.tool(call.name)?.target) {
                 "phone" -> "${call.name} is not available now: Ægentica hands is off or not connected."
                 "backend" -> "${call.name} is not available now: this phone is not connected to Ægentica."
+                "web" -> "${call.name} is not available now."
                 else -> "There is no tool called ${call.name}."
             }
             return
@@ -492,7 +494,7 @@ object PhoneAgent {
         val existing = current
         if (existing != null && (!fresh || existing.running)) return existing
         // The conversation it replaces is over: it goes to Ægentica's chat history when the phone is connected.
-        existing?.let { Backend.saveConversation(context.applicationContext, it) }
+        existing?.let { Backend.saveConversation(context.applicationContext, it); SheetBrowser.closeAll() }
         return AgentSession(context.applicationContext).also { current = it; GenieStatus.changed(context.applicationContext) }
     }
 }

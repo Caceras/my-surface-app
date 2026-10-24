@@ -199,6 +199,17 @@ On the Pixel:
 - lock the phone during a task: the notification shows the step, Stop works, Allow asks to unlock;
 - measure battery over an hour with the service on and idle.
 
+## Sheet browser acceptance
+
+`WebBrowserTest` covers what may open (public `http`/`https` pages only; not `javascript:`, `file:` or `intent:`, not addresses with a password or another port, not localhost, private, link-local or carrier-NAT addresses, IPv6 local or mapped ones, `.local` or one-word names, not Ægentica's own sites, and not a name that points at the phone's network), the agent's steps there (no page yet, opening with Allow and "always on this site", reading on its own, a *Köp* button always asking, a password field never typed into, typing with submit always asking, the element outlined before a click, a gone element refused), and the sheet showing the page the agent opened, its chip and closing the pages, with the browser's instructions and tools in the request.
+
+On the Pixel:
+- ask the sheet to find opening hours on a shop's website: Allow the page, watch it open in the sheet, see the answer cite the page;
+- ask it to search the site: it asks before typing with submit;
+- on a login page, check it asks you to type the password yourself; tap the field in the page and type;
+- ask it to open your router (192.168.1.1) or aegentica.se: it says it cannot;
+- from the floating bar, ask for a page, then tap *See the page*.
+
 ## Back office acceptance
 
 `BackendTest` covers pairing (the `access-token` message, only a real `aeg_pat_` token, kept only by Ægentica's own site in the app, stored sealed, never in the clear, disconnecting, Connect opening Settings → Security, and other sites not opening in the shell), the MCP client (one JSON-RPC call with the bearer token, structured results, an SSE answer, refusals, `401`), the back-office tools (offered only when connected, `why` and length limits, asking even with hands-free on, results fenced as data, drafts never sent), the agent handing a job over after Allow with the back office's instructions in its prompt, job events field by field (steps, the reply, tables appended from `start` with pictures in cells, pictures, files, cost, the browser, approvals with their price, the end with its links) and `job_get` snapshots, spoken approval only after the price was read back and only for a clear yes, following a job's stream and resuming it with `Last-Event-ID`, the live notification with a priced Approve that sends only an offered option, replies refused while an approval waits and otherwise steering the job, the job card (steps, price on the button, tables, pictures, files, the live browser, Tell the job only after an approval is answered), the live browser's events and taking over with taps as fractions, saving chats once (again only when grown, never with screens, never when turned off), and the sheet opening on a job and telling it. `RabbitOverlayTest` covers Ægentica opening when a job asks and its bar talking to the job.

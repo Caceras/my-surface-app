@@ -37,6 +37,12 @@
       "Inbox replies are drafts: they are never sent until the person reviews and sends them in Ægentica's Inbox. Say so when you draft one. New tasks are saved turned off until the person turns them on.",
       "Hand long or background jobs to the server agent with aegentica_handoff, with a complete brief. Then tell the person in a few words what it will do and end your turn: the phone shows its progress, asks them when it needs them, and tells them when it is done.",
       "Never answer a job's approvals or questions for the person. They answer on the phone, and a step that costs money is read back to them first."
+    ],
+    "web": [
+      "You have a browser inside Ægentica's sheet: the web_* tools open public web pages there, read them and act in them. The person sees the page on screen and can use it too.",
+      "Read before you act: web_snapshot for links, buttons and fields with refs, web_read for the text. After a click or typing, look again before the next step.",
+      "Opening a page, clicking, typing and choosing wait for the person's Allow; anything that sends, pays, books, deletes or changes an account asks every time. Never type a password, card number or code: ask the person to type it in the page themselves, then continue.",
+      "Ægentica's own sites and addresses on the phone's own network do not open in this browser."
     ]
   },
   "sensitive": {
@@ -471,6 +477,261 @@
           }
         },
         "required": ["jobId", "message", "why"]
+      }
+    },
+    {
+      "name": "web_open",
+      "description": "Open a public web page in the browser inside Ægentica's sheet, where the person sees it too. Returns the page's number and the start of its text. Ægentica's own sites and addresses on the phone's network do not open.",
+      "risk": "act",
+      "target": "web",
+      "label": "Opening {url}",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "description": "Absolute https URL" },
+          "new_page": {
+            "type": "boolean",
+            "description": "Open it beside the pages already open instead of in place of the one on screen"
+          },
+          "why": {
+            "type": "string",
+            "description": "One short sentence, in the person's words, saying what this step does and why. They see it before they allow it."
+          }
+        },
+        "required": ["url", "why"]
+      }
+    },
+    {
+      "name": "web_pages",
+      "description": "The pages open in the sheet's browser: number, title and address.",
+      "risk": "read",
+      "target": "web",
+      "label": "Looking over the pages",
+      "parameters": { "type": "object", "properties": {}, "required": [] }
+    },
+    {
+      "name": "web_read",
+      "description": "Read the page as text, 6,000 characters at a time; pass the returned offset to continue.",
+      "risk": "read",
+      "target": "web",
+      "label": "Reading the page",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "offset": { "type": "integer", "minimum": 0 },
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "web_snapshot",
+      "description": "List the links, buttons and fields on the page with refs like e12, visible ones first. Take a new one after the page changes.",
+      "risk": "read",
+      "target": "web",
+      "label": "Looking at buttons and fields",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "web_find",
+      "description": "Find passages on the page containing a phrase. Returns snippets with refs.",
+      "risk": "read",
+      "target": "web",
+      "label": "Finding “{query}”",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Words to find" },
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "web_highlight",
+      "description": "Scroll to an element and outline it briefly so the person sees it.",
+      "risk": "read",
+      "target": "web",
+      "label": "Pointing at {ref}",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ref": { "type": "string", "description": "Element ref from web_snapshot or web_find" },
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          }
+        },
+        "required": ["ref"]
+      }
+    },
+    {
+      "name": "web_scroll",
+      "description": "Scroll the page: up, down, top, bottom, or to an element ref.",
+      "risk": "read",
+      "target": "web",
+      "label": "Scrolling {target}",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string", "description": "up, down, top, bottom or a ref" },
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          }
+        },
+        "required": ["target"]
+      }
+    },
+    {
+      "name": "web_screenshot",
+      "description": "A picture of the page as the person sees it, when the look matters.",
+      "risk": "read",
+      "target": "web",
+      "label": "Looking at the page",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "web_close",
+      "description": "Close a page you no longer need.",
+      "risk": "read",
+      "target": "web",
+      "label": "Closing a page",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          }
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "web_click",
+      "description": "Click an element by ref. Needs the person's approval.",
+      "risk": "act",
+      "target": "web",
+      "label": "Click {ref}",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ref": { "type": "string", "description": "Element ref" },
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          },
+          "why": {
+            "type": "string",
+            "description": "One short sentence, in the person's words, saying what this step does and why. They see it before they allow it."
+          }
+        },
+        "required": ["ref", "why"]
+      }
+    },
+    {
+      "name": "web_type",
+      "description": "Type into a field by ref, replacing what is there unless clear is false, and optionally submit. Never a password, card number or code. Needs approval.",
+      "risk": "act",
+      "target": "web",
+      "label": "Type “{text}”",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ref": { "type": "string", "description": "Field ref" },
+          "text": { "type": "string", "description": "Text to type", "maxLength": 2000 },
+          "clear": { "type": "boolean", "description": "Replace what is in the field (default true)" },
+          "submit": { "type": "boolean", "description": "Submit the form or press Enter afterwards" },
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          },
+          "why": {
+            "type": "string",
+            "description": "One short sentence, in the person's words, saying what this step does and why. They see it before they allow it."
+          }
+        },
+        "required": ["ref", "text", "why"]
+      }
+    },
+    {
+      "name": "web_select",
+      "description": "Choose an option in a list by its value or visible text. Needs approval.",
+      "risk": "act",
+      "target": "web",
+      "label": "Choose “{value}”",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ref": { "type": "string", "description": "List ref" },
+          "value": { "type": "string", "description": "The option" },
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          },
+          "why": {
+            "type": "string",
+            "description": "One short sentence, in the person's words, saying what this step does and why. They see it before they allow it."
+          }
+        },
+        "required": ["ref", "value", "why"]
+      }
+    },
+    {
+      "name": "web_back",
+      "description": "Go back one page in the page's history. Needs approval.",
+      "risk": "act",
+      "target": "web",
+      "label": "Going back",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "description": "The page's number from web_pages; omit for the page on screen",
+            "minimum": 1
+          },
+          "why": {
+            "type": "string",
+            "description": "One short sentence, in the person's words, saying what this step does and why. They see it before they allow it."
+          }
+        },
+        "required": ["why"]
       }
     }
   ]
