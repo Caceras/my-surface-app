@@ -151,6 +151,8 @@ class GeniePanel(private val context: Context, private val host: Host) {
         fun open(intent: android.content.Intent)
         /** Turn the genie off in the app being typed in. */
         fun offHere()
+        /** Hand over to the phone's assistant on the current screen (it sees the screen; the keyboard does not). */
+        fun useScreen() {}
     }
 
     private fun ink(id: Int) = context.getColor(id)
@@ -228,6 +230,8 @@ class GeniePanel(private val context: Context, private val host: Host) {
         context_.text = what
         starters.removeAllViews(); starters.visibility = View.VISIBLE
         offers.forEach { (label, request) -> starters.addView(chip(label, "genie-starter") { host.ask(label, request) }, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(6) }) }
+        // With Ægentica as the phone's assistant, one tap hands over to it on what is on screen.
+        if (AssistantService.available) starters.addView(chip("Use the screen", "genie-screen") { host.useScreen() }, LinearLayout.LayoutParams(-2, dp(40)).apply { marginEnd = dp(6) })
         // Last, quiet: the genie can be switched off for this app (the keys keep working).
         starters.addView(chip("Off in ${app.ifBlank { "this app" }}", "genie-off-here") { host.offHere() }.apply { setTextColor(ink(R.color.keys_ink_dim)) },
             LinearLayout.LayoutParams(-2, dp(40)))

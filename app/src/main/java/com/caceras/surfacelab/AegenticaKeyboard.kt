@@ -178,6 +178,11 @@ class KeysPanel(private val context: Context, private val host: Host) {
             override fun listen() = listenToGenie()
             override fun open(intent: Intent) = host.open(intent)
             override fun offHere() = setGenieOff(true)
+            override fun useScreen() {
+                // The keyboard steps aside first, so the assistant sees the app and not the keys.
+                setMode(Mode.KEYS, animate = false); host.hide()
+                main.postDelayed({ AssistantService.onScreen() }, 350)
+            }
         })
         rabbit = ImageView(context).apply {
             tag = "keys-rabbit"; setImageResource(R.drawable.mascot_sitting); scaleType = ImageView.ScaleType.FIT_CENTER
