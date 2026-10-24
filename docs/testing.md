@@ -144,11 +144,11 @@ On the Pixel, record: engine label shown (Gemini on-device vs Android), Swedish 
 - the verbatim save;
 - the service's Stop action.
 
-`agent/tests` (CI job *LiveKit agent tests*) covers the token endpoint's access code, rate limit and ticket claims, tool forwarding and checks, settings validation and both voice modes. `ShotTest` renders `assistant-ready` and `assistant-panel` in light and dark (the floating sheet placed where Android puts it, over a stand-in app screenshot with simulated blur) and `agent-voice`.
+`agent/tests` (CI job *LiveKit agent tests*) covers the token endpoint's access code, rate limit and ticket claims, tool forwarding and checks, settings validation and both voice modes. `ShotTest` renders `assistant-ready` and `assistant-panel` in light and dark (the floating, opaque sheet placed where Android puts it, over a stand-in app screenshot) and `agent-voice`.
 
 On the Pixel:
 - choose Ægentica as digital assistant and invoke it with the corner swipe and power button, over Sheets, Gmail and a banking app (which should arrive empty);
-- check that the sheet blurs the app behind it, turns nearly opaque in battery saver, rises above the keyboard and closes on a tap outside;
+- check that the sheet is opaque in the light and dark themes, rises above the keyboard, stays above the gesture bar and closes on a tap outside;
 - with a third-party offline voice app (for example HayaiTTS), confirm the reading-voice picker lists its voices and that a long text reads without pauses between sentences;
 - with the phone language set to English (Sweden), tap the microphone in chat and in the assistant sheet: it should switch to an installed English pack and listen, without a "not ready yet" message;
 - with Google as Android's default and HayaiTTS installed, confirm Read aloud uses a HayaiTTS voice, the picker lists HayaiTTS first with voice names, and Google's voice is never used unless picked;
@@ -158,6 +158,24 @@ On the Pixel:
 - OpenRouter with a real key: streaming, the model picker, and a spent credit limit;
 - a local Ollama server over Tailscale;
 - Agent voice end to end on LiveKit Cloud: Swedish turn-taking, sharing another app's screen, a timer proposal, Stop from the notification.
+
+## Phone agent acceptance
+
+`PhoneAgentTest` covers:
+- the shared playbook ([playbook](playbook.md)): unique names, declared required fields, a `why` on every acting tool, and the read and act tier lists;
+- OpenRouter's stream: events split anywhere (CRLF and comments), tool calls folded by index across chunks, usage with cost, reasoning details, a call cut off mid-arguments, an error inside a 200 stream;
+- the request: the screen fenced as data that cannot close its fence, the screenshot only for a model that sees, tools offered now plus tools used earlier, `tool_choice: none` on the last turn, `data_collection: deny`, Claude's cache field;
+- the loop: an answer with its cost; reads running on their own and actions waiting for Allow, with "always for this app" remembered; a refusal reaching the model; steps that always ask never being remembered; a new instruction setting aside a pending Allow; Stop ending the run and the tools; the step limit's last turn without tools; unknown tools, hands that are off, a 402, and no connection;
+- the OpenRouter sign-in's S256 challenge (RFC 7636's example) and code exchange.
+
+`AssistantSheetTest` covers the sheet on the agent: the screen and screenshot on the first question only, the streamed answer and its label; Gemini Nano offline, when the connection drops mid-request, and without a key (with the sign-in chip); steering while it works and Stop on leaving; window insets that keep the sheet clear of the navigation bar and keyboard and a scroll area that never shrinks while an answer streams; and `withText` handing an answer back to its caller.
+
+On the Pixel:
+- sign in from the sheet's chip: Chrome opens OpenRouter, *Back to Ægentica* returns, and the next invocation answers with the agent;
+- ask about Sheets and Gmail with the screen on; check the answer uses the screenshot;
+- hold the mic, speak, let go: it sends and reads the answer aloud; talk again while it works: it changes course;
+- type a long question, send it while the keyboard is up, and watch a long answer stream: the sheet stays above the gesture bar and never shrinks;
+- turn on airplane mode: the sheet says *Offline · Gemini Nano on this phone* and answers.
 
 ## Ægentica home acceptance
 

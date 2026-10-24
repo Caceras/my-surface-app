@@ -93,6 +93,11 @@ object ConnectedAI {
     /** The saved Gemini key, whichever provider currently answers chat (Live voice and Transcribe use it). */
     fun geminiKey(context:Context):String? = geminiKeyForTest ?: savedKey(context,GEMINI_HOST)?.let { runCatching { decrypt(it) }.getOrNull() }
     fun geminiConfigured(context:Context)=savedKey(context,GEMINI_HOST)!=null
+    private const val OPENROUTER_HOST="openrouter.ai"
+    /** The saved OpenRouter key, whichever provider currently answers chat: the phone agent uses it. */
+    fun openRouterKey(context:Context):String? = savedKey(context,OPENROUTER_HOST)?.let { runCatching { decrypt(it) }.getOrNull() }?.takeIf { it.isNotBlank() }
+    /** Saves an OpenRouter key (from the phone agent's sign-in) beside the other providers' keys; the active provider is unchanged. */
+    fun saveOpenRouterKey(context:Context,key:String) { prefs(context).edit().putString("key:$OPENROUTER_HOST",encrypt(key.trim())).apply() }
     /** Matching Library excerpts are sent to the provider only after this separate opt-in. */
     fun recallAllowed(context:Context)=prefs(context).getBoolean("recall",false)
 
@@ -129,7 +134,7 @@ object ConnectedAI {
     fun interface Http { fun post(url:String,headers:Map<String,String>,body:ByteArray,onCall:(Call)->Unit):Response }
     /** Test-only network seam. */
     @Volatile var httpForTest:Http?=null
-    private val http:Http get()=httpForTest ?: UrlHttp
+    internal val http:Http get()=httpForTest ?: UrlHttp
 
     private object UrlHttp:Http {
         override fun post(url:String,headers:Map<String,String>,body:ByteArray,onCall:(Call)->Unit):Response {

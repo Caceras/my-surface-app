@@ -18,8 +18,11 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
@@ -32,9 +35,12 @@ import android.widget.Toast
 /**
  * The assistant panel, opened above the current app by [AssistantSession]
  * (or directly from Settings, without screen context). It shows what Android
- * shared, asks Nano or the connected model about it, and offers explicit
- * follow-ups. Nothing is tapped or typed in the other app, and generated text
- * is never run as a command: every action is a button the owner presses.
+ * shared and asks the phone agent about it ([AgentSession]: OpenRouter, with the
+ * screen's text and screenshot attached). Gemini Nano, or the connected model
+ * after its own opt-in, answers when OpenRouter cannot be reached or no key is
+ * saved, and says so. Hold the microphone to talk; it sends when you let go.
+ * Generated text is never run as a command: tools go through the playbook and
+ * the hands' own checks, and every follow-up is a button the owner presses.
  */
 class AssistantActivity : Activity() {
     private lateinit var seen: TextView
@@ -46,6 +52,8 @@ class AssistantActivity : Activity() {
     private lateinit var input: EditText
     private lateinit var mic: ImageButton
     private lateinit var send: ImageButton
+    private lateinit var plus: ImageButton
+    private lateinit var model: ImageButton
     private val sendFill = GradientDrawable().apply { shape = GradientDrawable.OVAL }
     /** The window background: the frosted sheet itself. */
     private val sheet = GradientDrawable()
@@ -68,6 +76,27 @@ class AssistantActivity : Activity() {
     /** The selection came from an editable field, so an answer can replace it. */
     private var editable = false
     private var source = ""
+    private lateinit var steps: LinearLayout
+    private lateinit var approvalCard: LinearLayout
+    private lateinit var scroll: CappedScroll
+    /** The phone agent's conversation for this invocation; null until a question goes to it. */
+    private var agent: AgentSession? = null
+    /** The screen goes with the first question of an invocation only; follow-ups continue the same conversation. */
+    private var agentScreenSent = false
+    /** The current exchange runs on the agent, not on Nano or the connected model. */
+    private var agentMode = false
+    /** The agent's finished exchange was handled once (actions shown, reply read). */
+    private var agentSettled = false
+    private var micDownAt = 0L
+    /** Where "Replace" sends the answer when the sheet was opened from inside the app (the keyboard). */
+    private var handback: ((String) -> Unit)? = null
+
+    /** The answer goes back to whoever opened the sheet with text: the selection menu's caller, or [withText]'s handback. */
+    private fun handBack(text: String) {
+        val back = handback
+        if (back != null) { handback = null; back(text) } else setResult(RESULT_OK, Intent().putExtra(Intent.EXTRA_PROCESS_TEXT, text))
+        finish()
+    }
 
     private fun prefs() = getSharedPreferences("surfacelab", 0)
     /** The owner can leave the screen out of a question with one tap on the context chip. */
@@ -85,22 +114,12 @@ class AssistantActivity : Activity() {
     private fun pill(fill: Int?, radius: Int) = GradientDrawable().apply { fill?.let { setColor(ink(it)) }; cornerRadius = dp(radius).toFloat() }
 
     /**
-     * Frosted glass. Android blurs the app behind this window when cross-window
-     * blur is on (the default on Pixel); with blur off, for example in battery
-     * saver, the sheet turns nearly opaque so text stays readable.
+     * The sheet's surface: opaque, in the theme's own colours, like aegentica.se's composer and
+     * popovers (its design contract excludes blur and glass), so it reads the same over any app.
      */
-    private fun frost(blurred: Boolean) {
-        sheet.setColor(ink(if (blurred) R.color.ask_glass_blur else R.color.ask_glass_solid))
-        if (android.os.Build.VERSION.SDK_INT >= 31) window.setBackgroundBlurRadius(if (blurred) dp(30) else 0)
-    }
-
-    @android.annotation.TargetApi(31)
-    private fun followBlur() {
-        val listener = java.util.function.Consumer<Boolean> { frost(blurForTest ?: it) }
-        window.decorView.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-            override fun onViewAttachedToWindow(v: View) = windowManager.addCrossWindowBlurEnabledListener(listener)
-            override fun onViewDetachedFromWindow(v: View) = windowManager.removeCrossWindowBlurEnabledListener(listener)
-        })
+    private fun surface() {
+        sheet.setColor(ink(R.color.ask_surface))
+        if (android.os.Build.VERSION.SDK_INT >= 31) window.setBackgroundBlurRadius(0)
     }
 
     private fun icon(drawable: Int, description: String, tagName: String, size: Int = 18, action: () -> Unit) = ImageButton(this).apply {
@@ -136,9 +155,16 @@ class AssistantActivity : Activity() {
             addView(asked, LinearLayout.LayoutParams(0, -2, 1f))
             addView(icon(R.drawable.ic_close, "Clear the answer", "assistant-close", 16) { clearThread() }, LinearLayout.LayoutParams(dp(40), dp(40)))
         }
+        steps = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; tag = "assistant-steps"; visibility = View.GONE; padDp(0, 4, 4, 2) }
+        approvalCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; tag = "assistant-approval"; visibility = View.GONE; padDp(12, 10, 12, 8)
+            background = pill(R.color.ask_fill, 18)
+        }
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            addView(steps, LinearLayout.LayoutParams(-1, -2))
             addView(answer, LinearLayout.LayoutParams(-1, -2))
+            addView(approvalCard, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); marginEnd = dp(10) })
             addView(HorizontalScrollView(this@AssistantActivity).apply { isHorizontalScrollBarEnabled = false; addView(follows) }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
         }
         val foot = LinearLayout(this).apply {
@@ -149,7 +175,8 @@ class AssistantActivity : Activity() {
         card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; tag = "assistant-card"; visibility = View.GONE; padDp(14, 4, 4, 0)
             addView(top, LinearLayout.LayoutParams(-1, -2))
-            addView(CappedScroll(this@AssistantActivity).apply { isVerticalScrollBarEnabled = false; addView(body) }, LinearLayout.LayoutParams(-1, -2))
+            scroll = CappedScroll(this@AssistantActivity).apply { isVerticalScrollBarEnabled = false; tag = "assistant-scroll"; addView(body) }
+            addView(scroll, LinearLayout.LayoutParams(-1, -2))
             addView(foot, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
             addView(View(this@AssistantActivity).apply { setBackgroundColor(ink(R.color.ask_divider)) }, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(2); marginEnd = dp(10) })
         }
@@ -175,24 +202,55 @@ class AssistantActivity : Activity() {
         input = EditText(this).apply {
             tag = "assistant-input"; textSize = 16f; background = null; isSingleLine = true
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or android.text.InputType.TYPE_TEXT_FLAG_AUTO_CORRECT
-            setTextColor(ink(R.color.ask_ink)); setHintTextColor(ink(R.color.ask_ink_3)); padDp(10, 0, 4, 0)
+            setTextColor(ink(R.color.ask_ink)); setHintTextColor(ink(R.color.ask_ink_3)); padDp(14, 0, 8, 0)
             imeOptions = EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
             setOnEditorActionListener { _, action, _ -> if (action == EditorInfo.IME_ACTION_SEND) { ask(text.toString(), false); true } else false }
             afterChange { updateSend(); showSuggestions() }
+            // Starting to type ends listening, so dictation never overwrites typed words.
+            setOnTouchListener { _, e -> if (e.actionMasked == MotionEvent.ACTION_DOWN && hint == "Listening…") ears?.cancel(); false }
         }
-        mic = icon(R.drawable.ic_mic_line, "Speak your question", "assistant-mic", 20) { listen() }.apply { imageTintList = ColorStateList.valueOf(ink(R.color.ask_ink_2)) }
+        mic = icon(R.drawable.ic_mic_line, "Speak your question. Hold to talk, let go to send.", "assistant-mic", 20) { toggleListen() }.apply {
+            imageTintList = ColorStateList.valueOf(ink(R.color.ask_ink_2))
+            // Hold to talk: listening starts on touch and the words go when the finger lifts. A quick
+            // tap listens until you pause, as before.
+            setOnTouchListener { v, e ->
+                when (e.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> { micDownAt = android.os.SystemClock.uptimeMillis(); v.isPressed = true; if (input.hint != "Listening…") listen(); true }
+                    MotionEvent.ACTION_UP -> { v.isPressed = false; if (android.os.SystemClock.uptimeMillis() - micDownAt >= HOLD_MS) ears?.stop(); true }
+                    MotionEvent.ACTION_CANCEL -> { v.isPressed = false; true }
+                    else -> true
+                }
+            }
+        }
         send = ImageButton(this).apply {
             tag = "assistant-ask"; contentDescription = "Ask"; scaleType = ImageView.ScaleType.FIT_CENTER
             // A 36dp circle centred in a 44dp touch target.
             background = InsetDrawable(RippleDrawable(press(), sendFill, null), dp(4), dp(4), dp(4), dp(4))
-            setOnClickListener { if (brain != null) { stop(); status.text = "Stopped." } else ask(input.text.toString(), false) }
+            setOnClickListener {
+                when {
+                    // Words typed while the agent works steer it; the round button stops it.
+                    agent?.running == true && input.text.isNotBlank() -> ask(input.text.toString(), false)
+                    busy() -> { stop(); status.text = "Stopped." }
+                    else -> ask(input.text.toString(), false)
+                }
+            }
         }
+        plus = icon(R.drawable.ic_plus, "More: the screen, models and phone tools", "assistant-plus", 18) { morePanel() }
+        model = icon(R.drawable.ic_surface, "Model", "assistant-model", 18) { modelTapped() }
+        // aegentica.se's composer shape: the message on top, then + and the screen on the left and
+        // the model, microphone and send on the right.
         val bar = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL; tag = "assistant-bar"; padDp(4, 0, 0, 0)
-            addView(chip, LinearLayout.LayoutParams(-2, dp(52)))
-            addView(input, LinearLayout.LayoutParams(0, dp(52), 1f))
-            addView(mic, LinearLayout.LayoutParams(dp(40), dp(40)))
-            addView(send, LinearLayout.LayoutParams(dp(44), dp(44)))
+            orientation = LinearLayout.VERTICAL; tag = "assistant-bar"
+            addView(input, LinearLayout.LayoutParams(-1, dp(48)))
+            addView(LinearLayout(this@AssistantActivity).apply {
+                gravity = Gravity.CENTER_VERTICAL; padDp(2, 0, 0, 2)
+                addView(plus, LinearLayout.LayoutParams(dp(40), dp(40)))
+                addView(chip, LinearLayout.LayoutParams(-2, dp(44)))
+                addView(View(this@AssistantActivity), LinearLayout.LayoutParams(0, 1, 1f))
+                addView(model, LinearLayout.LayoutParams(dp(40), dp(40)))
+                addView(mic, LinearLayout.LayoutParams(dp(40), dp(40)))
+                addView(send, LinearLayout.LayoutParams(dp(44), dp(44)))
+            }, LinearLayout.LayoutParams(-1, -2))
         }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; tag = "assistant-sheet"; padDp(4, 6, 4, 4)
@@ -206,24 +264,36 @@ class AssistantActivity : Activity() {
         window.setBackgroundDrawable(sheet)
         window.setLayout(width, android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
         window.setGravity(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
-        window.attributes = window.attributes.apply { y = dp(10) }
+        window.attributes = window.attributes.apply {
+            y = dp(10)
+            // Never under the gesture bar or the keyboard, whatever the content does while it streams.
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                fitInsetsTypes = SHEET_INSETS
+                fitInsetsSides = WindowInsets.Side.all()
+                isFitInsetsIgnoringVisibility = false
+            }
+        }
+        // The answer area's room follows the keyboard and the bars, so the sheet never outgrows its space.
+        root.setOnApplyWindowInsetsListener { v, insets -> scroll.requestLayout(); v.onApplyWindowInsets(insets) }
         setFinishOnTouchOutside(true)
-        frost(blurForTest ?: (android.os.Build.VERSION.SDK_INT >= 31 && windowManager.isCrossWindowBlurEnabled))
-        if (android.os.Build.VERSION.SDK_INT >= 31) followBlur()
+        surface()
         root.post { root.arrive() }
         unlisten = ScreenContexts.listen { showContext() }
         start(intent)
     }
 
+    private fun busy() = brain != null || agent?.running == true
+
     private fun updateSend() {
-        val busy = brain != null
+        val steering = agent?.running == true && input.text.isNotBlank()
+        val busy = busy() && !steering
         val filled = busy || input.text.isNotBlank()
         send.setImageResource(if (busy) R.drawable.ic_stop else R.drawable.ic_arrow_up)
         send.imageTintList = ColorStateList.valueOf(ink(if (filled) R.color.ask_on_ink else R.color.ask_ink_4))
         sendFill.setColor(ink(if (filled) R.color.ask_ink else R.color.ask_fill))
         // The arrow draws at 18dp, the stop square at 12dp.
         if (busy) send.padDp(10, 10, 10, 10) else send.padDp(13, 13, 13, 13)
-        send.contentDescription = if (busy) "Stop" else "Ask"
+        send.contentDescription = if (busy) "Stop" else if (steering) "Tell the agent" else "Ask"
     }
 
     private fun showSuggestions() {
@@ -233,6 +303,10 @@ class AssistantActivity : Activity() {
         if (!visible) return
         fun add(view: View) = chips.addView(view, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) })
         val picked = selection
+        // Without an OpenRouter key the sheet answers with Gemini Nano; one tap signs in to the full agent.
+        if (PhoneAgent.enabled(this) && PhoneAgent.key(this) == null) add(chipView("Sign in to OpenRouter", "assistant-sign-in", R.drawable.ic_arrow_up_right) {
+            OpenRouterSignIn.start(this); finish()
+        }.apply { contentDescription = "Sign in to OpenRouter to use the full agent. Until then Gemini Nano answers on this phone." })
         if (!context().empty) add(chipView("Chat about this", "assistant-chat", R.drawable.ic_compose) { chatAbout() }.apply {
             contentDescription = "Chat about this on aegentica.se: a new chat opens with the " + (if (picked != null) "selection" else "screen") + " in the message box"
         })
@@ -244,7 +318,10 @@ class AssistantActivity : Activity() {
     /** The cross ends the current question and returns to the suggestions. */
     private fun clearThread() {
         stop()
+        // A new conversation next time: the agent forgets this one.
+        agent?.listener = null; agent = null; agentScreenSent = false; agentMode = false
         question = ""; reply = ""; answer.text = ""; asked.text = ""; status.text = ""; actions.removeAllViews(); follows.removeAllViews()
+        steps.removeAllViews(); steps.visibility = View.GONE; approvalCard.visibility = View.GONE; scroll.reset()
         card.visibility = View.GONE; showSuggestions()
     }
 
@@ -262,17 +339,30 @@ class AssistantActivity : Activity() {
         selection = intent?.takeIf { it.action == Intent.ACTION_PROCESS_TEXT }
             ?.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()?.takeIf { it.isNotBlank() }?.take(ScreenContexts.MAX_TEXT)
         editable = selection != null && intent?.getBooleanExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, false) == false
-        source = callingPackage ?: referrer?.host.orEmpty()
+        source = intent?.getStringExtra(SOURCE_APP)?.takeIf { it.isNotBlank() } ?: callingPackage ?: referrer?.host.orEmpty()
+        handback = intent?.getStringExtra(HANDBACK)?.let { takeHandback(it) }
         // A selection is not a screen invocation: closing must not clear a shared screen.
         invocation = if (selection != null) -1 else ScreenContexts.invocation
         settled = selection != null || intent?.getBooleanExtra(DIRECT, false) == true
         if (!settled) main.postDelayed({ settled = true; showContext() }, 2500)
         question = ""; reply = ""; answer.text = ""; asked.text = ""; status.text = ""; actions.removeAllViews(); follows.removeAllViews(); input.setText("")
+        agent?.listener = null; agent = null; agentScreenSent = false; agentMode = false
+        if (::steps.isInitialized) { steps.removeAllViews(); steps.visibility = View.GONE; approvalCard.visibility = View.GONE; scroll.reset() }
         card.visibility = View.GONE
         showContext()
+        // Voice first: a fresh assistant invocation starts listening when the microphone is already allowed.
+        if (selection == null && intent?.getBooleanExtra(DIRECT, false) != true && prefs().getBoolean("assistant_listen", true) &&
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
+            main.postDelayed({ if (!isFinishing && question.isEmpty() && input.text.isBlank() && (ears ?: Ears(this).also { ears = it }).available()) listen() }, 350)
     }
 
-    private fun modelLabel(): String = if (ConnectedAI.forVoice(this)) ConnectedAI.label(this) else "Gemini Nano · on this phone"
+    /** Who answers, in the status line. A Nano answer while the agent is set up says it is the offline stand-in. */
+    private fun modelLabel(): String = when {
+        agentMode -> PhoneAgent.label(this)
+        ConnectedAI.forVoice(this) -> ConnectedAI.label(this)
+        PhoneAgent.ready(this) -> "Offline · Gemini Nano on this phone"
+        else -> "Gemini Nano · on this phone"
+    }
 
     private fun appName(pkg: String): String = if (pkg.isBlank()) "" else runCatching {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
@@ -305,11 +395,23 @@ class AssistantActivity : Activity() {
             else -> "Android shared nothing from this screen. Tap for assistant settings."
         }
         chip.alpha = if (!c.empty && !on) 0.55f else 1f
+        showModel()
         if (input.hint != "Listening…") input.hint = hint()
         updateSend(); showSuggestions()
     }
 
+    /**
+     * A question goes to the phone agent when it is set up and online; words sent while it works
+     * steer it. Otherwise Nano (or the connected model after its opt-in) answers, labelled.
+     */
     private fun ask(raw: String, aloud: Boolean, shown: String? = null) {
+        if (agent?.running == true) { steer(raw, aloud); return }
+        if (PhoneAgent.ready(this) && PhoneAgent.online(this)) { askAgent(raw, aloud, shown); return }
+        askBrain(raw, aloud, shown)
+    }
+
+    private fun askBrain(raw: String, aloud: Boolean, shown: String? = null) {
+        agentMode = false
         val screen = context()
         val question = raw.trim().ifEmpty { if (screen.empty) { toast("Type or speak a question."); return } else if (selection != null) "Explain this." else "Explain what is on this screen." }
         stop()
@@ -369,7 +471,7 @@ class AssistantActivity : Activity() {
             startActivity(LiveActivity.intent(this, start = true)); finish()
         }
         if (editable) follows.addView(chipView("Replace selection", "assistant-replace", R.drawable.ic_arrow_up_right) {
-            setResult(RESULT_OK, Intent().putExtra(Intent.EXTRA_PROCESS_TEXT, Markdown.strip(reply))); finish()
+            handBack(Markdown.strip(reply))
         }, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) })
         AssistantActions.detect(reply).forEach { (title, intent) ->
             follows.addView(chipView(title, "assistant-follow", R.drawable.ic_arrow_up_right) { open(intent) }, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) })
@@ -403,11 +505,181 @@ class AssistantActivity : Activity() {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST); return }
         val e = ears ?: Ears(this).also { ears = it }
         if (!e.available()) { toast("Offline speech is not ready on this phone. Type instead, or set up voice in Settings."); return }
-        stop()
+        // Talking while the agent works steers it, so the run keeps going; anything else is replaced.
+        if (agent?.running == true) { e.cancel(); mouth?.hush() } else stop()
         mic.setColorFilter(ink(R.color.listening)); input.hint = "Listening…"
         e.listen(onLevel = { mic.speechLevel(it) }, onPartial = { input.setText(it) },
             onFinal = { heard -> input.setText(heard); if (heard.isNotBlank()) ask(heard, true) },
             onStop = { problem -> mic.setColorFilter(null); mic.speechLevel(0f); input.hint = hint(); problem?.let { toast(it.message) } })
+    }
+
+    /** The model chip: the maker's logo for the agent's model, the Æ for Gemini Nano on the phone. */
+    private fun showModel() {
+        if (!::model.isInitialized) return
+        val agentOn = PhoneAgent.ready(this)
+        val id = PhoneAgent.model(this)
+        model.setImageResource(if (agentOn) Makers.logo(id) ?: R.drawable.ic_surface else R.drawable.ic_surface)
+        model.contentDescription = if (agentOn) "Model: ${id.substringAfter('/')} through OpenRouter. Tap to choose another."
+            else if (PhoneAgent.enabled(this)) "Gemini Nano on this phone. Tap to sign in to OpenRouter for the full agent." else "Gemini Nano on this phone."
+    }
+
+    private fun modelTapped() {
+        if (!PhoneAgent.enabled(this)) { toast("The agent is off in Settings, so Gemini Nano answers on this phone."); return }
+        if (PhoneAgent.key(this) == null) { OpenRouterSignIn.start(this); finish(); return }
+        toast("Loading OpenRouter's models…")
+        Thread {
+            val result = runCatching { ConnectedAI.fetchModels() }
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                result.onSuccess { list ->
+                    // The agent sees screenshots and calls tools, so only models that do both are offered.
+                    ConnectedAI.chooseModel(this, list.filter { it.vision && it.tools }) { m -> PhoneAgent.choose(this, m); showModel(); toast("The agent now uses ${m.name}.") }
+                }.onFailure { toast(it.message ?: "Could not load the model list.") }
+            }
+        }.start()
+    }
+
+    /** The + menu: the screen, the conversation on aegentica.se, voice and the agent's settings. */
+    private fun morePanel() {
+        val menu = android.widget.PopupMenu(this, plus)
+        val screen = context()
+        if (selection == null && !ScreenContexts.current.empty) menu.menu.add(0, 1, 0, "Include the screen").apply { isCheckable = true; isChecked = screenOn() }
+        if (!screen.empty) menu.menu.add(0, 2, 0, "Chat about this on aegentica.se")
+        if (Live.available() && ConnectedAI.geminiConfigured(this)) menu.menu.add(0, 3, 0, "Talk live about this screen")
+        if (PhoneAgent.enabled(this)) menu.menu.add(0, 4, 0, if (PhoneAgent.key(this) == null) "Sign in to OpenRouter" else "Choose the agent's model")
+        menu.menu.add(0, 5, 0, "Assistant settings")
+        menu.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                1 -> chipTapped()
+                2 -> chatAbout()
+                3 -> { Live.pendingScreen = context().takeIf { !it.empty }; startActivity(LiveActivity.intent(this, start = true)); finish() }
+                4 -> modelTapped()
+                5 -> setup(this)
+            }
+            true
+        }
+        menu.show()
+    }
+
+    /** For TalkBack and keyboards: the microphone button starts listening, or sends what it heard. */
+    private fun toggleListen() { if (input.hint == "Listening…") ears?.stop() else listen() }
+
+    private fun hideKeyboard() {
+        getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(input.windowToken, 0)
+    }
+
+    // ---------------------------------------------------------------- the phone agent
+
+    private fun askAgent(raw: String, aloud: Boolean, shown: String?) {
+        val screen = context()
+        val question = raw.trim().ifEmpty { if (screen.empty) { toast("Type or speak a question."); return } else if (selection != null) "Explain this." else "Explain what is on this screen." }
+        stop()
+        val session = agent ?: PhoneAgent.session(this, fresh = true).also { agent = it }
+        session.tools = PhoneTools.forAgent(this)
+        session.listener = { if (!isFinishing && agent === it) renderAgent(it) }
+        agentMode = true; agentSettled = false
+        val first = !agentScreenSent && !screen.empty
+        val shot = if (first) screen.screenshot?.let { ScreenContexts.jpeg(ScreenContexts.scaled(it)) } else null
+        val turn = AgentTurn.User(text = question, app = screen.app, appName = appName(screen.app),
+            screen = if (first) screen.text.take(ScreenContexts.MAX_TEXT) else "", selection = selection != null, screenshot = shot, aloud = aloud)
+        if (first) agentScreenSent = true
+        this.question = question; reply = ""; answer.text = ""; actions.removeAllViews(); follows.removeAllViews()
+        steps.removeAllViews(); steps.visibility = View.GONE; approvalCard.visibility = View.GONE; scroll.reset()
+        asked.text = shown ?: question; input.setText("")
+        card.visibility = View.VISIBLE; showSuggestions(); hideKeyboard()
+        mouth?.hush()
+        if (aloud) (mouth ?: Mouth(this).also { mouth = it }).begin(Ears(this).locale())
+        speaking = aloud
+        status.text = (if (screen.empty) "Thinking" else if (selection != null) "Reading the selection" else "Reading the screen") + " · " + PhoneAgent.label(this) +
+            if (shot != null && PhoneAgent.vision(this)) " · sees the screenshot" else ""
+        session.send(turn)
+        updateSend()
+    }
+
+    /** Words sent while the agent works: its newest instruction. */
+    private fun steer(raw: String, aloud: Boolean) {
+        val text = raw.trim()
+        if (text.isEmpty()) return
+        input.setText(""); hideKeyboard()
+        agentSettled = false
+        if (aloud) { speaking = true; (mouth ?: Mouth(this).also { mouth = it }).begin(Ears(this).locale()) }
+        agent?.send(AgentTurn.User(text, aloud = aloud))
+        status.text = "Got it. Changing course…"
+    }
+
+    /** Whether the current agent answer is read aloud (the question was spoken). */
+    private var speaking = false
+    private var shownApproval: String? = null
+
+    private fun renderAgent(session: AgentSession) {
+        val view = session.view()
+        updateSend()
+        renderSteps(view.steps)
+        if (view.answer.isNotBlank()) {
+            reply = Prompts.reply(view.answer)
+            answer.text = Markdown.render(reply, dp(18), view.busy)
+            if (speaking) mouth?.follow(Markdown.strip(reply, streaming = true))
+        }
+        renderApproval(view.approval)
+        val running = view.steps.lastOrNull { it.status == "running" }
+        val cost = view.cost?.let { if (it < 0.01) " · under 1 öre" else String.format(java.util.Locale.ROOT, " · $%.3f", it) }.orEmpty()
+        status.text = when {
+            view.approval != null -> "Waiting for you · " + view.approval.label
+            view.busy && running != null -> running.label + "…"
+            view.busy -> "Thinking · " + PhoneAgent.label(this)
+            view.error != null -> view.error
+            view.stopped -> "Stopped."
+            else -> PhoneAgent.label(this) + cost
+        }
+        if (!view.busy && !agentSettled) settleAgent(view)
+    }
+
+    /** The run ended: read the answer, show the follow-ups, or let Nano answer when OpenRouter was unreachable. */
+    private fun settleAgent(view: AgentView) {
+        agentSettled = true
+        if (view.offline && view.answer.isBlank()) {
+            // No connection: Gemini Nano answers on the phone, and says so.
+            agent?.listener = null; agent = null; agentScreenSent = false
+            askBrain(question, speaking, asked.text.toString())
+            return
+        }
+        if (speaking) { if (reply.isNotBlank()) mouth?.finish(Markdown.strip(reply)) else mouth?.hush() }
+        speaking = false
+        if (reply.isNotBlank()) { answer.text = Markdown.render(reply, dp(18)); showActions() }
+    }
+
+    private fun renderSteps(list: List<AgentStep>) {
+        steps.removeAllViews()
+        steps.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
+        val shown = list.takeLast(4)
+        if (list.size > shown.size) steps.addView(label("${list.size - shown.size} earlier steps", 12f).apply { setTextColor(ink(R.color.ask_ink_4)) })
+        shown.forEach { step ->
+            val mark = when (step.status) { "done" -> "✓"; "error" -> "!"; "denied" -> "✕"; "awaiting-approval" -> "?"; else -> "•" }
+            steps.addView(label("$mark  ${step.label}", 13f).apply {
+                tag = "assistant-step"; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END
+                setTextColor(ink(if (step.status == "running" || step.status == "awaiting-approval") R.color.ask_ink_2 else R.color.ask_ink_3))
+                padDp(0, 2, 0, 2)
+            })
+        }
+    }
+
+    /** An Allow prompt, when the sheet is in front. Steps that always ask say why and are never remembered. */
+    private fun renderApproval(approval: Approval?) {
+        if (approval == null) { approvalCard.visibility = View.GONE; approvalCard.removeAllViews(); return }
+        if (approvalCard.visibility == View.VISIBLE && shownApproval == approval.call.id) return
+        approvalCard.removeAllViews(); shownApproval = approval.call.id
+        approvalCard.visibility = View.VISIBLE
+        approvalCard.addView(label(approval.label, 15f).apply { medium(); setTextColor(ink(R.color.ask_ink)) })
+        val detail = listOfNotNull(approval.reason, approval.appName.takeIf { it.isNotBlank() }?.let { "In $it" }).joinToString(" · ")
+        if (detail.isNotBlank()) approvalCard.addView(label(detail, 13f).apply { setTextColor(ink(R.color.ask_ink_3)); padDp(0, 2, 0, 6) })
+        val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        fun button(title: String, tagName: String, decision: Decision) = row.addView(chipView(title, tagName) {
+            approvalCard.visibility = View.GONE; agent?.decide(approval.call.id, decision)
+        }, LinearLayout.LayoutParams(-2, dp(44)).apply { marginEnd = dp(6) })
+        button(if (approval.risk == Risk.ALWAYS) "Allow once" else "Allow", "assistant-allow", Decision(true))
+        if (approval.rememberable) button("Always in ${approval.appName}", "assistant-always", Decision(true, always = true))
+        button("Don't", "assistant-deny", Decision(false))
+        approvalCard.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(row) })
     }
 
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
@@ -419,6 +691,7 @@ class AssistantActivity : Activity() {
     private fun stop() {
         request++
         brain?.cancel(); brain = null
+        agent?.stop()
         ears?.cancel(); mic.speechLevel(0f); mic.setColorFilter(null)
         mouth?.hush()
         if (::send.isInitialized) updateSend()
@@ -439,23 +712,58 @@ class AssistantActivity : Activity() {
     }
     override fun onDestroy() {
         stop(); unlisten?.invoke(); unlisten = null
+        agent?.listener = null
         main.removeCallbacksAndMessages(null)
         mouth?.close(); mouth = null
         ScreenContexts.clear(invocation)
         super.onDestroy()
     }
 
-    /** A scroll area that grows with the answer up to half the screen (460dp at most), keeping the bar in view. */
-    private class CappedScroll(context: Context) : ScrollView(context) {
+    /**
+     * A scroll area that grows with the answer up to half the screen (460dp at most), and never
+     * past the room the keyboard and the system bars leave, so the bar stays in view. While an
+     * answer streams it never gets shorter (a re-rendered paragraph can measure a little less),
+     * until the next question; only less room (the keyboard opening) makes it smaller.
+     */
+    class CappedScroll(context: Context) : ScrollView(context) {
+        private var tallest = 0
+        /** Room left on screen for the answer, in pixels; null measures the window. */
+        internal var roomForTest: Int? = null
+
+        fun reset() { tallest = 0; requestLayout() }
+
+        /** Height the system bars, the cutout and the keyboard leave, minus the sheet's bar and margins. */
+        private fun room(): Int {
+            roomForTest?.let { return it }
+            val density = resources.displayMetrics.density
+            val screen = resources.displayMetrics.heightPixels
+            val taken = if (android.os.Build.VERSION.SDK_INT >= 30) runCatching {
+                val wm = context.getSystemService(android.view.WindowManager::class.java)
+                val insets = wm.currentWindowMetrics.windowInsets.getInsets(SHEET_INSETS)
+                insets.top + insets.bottom
+            }.getOrDefault(0) else 0
+            // The bar (52dp), the header row (40dp) and the sheet's margins and padding.
+            return screen - taken - (132 * density).toInt()
+        }
+
         override fun onMeasure(widthSpec: Int, heightSpec: Int) {
-            val cap = minOf((resources.displayMetrics.heightPixels * 0.5f).toInt(), (460 * resources.displayMetrics.density).toInt())
+            val density = resources.displayMetrics.density
+            val cap = minOf((resources.displayMetrics.heightPixels * 0.5f).toInt(), (460 * density).toInt(), room()).coerceAtLeast((96 * density).toInt())
             super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(cap, MeasureSpec.AT_MOST))
+            val height = maxOf(measuredHeight, minOf(tallest, cap))
+            tallest = maxOf(tallest, height)
+            setMeasuredDimension(measuredWidth, height)
         }
     }
 
     companion object {
         const val DIRECT = "direct"
-        /** Renders force the blurred or the plain sheet; null follows the device. */
+        /** Held this long, the microphone sends when the finger lifts. */
+        const val HOLD_MS = 350L
+        /** What the sheet's window keeps clear of: the status and navigation bars, the cutout and the keyboard. */
+        @get:android.annotation.TargetApi(30)
+        val SHEET_INSETS get() = WindowInsets.Type.systemBars() or WindowInsets.Type.ime() or WindowInsets.Type.displayCutout()
+        /** Kept for older renders; the sheet is opaque either way. */
         internal var blurForTest: Boolean? = null
         private const val REQUEST = 46
         val SUGGESTIONS = listOf("Explain this", "Summarize", "Fill in what's missing", "Draft a reply", "Translate to English")
@@ -468,13 +776,36 @@ class AssistantActivity : Activity() {
             "Improve" to "Rewrite this so it reads clearly and naturally, keeping its meaning and language. Reply with the rewritten text only.")
         fun intent(context: Context, direct: Boolean = false) = Intent(context, AssistantActivity::class.java).putExtra(DIRECT, direct)
 
+        const val SOURCE_APP = "com.caceras.surfacelab.extra.SOURCE_APP"
+        private const val HANDBACK = "com.caceras.surfacelab.extra.HANDBACK"
+        private val handbacks = java.util.concurrent.ConcurrentHashMap<String, (String) -> Unit>()
+        private fun takeHandback(token: String) = handbacks.remove(token)
+
+        /**
+         * Opens the sheet over the current app with [text] as its context, the way the selection
+         * menu does: a selection, or what the owner typed in a field (the keyboard's agent button).
+         * [app] is the package it came from. With [editable], an answer can replace the text: it
+         * goes to [handback] when given (held in memory for this one opening, never in the intent),
+         * otherwise back to the caller as the selection menu's result.
+         */
+        fun withText(context: Context, text: String, app: String? = null, editable: Boolean = false, handback: ((String) -> Unit)? = null): Intent =
+            Intent(context, AssistantActivity::class.java).setAction(Intent.ACTION_PROCESS_TEXT).setType("text/plain")
+                .putExtra(Intent.EXTRA_PROCESS_TEXT, text).putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, !editable)
+                .apply {
+                    app?.let { putExtra(SOURCE_APP, it) }
+                    if (handback != null) UUID().let { token -> handbacks[token] = handback; putExtra(HANDBACK, token) }
+                    if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+
+        private fun UUID() = java.util.UUID.randomUUID().toString()
+
         /** How to make Ægentica the phone's assistant, with a shortcut to the right settings page. */
         fun setup(activity: Activity) {
             AlertDialog.Builder(activity).setTitle("Make Ægentica your phone's assistant")
                 .setMessage("1. Open Default apps → Digital assistant app and choose Ægentica AI (this replaces Gemini there).\n" +
                     "2. On the same page, turn on Use text from screen and Use screenshot.\n" +
                     "3. Swipe up from a bottom corner, or hold the power button if it is set to Digital assistant, in any app.\n\n" +
-                    "The screen is read only when you invoke the assistant. Answers come from Gemini Nano on the phone unless you chose your connected model for voice and the assistant in Connected AI; then the screen text and screenshot go to that provider.")
+                    "The screen is read only when you invoke the assistant. Answers come from the phone agent on OpenRouter once you sign in (Settings → Phone agent); the screen text and screenshot then go to OpenRouter with your question. Without a connection or a sign-in, Gemini Nano answers on the phone.")
                 .setNegativeButton("Not now", null)
                 .setNeutralButton("Try without screen") { _, _ -> activity.startActivity(intent(activity, direct = true)) }
                 .setPositiveButton("Open settings") { _, _ ->

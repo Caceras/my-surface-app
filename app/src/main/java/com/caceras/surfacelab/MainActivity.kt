@@ -344,6 +344,7 @@ class MainActivity : Activity() {
         })
         panel.addView(flatButton("Connected AI · OpenRouter, Gemini or local") { ConnectedAI.settings(this) { updateSend(); status.text=if(ConnectedAI.enabled(this)) "Connected AI · " + ConnectedAI.host(this) else "Gemini Nano · On device" } })
         panel.addView(flatButton("Phone assistant · see and ask about any screen") { AssistantActivity.setup(this) })
+        panel.addView(flatButton("Phone agent · OpenRouter sign-in and model") { PhoneAgent.settings(this) })
         panel.addView(flatButton("Ægentica keys · AI beside your keyboard") { KeyboardPanel.setup(this) })
         panel.addView(flatButton("AI sources") { KnowledgeContext.choose(this) { composeState.text=KnowledgeContext.label(this) } })
         panel.addView(preferenceSwitch("Recall matching notes when I ask", KnowledgeContext.recallEnabled(this)) { KnowledgeContext.setRecall(this, it) }.apply { tag = "recall-switch" })

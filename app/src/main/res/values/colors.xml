@@ -31,6 +31,8 @@
     <color name="ask_press">#14000000</color>
     <color name="ask_glass_blur">#94FFFFFF</color>
     <color name="ask_glass_solid">#F5F8F8FA</color>
+    <!-- The sheet, opaque like aegentica.se's composer and popovers (docs/DESIGN.md: no blur or glass). -->
+    <color name="ask_surface">#FFFFFF</color>
     <color name="ask_edge">#1A000000</color>
     <color name="ask_keys">#ECEEF2</color>
     <color name="ask_divider">#12000000</color>

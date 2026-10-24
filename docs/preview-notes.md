@@ -1,6 +1,11 @@
 # Current preview changes
 
 **New in this build:**
+- **The assistant thinks with a real agent.** Swipe up from a bottom corner: the sheet now asks Ægentica's own agent on OpenRouter, with your screen's text and screenshot attached, instead of Gemini Nano. Sign in once in Settings → *Phone agent* (or with the *Sign in to OpenRouter* chip in the sheet); Claude Sonnet 5.5 is the default, and the model chip with its maker's logo picks another. Gemini Nano answers only when there is no connection, and the sheet says *Offline*.
+- **Voice first.** The sheet starts listening when it opens. Hold the microphone to talk and let go to send. Talk or type while it works to change its course; the round button stops it. Spoken questions are answered aloud.
+- **The sheet stays put.** It no longer shrinks or slides under the gesture bar while an answer streams: it keeps clear of the bars and the keyboard and keeps its height until the next question. It is opaque now, in aegentica.se's white and black, with the same message box: + on the left (the screen, Chat on aegentica.se, Talk live, the model, settings), the model, the microphone and send on the right.
+
+**Earlier in this build:**
 - **Chat about your screen on aegentica.se.** In the phone's assistant (swipe up from a bottom corner), tap **Chat about this**: a new chat opens on aegentica.se with the screen's text in the message box and the screenshot attached, so the AI sees what you see. Add your question and send; nothing is sent before you do. After an answer, the pencil icon does the same. A selection goes along as text.
 
 **Earlier in build 213:**
