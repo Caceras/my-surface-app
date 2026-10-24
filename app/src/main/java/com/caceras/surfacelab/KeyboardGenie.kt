@@ -47,6 +47,8 @@ interface GenieWork {
     fun steer(text: String)
     fun stop()
     fun decide(approval: Approval, allow: Boolean, always: Boolean)
+    /** The work is the phone agent's current conversation, so the full sheet can continue it. */
+    val continues: Boolean get() = false
 }
 
 /** Who does the work. The phone agent when it is signed in and online; Gemini Nano (or the chosen model) otherwise. */
@@ -86,7 +88,9 @@ object PhoneGenie : GenieAgent {
         val session = PhoneAgent.session(context, fresh = true)
         session.tools = PhoneTools.forAgent(context)
         val who = PhoneAgent.label(context)
-        session.listener = { s ->
+        // An observer, not the listener: when the sheet continues this conversation it takes the
+        // listener, and the keyboard keeps following, so the answer is waiting back in the keys.
+        session.addObserver { s ->
             val v = s.view()
             update(GenieState(v.steps, v.answer, v.busy, v.approval, v.error, who))
         }
@@ -96,6 +100,7 @@ object PhoneGenie : GenieAgent {
             override fun steer(text: String) = session.send(AgentTurn.User(text = text, app = ask.app, appName = ask.appName))
             override fun stop() = session.stop()
             override fun decide(approval: Approval, allow: Boolean, always: Boolean) = session.decide(approval.call.id, Decision(allow, always))
+            override val continues get() = PhoneAgent.current === session
         }
     }
 }

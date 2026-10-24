@@ -54,7 +54,7 @@ class KeyboardTest {
     }
 
     /** Stands in for the phone agent: records what it was asked and lets the test stream its work. */
-    private class FakeAgent : GenieAgent {
+    private class FakeAgent(private val conversation: Boolean = false) : GenieAgent {
         var ask: GenieAsk? = null
         var update: ((GenieState) -> Unit)? = null
         val steered = mutableListOf<String>()
@@ -65,6 +65,7 @@ class KeyboardTest {
                 override fun steer(text: String) { steered += text }
                 override fun stop() = Unit
                 override fun decide(approval: Approval, allow: Boolean, always: Boolean) { decisions += allow }
+                override val continues get() = conversation
             }
         }
     }
@@ -233,5 +234,21 @@ class KeyboardTest {
         KeyboardInbox.answer(second, "Vi ses i morgon!")
         panel.start(host.info)
         assertEquals("text that changed meanwhile is never overwritten", "ses imorgon kl 3", field.text.toString())
+    }
+
+    @Test fun `dragging up continues the same conversation in the full sheet`() {
+        val agent = FakeAgent(conversation = true); KeyboardAgents.forTest = agent
+        val (panel, host) = panel(field("hej"))
+        panel.openGenie()
+        text(panel.view, "Improve").performClick(); idle()
+        panel.workspace()
+        val opened = host.opened.single()
+        assertTrue("the sheet continues the keyboard's conversation", opened.getBooleanExtra(GenieKeyboardBridge.CONTINUE, false))
+        val sheet = shadowOf(Robolectric.buildActivity(GenieKeyboardBridge::class.java, opened).create().get()).nextStartedActivityForResult.intent
+        assertEquals(AssistantActivity::class.java.name, sheet.component!!.className)
+        assertEquals("the sheet opens over the app, not in Ægentica's own task", 0, sheet.flags and Intent.FLAG_ACTIVITY_NEW_TASK)
+        agent.update!!(GenieState(answer = "Hej!", who = "Ægentica")); idle()
+        panel.openGenie()
+        assertTrue("its answer is waiting back in the keys", views(panel.view).any { it.tag == "genie-insert" && shown(it) })
     }
 }

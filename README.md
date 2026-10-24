@@ -59,11 +59,12 @@ The Pixel 10 Pro XL is listed in Google's Prompt API support table. Availability
 | Voice | Opens the foreground voice conversation | Chat → Voice |
 | Pixel Quick Tap | Opens chat with a back-of-phone double tap | Android Settings → System → Gestures → Quick Tap → Open app |
 | Assistant gesture | Opens Voice where Android supports the selected assistant | Settings → Set as digital assistant |
-| Quick Settings | Voice tile opens Voice; **Transcribe** tile starts or opens a transcript | Add the tiles from Android's tile editor |
-| Home widget | Capture/Talk; pinned-note or last-answer preview only when enabled | Settings → Add home screen widget |
-| Launcher shortcuts | Transcribe, Voice, History and Capture note; Chat/Voice can be pinned | Long-press the launcher icon |
+| Quick Settings | **Ægentica** tile opens the genie and says what it is doing (Working, Waiting for you, Answer ready); Voice tile opens Voice; **Transcribe** tile starts or opens a transcript | Add the tiles from Android's tile editor |
+| Home widget | **Ægentica** (2×1): the rabbit and what the genie is doing, tap to ask; the classic widget: Capture/Talk, pinned-note or last-answer preview only when enabled | Long-press the home screen → Widgets → Ægentica AI |
+| Launcher shortcuts | **Ask Ægentica** (the genie over the home screen), Transcribe, Voice, History and Capture note; Chat/Voice can be pinned | Long-press the launcher icon |
 | Transcribe | Long-form verbatim transcription with a Pause / Stop & save notification | Today or Notes → Transcribe |
-| Share sheet | Stages shared **plain text** in the composer for review | Share text → Ægentica AI |
+| Share sheet | **Ask Ægentica**: links, text, pictures, screenshots, PDFs (first page) and text files open the genie over the app with them as context. **Ægentica AI**: shared text becomes a new chat's draft on aegentica.se | Share → Ask Ægentica or Ægentica AI |
+| NFC tag | Tap a tag and the genie starts on what you wrote on it; only tags this phone wrote start at once, others show their words and wait for *Start* | Settings → *NFC tag* → type the request, hold a tag to the phone |
 | Ægentica keys | A full keyboard (Svenska å ä ö or English, numbers, symbols, emoji, accents on long press, dictation) that can replace Gboard, with the genie inside: **Æ** turns the keys into the live genie about what you are writing (steps, streaming answer, Insert / Replace cards, Allow for actions), drag up for the full genie sheet over the app | Settings → *Ægentica keys* → Turn on, then Choose keyboard (two taps); also in aegentica.se's Phone menu |
 | Text selection | One entry, *Ægentica*: the genie sheet opens over the app with the selection as context, the agent helps at once, and *Replace* puts an answer back in an editable field. On Ægentica's own pages (aegentica.se, Glimt) *Ægentica* is first in the selection toolbar | Select text → *Ægentica* (first on our pages; in other apps it sits in the ⋮ menu, after Android's own smart action) |
 

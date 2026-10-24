@@ -17,6 +17,9 @@
     <uses-permission android:name="com.beeper.android.permission.READ_PERMISSION" />
     <uses-permission android:name="com.beeper.android.permission.SEND_PERMISSION" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!-- NFC tags that start the genie: reading them, and writing one from Settings. -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <!-- Android 16 live updates: a running agent shows its progress in the status bar. -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
@@ -254,6 +257,57 @@
             </intent-filter>
             <meta-data android:name="android.view.im" android:resource="@xml/keyboard" />
         </service>
+        <!--
+            The genie's other doors: the share sheet (text, links, pictures, PDFs, text files), the
+            launcher shortcut, the tile, the widget and NFC tags. It shows nothing itself and opens the
+            genie in a task of its own; a tag only starts at once when this phone signed it.
+        -->
+        <activity
+            android:name=".GenieEntryActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:label="@string/genie_share"
+            android:icon="@drawable/ic_surface"
+            android:theme="@style/GenieBridge">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="text/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.caceras.surfacelab.action.GENIE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="aegentica" android:host="genie" />
+            </intent-filter>
+        </activity>
+        <service
+            android:name=".GenieTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_surface"
+            android:label="@string/genie_tile"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <receiver android:name=".GenieWidgetProvider" android:exported="false" android:label="@string/genie_tile">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/genie_widget_info" />
+        </receiver>
         <!-- Opens the genie sheet for the keyboard in a task of its own, over the app being typed in. -->
         <activity
             android:name=".GenieKeyboardBridge"

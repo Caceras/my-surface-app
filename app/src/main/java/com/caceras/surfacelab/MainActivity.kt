@@ -347,6 +347,7 @@ class MainActivity : Activity() {
         panel.addView(flatButton("Phone agent · OpenRouter sign-in and model") { PhoneAgent.settings(this) })
         panel.addView(flatButton("Ægentica hands · let the assistant use your phone") { HandsSetup.show(this) })
         panel.addView(flatButton("Ægentica keys · a keyboard with the genie inside") { KeyboardSetup.show(this) })
+        panel.addView(flatButton("NFC tag · start the genie with a tap") { GenieTags.write(this) })
         panel.addView(flatButton("AI sources") { KnowledgeContext.choose(this) { composeState.text=KnowledgeContext.label(this) } })
         panel.addView(preferenceSwitch("Recall matching notes when I ask", KnowledgeContext.recallEnabled(this)) { KnowledgeContext.setRecall(this, it) }.apply { tag = "recall-switch" })
         panel.addView(label("Searches your own notes and transcripts for words in your question and cites them. Stays on this phone with Nano; connected AI needs its own opt-in.", 13f, true))

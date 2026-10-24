@@ -69,6 +69,8 @@ Workspace imports merge transactionally. Conflicting content becomes separate re
 
 No broad storage, contacts, direct-call, location, notification-listener or wake-word access is requested. Document import/export uses Android's file picker. Review merged dependency manifests when changing SDK versions.
 
+**Doors to the genie.** *Ask Ægentica* in the share sheet reads only what was shared (text, links, the first picture scaled to 1568 px, a PDF's first page, up to 6,000 characters of a text file) and holds it in memory as the genie's screen for that question; it goes to the model only when you ask. The tile and the widget show the genie's status in words; a step's own words appear there only when widget previews are on. An NFC tag carries the words you wrote and a signature made with a key that stays on this phone (app-private storage, excluded from backups); only signed tags may start the genie at once, and no tag approves an action.
+
 ## Visible surfaces
 
 Widget previews default off; enabling them can show a pinned note or last answer to anyone viewing the home screen. Compact widgets omit content. Private screen protects app windows/Recents using FLAG_SECURE; it does not encrypt files or protect other apps opened through handoffs. Clipboard copies set sensitive-preview metadata. Editors request no personalized learning, but the keyboard controls its own behavior.

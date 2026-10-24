@@ -413,6 +413,13 @@ class KeysPanel(private val context: Context, private val host: Host) {
     fun workspace() {
         if (locked) { notice("Ægentica is off in this field.", null, null); return }
         val info = host.editor() ?: return
+        // A conversation already going on the phone agent continues in the sheet, and its answer
+        // waits back in the keys; otherwise the sheet starts on the field's text, and its Replace comes back here.
+        if (KeyboardLive.work?.continues == true && KeyboardLive.sameField(info)) {
+            setMode(Mode.KEYS, animate = false)
+            host.open(Intent(context, GenieKeyboardBridge::class.java).putExtra(GenieKeyboardBridge.CONTINUE, true))
+            return
+        }
         val ask = KeyboardLive.ask?.takeIf { KeyboardLive.sameField(info) } ?: fieldAsk("") ?: return
         val ticket = KeyboardInbox.open(info, ask.field, ask.app, KeyboardLive.asked.ifBlank { null })
         setMode(Mode.KEYS, animate = false)
@@ -579,20 +586,26 @@ object KeyboardLive {
     @Volatile var listener: ((GenieState) -> Unit)? = null
     private var field: Pair<String, Int>? = null
     private var unseen = false
+    private var generation = 0
     private val main = Handler(Looper.getMainLooper())
 
     fun start(context: Context, ask: GenieAsk, shown: String, info: EditorInfo?) {
         work?.stop()
+        val token = ++generation
         this.ask = ask; asked = shown
         field = info?.let { (it.packageName.orEmpty()) to it.fieldId }
         state = GenieState(busy = true)
         unseen = false
         val run = KeyboardAgents.get(context)
+        val app = context.applicationContext
         work = run.start(context, ask) { s ->
             main.post {
+                // Updates from an earlier request (its agent may keep reporting) are ignored.
+                if (token != generation) return@post
                 state = s
                 if (!s.busy) unseen = true
                 listener?.invoke(s)
+                GenieStatus.changed(app)
             }
         }
     }
@@ -602,7 +615,7 @@ object KeyboardLive {
     fun seen() { unseen = false }
     /** The answer went into a field: nothing is waiting any more. */
     fun used() { unseen = false }
-    fun forget() { work?.stop(); work = null; ask = null; asked = ""; state = GenieState(); unseen = false; field = null }
+    fun forget() { generation++; work?.stop(); work = null; ask = null; asked = ""; state = GenieState(); unseen = false; field = null }
 }
 
 /** Typing on an input connection: letters, shift and caps lock, delete, Enter's action and the cursor. */

@@ -13,6 +13,11 @@ class GenieKeyboardBridge : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (savedInstanceState != null) return
+        if (intent.getBooleanExtra(CONTINUE, false)) {
+            @Suppress("DEPRECATION") startActivityForResult(Genie.sameTask(this, AssistantActivity.resume(this)), REQUEST)
+            @Suppress("DEPRECATION") overridePendingTransition(0, 0)
+            return
+        }
         val ticket = KeyboardInbox.ticket(intent.getStringExtra(TICKET))
         if (ticket == null) { finish(); return }
         val id = ticket.id
@@ -31,6 +36,8 @@ class GenieKeyboardBridge : Activity() {
 
     companion object {
         const val TICKET = "ticket"
+        /** Continue the keyboard's conversation with the phone agent in the sheet. */
+        const val CONTINUE = "continue"
         private const val REQUEST = 48
     }
 }
