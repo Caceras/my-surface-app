@@ -47,4 +47,12 @@
         <item name="android:textColorSecondary">@color/text_dim</item>
         <item name="android:fontFamily">sans-serif</item>
     </style>
+    <!-- Invisible: it only opens the genie sheet for the keyboard and waits for it to close. -->
+    <style name="GenieBridge" parent="@android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowNoDisplay">false</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>

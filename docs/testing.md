@@ -133,7 +133,8 @@ On the Pixel, record: engine label shown (Gemini on-device vs Android), Swedish 
 - leaving the panel cancelling generation and dropping late results;
 - the direct-open explanation;
 - the follow-up detector;
-- Gemini Live receiving the screen text and exactly one frame.
+- Gemini Live receiving the screen text and exactly one frame;
+- *Chat about this* opening aegentica.se with the screen text and a 1280 px JPEG screenshot (not offered before the screen arrives or with the screen left out), and a selection going as text alone, also after an answer.
 
 `AgentTest` covers:
 - room tickets and errors;
@@ -143,24 +144,90 @@ On the Pixel, record: engine label shown (Gemini on-device vs Android), Swedish 
 - the verbatim save;
 - the service's Stop action.
 
-`agent/tests` (CI job *LiveKit agent tests*) covers the token endpoint's access code, rate limit and ticket claims, tool forwarding and checks, settings validation and both voice modes. `ShotTest` renders `assistant-ready` and `assistant-panel` in light and dark (the floating sheet placed where Android puts it, over a stand-in app screenshot with simulated blur) and `agent-voice`.
+`agent/tests` (CI job *LiveKit agent tests*) covers the token endpoint's access code, rate limit and ticket claims, tool forwarding and checks, settings validation and both voice modes. `ShotTest` renders `assistant-ready` and `assistant-panel` in light and dark (the floating, opaque sheet placed where Android puts it, over a stand-in app screenshot) and `agent-voice`.
 
 On the Pixel:
 - choose Ægentica as digital assistant and invoke it with the corner swipe and power button, over Sheets, Gmail and a banking app (which should arrive empty);
-- check that the sheet blurs the app behind it, turns nearly opaque in battery saver, rises above the keyboard and closes on a tap outside;
+- check that the sheet is opaque in the light and dark themes, rises above the keyboard, stays above the gesture bar and closes on a tap outside;
 - with a third-party offline voice app (for example HayaiTTS), confirm the reading-voice picker lists its voices and that a long text reads without pauses between sentences;
 - with the phone language set to English (Sweden), tap the microphone in chat and in the assistant sheet: it should switch to an installed English pack and listen, without a "not ready yet" message;
 - with Google as Android's default and HayaiTTS installed, confirm Read aloud uses a HayaiTTS voice, the picker lists HayaiTTS first with voice names, and Google's voice is never used unless picked;
-- select text in Chrome: *Ægentica* opens the sheet; on editable text, *Replace selection* replaces it; *Listen* reads it;
-- turn on *Ægentica keys*, switch to it in Messages and Gmail: Fix and Translate with Nano and with the connected model (Nano may refuse when Ægentica is not the foreground app), Replace and Insert, *Reply to copied*, dictation, the keyboard icon back to Gboard, and a password field showing the panel as off;
+- select text in Chrome and Messages: *Ægentica* (in the ⋮ menu) opens the sheet over the app; on editable text, *Replace selection* replaces it; no Listen, Summarise or Proofread entries remain;
+- select a word on aegentica.se inside Ægentica: *Ægentica* is the first toolbar item (with the rabbit), Google's Translate is second and still opens; select text in the site's message box, ask Ægentica to rewrite it and tap *Replace selection*: the box shows the new text and the site reacts to it as typing;
+- Settings → *Ægentica keys* → **Turn on**, enable it, come back: the keyboard picker opens; choose it. In Messages, Gmail, Chrome and WhatsApp: type Swedish with å ä ö, shift and caps lock, long-press accents, symbols and emoji, hold delete, slide on space, Enter sending in a chat and searching in Chrome; switch to English (US) in Settings → Languages; dictation; the globe back to Gboard. Hold space and say a request: it starts when you let go. With Ægentica as the assistant, tap *Use the screen* in the panel: the keys hide and the assistant opens with the screen. Watch the ideas line finish words and offer the next one after a few messages. Tap Æ: the panel keeps the keyboard's height, the agent streams with steps, Insert and Replace work and Undo restores; type and speak to steer; close the panel mid-answer and reopen it; drag up for the full sheet and tap *Replace selection* there: the text lands in the same field. Check a banking app's password and one-time-code fields, a card number and Chrome's incognito: plain keys only, Æ faded;
+- share a link from Chrome, a screenshot from Photos and a PDF from Files to *Ask Ægentica*: Ægentica opens over the app with it; add the Ægentica tile and widget and watch them change while it works from the keyboard; long-press the icon for *Ask Ægentica*; write an NFC tag in Settings and tap it with the screen on;
+- keyboard feel on the Pixel 10 Pro XL: no dropped letters when typing fast, haptics following Settings → Sound & vibration → keyboard vibration, light and dark themes, TalkBack explore-by-touch announcing keys;
 - Nano answering about a screenshot in Swedish;
 - OpenRouter with a real key: streaming, the model picker, and a spent credit limit;
 - a local Ollama server over Tailscale;
 - Agent voice end to end on LiveKit Cloud: Swedish turn-taking, sharing another app's screen, a timer proposal, Stop from the notification.
 
+## Phone agent acceptance
+
+`PhoneAgentTest` covers:
+- the shared playbook ([playbook](playbook.md)): unique names, declared required fields, a `why` on every acting tool, and the read and act tier lists;
+- OpenRouter's stream: events split anywhere (CRLF and comments), tool calls folded by index across chunks, usage with cost, reasoning details, a call cut off mid-arguments, an error inside a 200 stream;
+- the request: the screen fenced as data that cannot close its fence, the screenshot only for a model that sees, tools offered now plus tools used earlier, `tool_choice: none` on the last turn, `data_collection: deny`, Claude's cache field;
+- the loop: an answer with its cost; reads running on their own and actions waiting for Allow, with "always for this app" remembered; a refusal reaching the model; steps that always ask never being remembered; a new instruction setting aside a pending Allow; Stop ending the run and the tools; the step limit's last turn without tools; unknown tools, hands that are off, a 402, and no connection;
+- the OpenRouter sign-in's S256 challenge (RFC 7636's example) and code exchange.
+
+`AssistantSheetTest` covers the sheet on the agent: the screen and screenshot on the first question only, the streamed answer and its label; Gemini Nano offline, when the connection drops mid-request, and without a key (with the sign-in chip); steering while it works and Stop on leaving; window insets that keep the sheet clear of the navigation bar and keyboard and a scroll area that never shrinks while an answer streams; and `withText` handing an answer back to its caller.
+
+On the Pixel:
+- sign in from the sheet's chip: Chrome opens OpenRouter, *Back to Ægentica* returns, and the next invocation answers with the agent;
+- ask about Sheets and Gmail with the screen on; check the answer uses the screenshot;
+- hold the mic, speak, let go: it sends and reads the answer aloud; talk again while it works: it changes course;
+- type a long question, send it while the keyboard is up, and watch a long answer stream: the sheet stays above the gesture bar and never shrinks;
+- turn on airplane mode: the sheet says *Offline · Gemini Nano on this phone* and answers.
+
+## Hands and floating bar acceptance
+
+`HandsTest` covers the snapshot (stable refs across snapshots and `@e` refs, roles, bounds, rows named by their words, hidden elements left out, password values masked and never found), secret fields by flags, input type and Swedish and English words, steps that always ask from a button's words or id, every refusal (missing or long `why`, bad or stale refs, points off screen, swipes off screen, link schemes, typing into a non-field or too much text, Ægentica's own controls), the password hand-over, tiers that the model's words cannot lower (a Send button, *submit*, `tel:` and `sms:`, banking and payment apps), opening apps by name, "always for this app", steps running after the rabbit's flight with the screen change reported, typing, scrolling, Back, Home, opening apps, screenshots (and protected screens), waiting, Stop refusing every step until the next question, the service going away, and touches pausing the hands only when they are not the hands' own.
+
+`RabbitMotionTest` checks the rabbit against Glimt's rules: every pose has its sprite at the size in its file, it lands beside the target with its feet on the bottom edge and never off screen, poses follow what Ægentica is doing, every phone step has an act, trips are 240 to 620 ms (none with reduced motion) and fidgets never keep a beat.
+
+`RabbitOverlayTest` covers Ægentica's windows (a stage that never takes a touch, a panel that takes the keyboard only while typing and watches touches elsewhere), the bar, bubble and expanded forms, closing without leftovers, Stop in the bar and in the bubble, take-over and Continue, the password hand-over, where the rabbit lands and its flight there and back, an Allow prompt in the bar and the notification letting the step run, the done notification, and the notification's Stop reaching the agent.
+
+On the Pixel:
+- turn on Ægentica hands, including *Allow restricted settings*;
+- swipe from a corner over Settings: Ægentica bar opens listening; ask it to turn on Wi-Fi and watch the rabbit fly to the switch before Allow;
+- hold the rabbit, drag it, fold it, unfold it; turn on *Remove animations* and check nothing moves;
+- touch the screen while it works: it pauses; Continue hands it back;
+- ask it to log in somewhere: it stops at the password field and asks you to take over;
+- ask it to send a message: the Send step always asks;
+- keep the microphone open and steer it mid-task; talk over its voice;
+- lock the phone during a task: the notification shows the step, Stop works, Allow asks to unlock;
+- measure battery over an hour with the service on and idle.
+
+## Sheet browser acceptance
+
+`WebBrowserTest` covers what may open (public `http`/`https` pages only; not `javascript:`, `file:` or `intent:`, not addresses with a password or another port, not localhost, private, link-local or carrier-NAT addresses, IPv6 local or mapped ones, `.local` or one-word names, not Ægentica's own sites, and not a name that points at the phone's network), the agent's steps there (no page yet, opening with Allow and "always on this site", reading on its own, a *Köp* button always asking, a password field never typed into, typing with submit always asking, the element outlined before a click, a gone element refused), and the sheet showing the page the agent opened, its chip and closing the pages, with the browser's instructions and tools in the request.
+
+On the Pixel:
+- ask the sheet to find opening hours on a shop's website: Allow the page, watch it open in the sheet, see the answer cite the page;
+- ask it to search the site: it asks before typing with submit;
+- on a login page, check it asks you to type the password yourself; tap the field in the page and type;
+- ask it to open your router (192.168.1.1) or aegentica.se: it says it cannot;
+- from the floating bar, ask for a page, then tap *See the page*.
+
+## Back office acceptance
+
+`BackendTest` covers pairing (the `access-token` message, only a real `aeg_pat_` token, kept only by Ægentica's own site in the app, stored sealed, never in the clear, disconnecting, Connect opening Settings → Security, and other sites not opening in the shell), the MCP client (one JSON-RPC call with the bearer token, structured results, an SSE answer, refusals, `401`), the back-office tools (offered only when connected, `why` and length limits, asking even with hands-free on, results fenced as data, drafts never sent), the agent handing a job over after Allow with the back office's instructions in its prompt, job events field by field (steps, the reply, tables appended from `start` with pictures in cells, pictures, files, cost, the browser, approvals with their price, the end with its links) and `job_get` snapshots, spoken approval only after the price was read back and only for a clear yes, following a job's stream and resuming it with `Last-Event-ID`, the live notification with a priced Approve that sends only an offered option, replies refused while an approval waits and otherwise steering the job, the job card (steps, price on the button, tables, pictures, files, the live browser, Tell the job only after an approval is answered), the live browser's events and taking over with taps as fractions, saving chats once (again only when grown, never with screens, never when turned off), and the sheet opening on a job and telling it. `RabbitOverlayTest` covers Ægentica opening when a job asks and its bar talking to the job.
+
+On the Pixel:
+- connect in Settings → Connect to Ægentica, tap *Make token* on aegentica.se, and check the toast;
+- ask Ægentica "remember that I like oat milk", then on the computer check Memory;
+- ask it to reply to a message in the Inbox: it drafts, and the draft waits in Ægentica's Inbox;
+- ask for a long job ("find twelve dog breeds for small flats with pictures, as a spreadsheet"): it asks to hand over, then the card fills in; lock the phone and watch the notification;
+- when it asks to pay for pictures, check the price on the button; answer by voice in a conversation: it reads the amount, then a yes approves;
+- tap the live picture, take over, tap and scroll, hand back;
+- tell the job something mid-way; check it changes course;
+- when it is done, open the chat and the spreadsheet from the notification;
+- close the sheet and find the phone conversation in Ægentica's chat history on the computer.
+
 ## Ægentica home acceptance
 
-`ShellTest` covers the bridge (context kept until the page says hello, speech with pause and resume, dictation, sign-in, the voice picker and menu, malformed requests and non-http links ignored, a new page load must say hello again), the localhost sign-in on a real socket (OpenRouter's redirect, the code, the reply page), the Ægentica shell (aegentica.se loads, the user agent names the shell, file access is off, only `aegentica.se` and `www.aegentica.se` stay in the app, a share is consumed once), the microphone rule (aegentica.se after Android's prompt, never the camera, never another site, never Glimt's page), Glimt's shell, and the file picker returning one file, several or none. `ReaderRepairTest` checks that a Swedish reply is read with a Swedish voice, that the reading state reaches the page, and that a pause keeps the reading open while closing the reader ends it. The site's side is tested in `Caceras/aegentica-app` (`scripts/test-phone-app.mjs` and `scripts/test-phone-app-browser.mjs`); Glimt's in `Caceras/awesomeseo-monorepo` (`apps/chatbar/tests/android.test.ts`).
+`ShellTest` covers the bridge (context kept until the page says hello, a screen with its JPEG screenshot under protocol version 1, a screenshot that is not a JPEG data URL or is too large left out, speech with pause and resume, dictation, sign-in, the voice picker and menu, malformed requests and non-http links ignored, a new page load must say hello again), the screenshot as a data URL (a Pixel-sized screen becomes a JPEG of at most 1280 px; a busy one is compressed harder and made smaller to fit, or dropped), the assistant's hand-over to aegentica.se (held in memory, never in the intent, taken once, dropped after a minute), the localhost sign-in on a real socket (OpenRouter's redirect, the code, the reply page), the Ægentica shell (aegentica.se loads, the user agent names the shell, file access is off, only `aegentica.se` and `www.aegentica.se` stay in the app, a share is consumed once), the microphone rule (aegentica.se after Android's prompt, never the camera, never another site, never Glimt's page), Glimt's shell, and the file picker returning one file, several or none. `ReaderRepairTest` checks that a Swedish reply is read with a Swedish voice, that the reading state reaches the page, and that a pause keeps the reading open while closing the reader ends it. The site's side is tested in `Caceras/aegentica-app` (`scripts/test-phone-app.mjs` and `scripts/test-phone-app-browser.mjs`); Glimt's in `Caceras/awesomeseo-monorepo` (`apps/chatbar/tests/android.test.ts`).
 
 On a Pixel:
 
@@ -182,3 +249,11 @@ On the Pixel: a 60-minute locked-screen recording (two parts, playback across th
 `LiveAndInsightsTest` drives `LiveSession` and `LiveActivity` through a fake transport and fake audio: setup content and tool declarations, no microphone before `setupComplete`, PCM chunk encoding, read-only tool answers that exclude unrelated notes and reject unknown functions, playback and barge-in flush, transcript fragments merged into lines, a saved verbatim note, resumption with the latest handle after `goAway`, stale-socket fencing, a rejected-key message, and ending plus saving when the screen pauses. Insights covers JSON parsing around prose/code fences, review labels (existing vs new), transactional apply with provenance and exact undo. `ShotTest` renders `live-conversation`, `insights-review` and `verbatim-changes`.
 
 On the Pixel: Live with a real key (connect, Swedish question about a known transcript, citation of the note title, interrupting by voice, loudspeaker echo vs headphones, a 12+ minute session crossing a connection reset, airplane-mode failure message), Insights quality with Nano and with Gemini on a Swedish transcript, and the Transcribe tile from the lock screen.
+
+## Selection and keyboard acceptance
+
+`KeyboardTest` covers typing (sentence capitals, caps lock, a whole emoji per delete, the double-space full stop), layouts by language and field (å ä ö, US, number pad), Enter following the field's action or giving a new line; plain keys in password, PIN, number, incognito and hinted card or code fields with nothing read and no Ægentica; Ægentica panel reading the field and app, streaming without touching the field, Replace and Undo, typed requests that steer, Allow cards from the agent, Insert into an empty field; and the full sheet's Replace landing only in the field it came from and never over changed text. `ShotTest` renders `keyboard-keys` and `keyboard-genie` in light and dark.
+
+`GenieDoorsTest` covers sharing a picture and a text file (both reach Ægentica's screen context, the picture scaled), the tile, shortcut and widget opening Ægentica and showing its status in words (step words only with previews on), and NFC requests: signed by this phone they start at once, changed words or foreign tags are shown and start only after *Start*, other links are ignored. `KeyboardTest` also covers the ideas line (next words and completions from the owner's own typing, nothing learned in an email field), the per-app switch and answer links that open only on a tap, and dragging up to continue the same conversation in the sheet (in the app's task, not Ægentica's) with its answer waiting back in the keys.
+
+`SelectionTest` covers the toolbar on Ægentica's own pages: Ægentica in the first (assist) slot, Android's own smart action moved after it and still running with its original item, our own selection entry not listed twice, other apps' entries kept and a lone Paste toolbar left alone; a selection in one of our fields or on the page handed to the sheet, replaced only after the sheet answers with Replace (and typed into the page as quoted data), and password fields never handed over; and the manifest's single *Ægentica* entry pointing at the sheet.

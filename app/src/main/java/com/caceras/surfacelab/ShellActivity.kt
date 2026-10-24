@@ -67,7 +67,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
     protected lateinit var web: WebView
     private lateinit var offline: View
     private val main = Handler(Looper.getMainLooper())
-    private val bridge = ShellBridge({ json -> port?.postMessage(WebMessage(json)) }, this)
+    internal val bridge = ShellBridge({ json -> port?.postMessage(WebMessage(json)) }, this)
     private var channel: Array<WebMessagePort>? = null
     private val port get() = channel?.get(0)
     private var postedForLoad = false
@@ -77,6 +77,8 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
     private var signedIn: ((String?, String?) -> Unit)? = null
     private var choosing: ValueCallback<Array<Uri>>? = null
     private var micRequest: PermissionRequest? = null
+    /** Selecting text on the page puts Ægentica first in the toolbar and opens the genie sheet in place. */
+    private val selectionGenie = SelectionGenie(this)
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(state: Bundle?) {
@@ -106,7 +108,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
             addView(label("Check your connection, then try again.", 15f, true).apply { gravity = Gravity.CENTER; padDp(0, 8, 0, 20) })
             addView(pill("Try again", primary = true) { visibility = View.GONE; web.reload() })
         }
-        val root = FrameLayout(this).apply {
+        val root = selectionGenie.root().apply {
             setBackgroundColor(canvas)
             addView(web, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             addView(offline, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -119,7 +121,8 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
             window.statusBarColor = canvas
             window.navigationBarColor = canvas
         }
-        if (state == null || web.restoreState(state) == null) web.loadUrl(site.home)
+        if (state == null || web.restoreState(state) == null) web.loadUrl(target(intent) ?: site.home)
+        intent?.removeExtra(EXTRA_URL)
         accept(intent)
     }
 
@@ -129,8 +132,17 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
         accept(intent)
     }
 
-    /** What another app handed over: a share (link or text). A return link carries nothing. */
+    /**
+     * What another app handed over: a share (link or text), or the screen the assistant saw
+     * ([handOver]). A return link carries nothing.
+     */
     private fun accept(intent: Intent?) {
+        target(intent)?.let { web.loadUrl(it); intent?.removeExtra(EXTRA_URL) }
+        if (intent?.action == ACTION_CONTEXT) {
+            take()?.let { bridge.context(it.kind, text = it.text, title = it.title, app = it.app, screenshot = it.screenshot) }
+            intent.action = Intent.ACTION_MAIN
+            return
+        }
         if (intent?.action != Intent.ACTION_SEND) return
         val text = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
         if (text.isEmpty()) return
@@ -147,6 +159,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
     override fun onResume() {
         super.onResume()
         web.onResume()
+        KeyboardSetup.resumed(this)
     }
 
     override fun onPause() {
@@ -193,6 +206,7 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
     @Deprecated("Framework callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
+        if (selectionGenie.result(requestCode, resultCode, data)) return
         if (requestCode != PICK_FILES) return
         choosing?.onReceiveValue(chosenFiles(resultCode, data))
         choosing = null
@@ -358,6 +372,16 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
 
     override fun chooseVoice() = SpeechVoices.showPicker(this) { ReadingService.refreshVoice() }
 
+    /** A page of this site to open ([EXTRA_URL]); other addresses are ignored. */
+    private fun target(intent: Intent?): String? = intent?.getStringExtra(EXTRA_URL)?.takeIf { it.length <= 2048 && site.keeps(Uri.parse(it)) }
+
+    /** Ægentica's own site, on its own address, hands this phone an access token for the back office. */
+    override fun accessToken(token: String, name: String) {
+        if (site !== AegenticaActivity.SITE || web.url?.let { site.keeps(Uri.parse(it)) } != true) return
+        val ok = Backend.pair(this, token, name)
+        android.widget.Toast.makeText(this, if (ok) "Connected to Ægentica. The phone agent can use your memory, Inbox and server jobs." else "This phone could not keep Ægentica's access. Try again.", android.widget.Toast.LENGTH_LONG).show()
+    }
+
     override fun menu() {
         val items = menuItems()
         AlertDialog.Builder(this).setTitle(ShellBridge.APP)
@@ -371,17 +395,45 @@ abstract class ShellActivity : Activity(), ShellBridge.Phone {
         "Record and transcribe" to { startActivity(TranscribeActivity.intent(this)) },
         "Talk hands-free" to { startActivity(Intent(this, VoiceActivity::class.java)) },
         "Reading voice" to { chooseVoice() },
+        "Ægentica keyboard" to { KeyboardSetup.show(this) },
         "Phone assistant, keyboard and settings" to {
             startActivity(Intent(this, MainActivity::class.java).putExtra("settings", true))
         },
     )
 
+    /** The assistant's screen (or selection) for the page: text, a title, and a JPEG data URL. */
+    class Handed(val kind: String, val text: String, val title: String?, val app: String?, val screenshot: String?)
+
     companion object {
         /** Pages read this to know they are inside the app; every capability still needs the channel. */
         const val USER_AGENT = "AegenticaShell/1"
         const val HANDSHAKE = "aegentica-shell"
+        /** Opens the shell with what [handOver] left; the intent itself carries nothing. */
+        const val ACTION_CONTEXT = "com.caceras.surfacelab.action.SHELL_CONTEXT"
+        /** A page of the site to open instead of its home; only the site's own addresses. */
+        const val EXTRA_URL = "com.caceras.surfacelab.extra.URL"
         private const val PICK_FILES = 31
         private const val MIC = 32
+        /** A hand-over the shell never picked up (the start failed) is dropped after this long. */
+        private const val HANDED_MS = 60_000L
+
+        @Volatile private var handed: Pair<Long, Handed>? = null
+
+        /**
+         * Leave [what] for the shell [intent] opens; it is held in memory only, taken once by the
+         * shell and never stored. The intent carries no data, so another app sending the same
+         * action finds nothing to hand over.
+         */
+        fun handOver(intent: Intent, what: Handed): Intent {
+            handed = android.os.SystemClock.elapsedRealtime() to what
+            return intent.setAction(ACTION_CONTEXT)
+        }
+
+        internal fun take(): Handed? {
+            val (at, what) = handed ?: return null
+            handed = null
+            return what.takeIf { android.os.SystemClock.elapsedRealtime() - at <= HANDED_MS }
+        }
 
         /** One file or several (a page's multiple file input), or none when cancelled. */
         fun chosenFiles(resultCode: Int, data: Intent?): Array<Uri>? {

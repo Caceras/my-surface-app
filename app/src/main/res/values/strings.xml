@@ -14,6 +14,16 @@
     <string name="task_polish">Polish dictation</string>
     <string name="task_listen">Listen</string>
     <string name="keyboard_name">Ægentica keys</string>
+    <string name="shortcut_genie">Ask Ægentica</string>
+    <string name="genie_tile">Ægentica</string>
+    <string name="genie_widget_description">The rabbit and what Ægentica is doing; tap to ask.</string>
+    <string name="genie_share">Ask Ægentica</string>
+    <string name="genie_ask">Ask</string>
+    <string name="keyboard_subtype_sv">Svenska</string>
+    <string name="keyboard_subtype_en">English (US)</string>
+    <!-- Ægentica hands, as Android's Accessibility settings show it. -->
+    <string name="hands_name">Ægentica hands</string>
+    <string name="hands_description">Lets your phone assistant see the screen and tap, type, scroll and open apps for you, only while it works on something you asked. A rabbit shows every move and a Stop button stays on screen; touching the screen pauses it. It never types passwords, card numbers or codes, and it asks you before anything that sends, calls, pays, buys, deletes or changes an account. What it sees goes to the AI you chose in Ægentica, only for your request. Turn it off here at any time.</string>
 
     <string name="working">Thinking on your phone\u2026</string>
     <string name="copy">Copy</string>

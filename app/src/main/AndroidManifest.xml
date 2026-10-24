@@ -17,6 +17,11 @@
     <uses-permission android:name="com.beeper.android.permission.READ_PERMISSION" />
     <uses-permission android:name="com.beeper.android.permission.SEND_PERMISSION" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!-- NFC tags that start the genie: reading them, and writing one from Settings. -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <!-- Android 16 live updates: a running agent shows its progress in the status bar. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <!--
         Package visibility, from Android 11. Without these the speech
@@ -30,6 +35,11 @@
         </intent>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <!-- Ægentica hands opens apps by name (phone_open_app). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
         </intent>
     </queries>
 
@@ -65,6 +75,13 @@
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- The phone agent's OpenRouter sign-in, finished in Chrome, links back here. It carries nothing. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="aegentica" android:host="home" />
             </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
@@ -129,6 +146,29 @@
             android:exported="true"
             android:permission="android.permission.BIND_VOICE_INTERACTION" />
         <service android:name=".AssistantRecognitionService" android:exported="false" />
+        <!--
+            Ægentica hands: opt-in in Android's Accessibility settings. Only Android can bind it
+            (BIND_ACCESSIBILITY_SERVICE); it acts only on the phone agent's validated steps.
+        -->
+        <service
+            android:name=".HandsService"
+            android:label="@string/hands_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/hands" />
+        </service>
+        <!-- Stop, Allow and a typed reply from the agent's notifications (the phone agent, and jobs on aegentica.se). -->
+        <receiver android:name=".AgentActionReceiver" android:exported="false" />
+        <!-- Ægentica's browser on aegentica.se, live and full screen, with taking over. -->
+        <activity
+            android:name=".LiveViewActivity"
+            android:exported="false"
+            android:theme="@style/Launch"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
         <!-- Real-time voice with the owner's LiveKit agent; visible notification with Stop while it runs. -->
         <service android:name=".AgentService" android:exported="false" android:foregroundServiceType="microphone" />
         <activity android:name=".AgentActivity" android:exported="false" android:launchMode="singleTop" />
@@ -211,12 +251,9 @@
         </receiver>
 
         <!--
-            The worker behind every text-selection action. It is not exported
-            and carries no intent-filter of its own: each flavour supplies its
-            own <activity-alias> entries, which is what puts one menu item per
-            task into the selection popup.
+            Ægentica keys: a full keyboard with the genie inside. Model text reaches a field only when
+            the owner taps Insert or Replace; password, card, code, number and incognito fields get plain keys.
         -->
-        <!-- Ægentica keys: an AI panel beside the owner's keyboard; it writes only when they tap Replace or Insert. -->
         <service
             android:name=".AegenticaKeyboard"
             android:label="@string/keyboard_name"
@@ -227,19 +264,83 @@
             </intent-filter>
             <meta-data android:name="android.view.im" android:resource="@xml/keyboard" />
         </service>
-        <!-- "Listen" in the selection menu reads the selection with the gap-free reader. -->
-        <activity-alias
-            android:name=".Listen"
-            android:targetActivity=".ReadingActivity"
+        <!--
+            The genie's other doors: the share sheet (text, links, pictures, PDFs, text files), the
+            launcher shortcut, the tile, the widget and NFC tags. It shows nothing itself and opens the
+            genie in a task of its own; a tag only starts at once when this phone signed it.
+        -->
+        <activity
+            android:name=".GenieEntryActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:label="@string/genie_share"
+            android:icon="@drawable/ic_surface"
+            android:theme="@style/GenieBridge">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="text/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.caceras.surfacelab.action.GENIE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="aegentica" android:host="genie" />
+            </intent-filter>
+        </activity>
+        <service
+            android:name=".GenieTileService"
             android:exported="true"
             android:icon="@drawable/ic_surface"
-            android:label="@string/task_listen">
+            android:label="@string/genie_tile"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <receiver android:name=".GenieWidgetProvider" android:exported="false" android:label="@string/genie_tile">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/genie_widget_info" />
+        </receiver>
+        <!-- Opens the genie sheet for the keyboard in a task of its own, over the app being typed in. -->
+        <activity
+            android:name=".GenieKeyboardBridge"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:noHistory="false"
+            android:theme="@style/GenieBridge" />
+        <!--
+            "Ægentica" in any app's text-selection menu: the genie sheet opens over that app with the
+            selection as context, and Replace puts an answer back in an editable field. It is the one
+            selection entry; the earlier per-task entries (Summarise, Proofread, Listen…) live inside it.
+        -->
+        <activity-alias
+            android:name=".Ask"
+            android:targetActivity=".AssistantActivity"
+            android:exported="true"
+            android:icon="@drawable/ic_surface"
+            android:label="@string/task_ask">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity-alias>
+        <!-- The core build's demo selection entry (Uppercase) runs here; it is not exported. -->
         <activity
             android:name=".ProcessTextActivity"
             android:exported="false"

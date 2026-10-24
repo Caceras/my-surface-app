@@ -51,7 +51,7 @@ class AssistantTest {
     private fun screenshot() = Bitmap.createBitmap(2400, 1080, Bitmap.Config.ARGB_8888)
 
     @Before fun setUp() { context.getSharedPreferences("connected-ai", 0).edit().clear().commit(); context.getSharedPreferences("surfacelab", 0).edit().clear().commit(); ScreenContexts.begin() }
-    @After fun tearDown() { Brains.useForTest(null); Live.transportForTest = null; Live.audioForTest = null; Live.keyForTest = null; Live.pendingScreen = null; ScreenContexts.begin(); idle() }
+    @After fun tearDown() { Brains.useForTest(null); Live.transportForTest = null; Live.audioForTest = null; Live.keyForTest = null; Live.pendingScreen = null; ShellActivity.take(); ScreenContexts.begin(); idle() }
 
     @Test fun `screen text keeps reading order, skips password fields and drops repeats`() {
         val root = Node(children = listOf(
@@ -145,11 +145,12 @@ class AssistantTest {
         val activity = Robolectric.buildActivity(AssistantActivity::class.java, launch).setup()
         val root = activity.get().window.decorView
         assertEquals("Selection", (byTag(root, "assistant-seen") as TextView).text.toString())
-        views(root).first { it is TextView && it.text.toString() == "Translate" }.performClick(); idle()
+        assertTrue("no translation chips", views(root).none { it is TextView && it.text.toString().startsWith("Translate") })
+        views(root).first { it is TextView && it.text.toString() == "Improve" }.performClick(); idle()
         assertEquals("Vi ses i morgon", brain.input)
-        assertTrue(brain.instruction.contains("translate it into English"))
+        assertTrue(brain.instruction.contains("Rewrite this so it reads clearly"))
         assertNull("a selection never sends a screenshot", brain.looked)
-        assertEquals("Translate", (byTag(root, "assistant-question") as TextView).text.toString())
+        assertEquals("Improve", (byTag(root, "assistant-question") as TextView).text.toString())
         brain.finish!!(BrainResult("**See you tomorrow**", true)); idle()
         byTag(root, "assistant-replace").performClick(); idle()
         val result = shadowOf(activity.get())
@@ -158,6 +159,49 @@ class AssistantTest {
         activity.pause().stop().destroy()
         assertEquals("closing a selection leaves the shared screen alone", "Shared screen", ScreenContexts.current.text)
         assertEquals(before, ScreenContexts.invocation)
+    }
+
+    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun `chat about this opens a new chat on aegentica-se with the screen text and a smaller screenshot`() {
+        Brains.useForTest(StubBrain(images = false))
+        val activity = Robolectric.buildActivity(AssistantActivity::class.java, AssistantActivity.intent(context)).setup()
+        val root = activity.get().window.decorView
+        assertNull("nothing to chat about before the screen arrives", views(root).firstOrNull { it.tag == "assistant-chat" })
+        ScreenContexts.text("com.google.android.apps.docs.editors.sheets", sheet); ScreenContexts.screenshot(screenshot()); idle()
+        // Left out with the context chip, the screen is not offered either.
+        byTag(root, "assistant-screen").performClick(); idle()
+        assertNull(views(root).firstOrNull { it.tag == "assistant-chat" })
+        byTag(root, "assistant-screen").performClick(); idle()
+        byTag(root, "assistant-chat").performClick(); idle()
+        val started = shadowOf(activity.get()).nextStartedActivity
+        assertEquals(AegenticaActivity::class.java.name, started.component?.className)
+        assertEquals(ShellActivity.ACTION_CONTEXT, started.action)
+        val handed = ShellActivity.take()!!
+        assertEquals("screen", handed.kind)
+        assertEquals(sheet, handed.text)
+        assertEquals("My screen in Sheets", handed.title)
+        val bytes = android.util.Base64.decode(handed.screenshot!!.removePrefix("data:image/jpeg;base64,"), android.util.Base64.DEFAULT)
+        val picture = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        assertEquals("the screenshot at most 1280 pixels wide", 1280, picture.width)
+        assertEquals(576, picture.height)
+        assertTrue("the sheet closes", activity.get().isFinishing)
+        activity.pause().stop().destroy()
+
+        // A selection goes as text alone, also after an answer, never with the screenshot.
+        val brain = StubBrain(images = true); Brains.useForTest(brain)
+        ScreenContexts.text("com.example.mail", "Shared screen"); ScreenContexts.screenshot(screenshot()); idle()
+        val launch = Intent(Intent.ACTION_PROCESS_TEXT).setClassName(context, "com.caceras.surfacelab.AssistantActivity")
+            .putExtra(Intent.EXTRA_PROCESS_TEXT, "Vi ses i morgon").putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true)
+        val selected = Robolectric.buildActivity(AssistantActivity::class.java, launch).setup()
+        val sheetRoot = selected.get().window.decorView
+        views(sheetRoot).first { it is TextView && it.text.toString() == "Explain" }.performClick(); idle()
+        brain.finish!!(BrainResult("See you tomorrow.", true)); idle()
+        byTag(sheetRoot, "assistant-continue").performClick(); idle()
+        val selection = ShellActivity.take()!!
+        assertEquals("selection", selection.kind)
+        assertEquals("Vi ses i morgon", selection.text)
+        assertNull(selection.screenshot)
+        selected.pause().stop().destroy()
     }
 
     @Test fun `a read-only selection offers no replace`() {

@@ -27,7 +27,28 @@ Clock uses the normal SET_ALARM permission. Calendar, Maps and Dialer do not req
 | Quick Settings | Opens foreground Voice after required unlock; add requests report success/decline/error |
 | Widget | Type/Talk controls; full-size preview only with opt-in; compact layout never exposes answer text |
 
-## Keyboard
+## Ægentica keys (the on-screen keyboard)
+
+Ægentica keys is a full keyboard that can be the phone's everyday keyboard. Turn it on in Settings → *Ægentica keys* (or aegentica.se's Phone menu → *Ægentica keyboard*): **Turn on** opens Android's keyboard list (Android requires the owner to switch a keyboard on once and shows its warning), and coming back offers the keyboard picker at once; **Choose keyboard** opens the picker directly.
+
+| Key or gesture | What it does |
+|---|---|
+| Letters | Svenska layout with å ä ö, or English (US) from Settings → Languages; sentence capitals where the field asks for them; two spaces after a word type a full stop |
+| Shift | Once for one capital, twice quickly for caps lock, again to turn it off |
+| Long press | Accents and the top row's digits (hint in the corner); `.` offers punctuation and, in email and web fields, `.se` and `.com` |
+| Delete | Deletes a whole character (an emoji with a skin tone too); held, it repeats |
+| Space | Slide left or right to move the cursor; hold and speak to ask Ægentica (it starts when you let go; without the microphone, holding opens the keyboard picker) |
+| Enter | The field's own action (Search, Send, Go, Next, Done) or a new line |
+| ?123, =\<, 😊 | Numbers and symbols, more symbols, emoji |
+| Æ | Ægentica panel, about what you are writing; hold it for the full sheet |
+| Bar | The rabbit (Ægentica), the ideas line, clipboard (paste with one tap), on-device dictation, the globe back to your previous keyboard |
+| Ideas line | While you type: up to three completions, the first shown as ghost text (what you typed, then the rest faded); after a space: the words you usually write next. Tap one to put it in. It learns from your own typing, on the phone only |
+
+Ægentica panel shows what the agent is doing and its results as cards. **Insert** puts the text at the cursor; **Replace** swaps it for the text Ægentica read, only while the field still holds exactly that text, with **Undo** on the bar. An action the agent wants to take arrives as an **Allow** card (the playbook decides what asks). Type (the keys type into the request line) or tap the microphone to steer it. Close the panel with the keyboard icon; the work continues and the rabbit waves when the answer is ready. When Ægentica is the phone's assistant, **Use the screen** hands over to it: the keyboard steps aside and the assistant opens on what is on screen (it gets the screen as with the gesture; the keyboard itself never captures the screen). Links and phone numbers in an answer become chips that open the app's own screen on a tap. **Off in <app>** (the last chip when the panel opens) turns Ægentica off in that app; the keys and ideas keep working, and tapping Æ there offers **Turn on**. With Ægentica hands on, the float icon folds Ægentica into its rabbit bubble over the app and the keyboard steps aside. Drag the panel up, tap the expand icon or hold Æ for the full sheet over the app: the same conversation continues there, and its answer waits back in the keys when you return. Opened before you asked anything, the sheet works on the field's text and its *Replace selection* comes back to the same field. Number, phone, date, password, card, code and incognito fields get plain keys only.
+
+Gboard's swipe typing and autocorrect are not matched: Ægentica keys types exactly what you tap, and its ideas line starts from a short everyday word list plus what you type, not a large language model.
+
+## Hardware keyboard
 
 | Shortcut | Behavior |
 |---|---|
